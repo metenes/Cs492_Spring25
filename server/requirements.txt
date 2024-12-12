@@ -1,3 +1,6 @@
 flask
 transformers
 torch
+flask-jwt-extended
+flask-cors
+flask-bcrypt

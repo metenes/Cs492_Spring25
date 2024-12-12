@@ -1,19 +1,33 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import HomeScreen from "./HomeScreen";
-import JournalScreen from "./JournalScreen";
-import ChatbotScreen from "./ChatbotScreen";
+import { NavigationContainer } from "@react-navigation/native";
+import { RootStackParamList } from "./types/types"; // Import the route types
+
+// Import your screens
+import LoginScreen from "./LoginScreen";
+import ProfileScreen from "./ProfileScreen";
+import ActivityScreen from "./ActivityScreen";
 import SettingsScreen from "./SettingsScreen";
+import HomeScreen from "./HomeScreen";
+import RegisterScreen from "./RegisterScreen";
 
-const Stack = createNativeStackNavigator();
+// Create the stack navigator
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const AppNavigation = () => (
-  <Stack.Navigator initialRouteName="Home">
-    <Stack.Screen name="Home" component={HomeScreen} />
-    <Stack.Screen name="Journal" component={JournalScreen} />
-    <Stack.Screen name="Chatbot" component={ChatbotScreen} />
-    <Stack.Screen name="Settings" component={SettingsScreen} />
-  </Stack.Navigator>
-);
+const AppNavigation = () => {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login" >
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Activity" component={ActivityScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
 
 export default AppNavigation;

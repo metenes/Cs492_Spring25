@@ -1,0 +1,3 @@
+Username: sentioanalysisco
+Password: 9o2Y9o20jmgNziQi
+mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/
