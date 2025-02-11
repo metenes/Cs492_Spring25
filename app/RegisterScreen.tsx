@@ -7,6 +7,7 @@ const RegisterScreen = () => {
   const [password, setPassword] = useState("");
 
   const handleRegister = async () => {
+    
     try {
       await registerUser(email, password);
       Alert.alert("Success", "Registration successful. You can now log in.");
