@@ -10,7 +10,7 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
 
-export const FreeJournalingScreen = () => {
+const FreeJournalingScreen = () => {
   const [content, setContent] = useState('');
   const navigation = useNavigation<NavigationProp>();
 
@@ -42,3 +42,5 @@ export const FreeJournalingScreen = () => {
     </View>
   );
 };
+
+export default FreeJournalingScreen;

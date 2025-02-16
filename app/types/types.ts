@@ -6,5 +6,7 @@ export type RootStackParamList = {
     Profile: undefined;
     Activity: undefined;
     Settings: undefined;
+    PaymentMethodHistoryScreen: undefined;
+    PaymentMethodSettingScreen: undefined;
   };
   

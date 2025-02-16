@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from ml.sentiment_model import load_model, predict_sentiment
-from transformers import pipeline
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
@@ -11,6 +11,14 @@ import datetime
 import os
 import pymongo
 import certifi
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import torch
+from flask import Flask, jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from bson import ObjectId
+from datetime import datetime, timedelta
+
 app = Flask(__name__)
 CORS(app)
 
@@ -20,7 +28,8 @@ model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your_secret_key")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(days=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
+# datetime.timedelta(days=1)
 
 # Mail Config (Hide Credentials in Environment Variables)
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -32,7 +41,6 @@ app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentiooffical@gmail.com")
 app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR71456.")
 
-
 mail = Mail(app)
 jwt = JWTManager(app)
 bcrypt = Bcrypt(app)
@@ -43,15 +51,27 @@ MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb
 try:
     client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
     db = client["mydb"]
-    print("Connected to MongoDB successfully!")
+    print("✅ Connected to MongoDB successfully!")
     users_collection = db["users"]
+    sentiments_collection = db["sentiments"]  # db sentiments 
     activities_collection = db["activities"]
+    print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
 except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
+    print(f"❌ Error connecting to MongoDB: {e}")
     exit(1)
+# ---------------------------------------
+# **Time classification 
+# ---------------------------------------
+def get_period_of_day(timestamp):
+    hour = timestamp.hour
+    if hour < 12:
+        return 'Morning'
+    elif hour < 17:
+        return 'Afternoon'
+    return 'Evening'
 
 # ---------------------------------------
-# 🛠️ **Fixing Register Endpoint**
+#  **Fixing Register Endpoint**
 # ---------------------------------------
 @app.route("/register", methods=["POST"])
 def register():
@@ -81,7 +101,7 @@ def register():
         return jsonify({"error": str(e)}), 500
 
 # ---------------------------------------
-# 🔑 **Fixing Login Endpoint**
+#  **Fixing Login Endpoint**
 # ---------------------------------------
 @app.route("/login", methods=["POST"])
 def login():
@@ -109,7 +129,7 @@ def login():
         return jsonify({"error": str(e)}), 500
 
 # ---------------------------------------
-# 👤 **Profile Route**
+#  **Profile Route**
 # ---------------------------------------
 @app.route("/profile", methods=["GET"])
 @jwt_required()
@@ -126,7 +146,7 @@ def profile():
         return jsonify({"error": str(e)}), 500
 
 # ---------------------------------------
-# 🏃 **Activity Logging**
+#  **Activity Logging**
 # ---------------------------------------
 @app.route("/activity", methods=["POST"])
 @jwt_required()
@@ -149,7 +169,7 @@ def track_activity():
         return jsonify({"error": str(e)}), 500
 
 # ---------------------------------------
-# 📧 **Forgot Password**
+#  **Forgot Password**
 # ---------------------------------------
 @app.route("/forgot-password", methods=["POST"])
 def forgot_password():
@@ -170,8 +190,12 @@ def forgot_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --------------------------------------- Sentiment Analysis  ---------------------------------------
+# Our model , we got the .pt files
+
+
 # ---------------------------------------
-# 📊 **Sentiment Analysis**
+#  **Sentiment Analysis**
 # ---------------------------------------
 @app.route("/analyze", methods=["POST"])
 def analyze_sentiment():
@@ -183,6 +207,129 @@ def analyze_sentiment():
         return jsonify(result[0])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/sentiment/<timeframe>", methods=["GET"])
+@jwt_required()
+def get_sentiment_data(timeframe):
+    try:
+        user_id = get_jwt_identity()
+
+        # Validate ObjectId
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+
+        user_id = ObjectId(user_id)
+        now = datetime.utcnow()
+
+        # Determine the time range
+        if timeframe == 'day':
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            date_group = {"$dateToString": {"format": "%H", "date": "$timestamp"}}
+        elif timeframe == 'week':
+            start_date = now - timedelta(days=7)
+            date_group = {"$dateToString": {"format": "%a", "date": "$timestamp"}}  # Groups by weekday name
+        elif timeframe == 'month':
+            start_date = now - timedelta(days=30)
+            date_group = {"$isoWeek": "$timestamp"}  # Groups by week number
+        else:
+            return jsonify({"error": "Invalid timeframe"}), 400
+
+        # MongoDB Aggregation Pipeline
+        pipeline = [
+            {"$match": {"user_id": user_id, "timestamp": {"$gte": start_date}}},
+            {"$group": {
+                "_id": date_group,
+                "avg_joy": {"$avg": "$joy"},
+                "avg_excitement": {"$avg": "$excitement"},
+                "avg_approval": {"$avg": "$approval"}
+            }},
+            {"$sort": {"_id": 1}}
+        ]
+
+        sentiments = list(sentiments_collection.aggregate(pipeline))
+
+        # Format output
+        result = [{"name": item["_id"], "Joy": round(item["avg_joy"], 1), 
+                   "Excitement": round(item["avg_excitement"], 1), 
+                   "Approval": round(item["avg_approval"], 1)} 
+                  for item in sentiments]
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/sentiment/current", methods=["GET"])
+@jwt_required()
+def get_current_mood():
+    try:
+        user_id = get_jwt_identity()
+
+        # Validate ObjectId
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+
+        user_id = ObjectId(user_id)
+
+        # Get the latest sentiment entry
+        current_sentiment = sentiments_collection.find_one(
+            {"user_id": user_id},
+            projection={"joy": 1, "excitement": 1, "approval": 1, "_id": 0},
+            sort=[("timestamp", -1)]
+        )
+
+        if not current_sentiment:
+            return jsonify({"error": "No sentiment data found"}), 404
+
+        # Calculate overall mood
+        avg_score = (current_sentiment['joy'] + 
+                    current_sentiment['excitement'] + 
+                    current_sentiment['approval']) / 3
+
+        mood = "Happiness" if avg_score >= 4 else \
+               "Content" if avg_score >= 3 else \
+               "Neutral" if avg_score >= 2 else "Low"
+
+        return jsonify({
+            "mood": mood,
+            "description": "Joy, Excitement, and Approval",
+            "scores": current_sentiment
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --------------------------------------- Chatbot Analysis  ---------------------------------------
+# We use API
+
+# ---------------------------------------
+#  **Chatbot Analysis**
+# ---------------------------------------
+# Define Request Model
+try:
+    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
+    model = AutoModelForCausalLM.from_pretrained(TOKENIZER_NAME)
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device("cpu")))
+    model.eval()
+    print("✅ Model Loaded Successfully!")
+except Exception as e:
+    print(f"❌ Model Load Error: {e}")
+
+# Define Request Model
+class ChatRequest(BaseModel):
+    user_input: str
+# Chatbot API Endpoint
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    try:
+        inputs = tokenizer.encode(request.user_input, return_tensors="pt")
+        output = model.generate(inputs, max_length=100, num_return_sequences=1)
+        response = tokenizer.decode(output[0], skip_special_tokens=True)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

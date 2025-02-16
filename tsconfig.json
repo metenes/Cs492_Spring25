@@ -21,7 +21,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./app/*"],
-      "assets/*": ["./assets/*"]
+      "assets/*": ["./assets/*"],
+      // "react": [ "./node_modules/@types/react" ], // For the react "icon" 
+      
     },
     "typeRoots": [
       "./node_modules/@types",

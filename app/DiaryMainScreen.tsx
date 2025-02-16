@@ -13,7 +13,7 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'DiaryMain'>;
 
-export const DiaryMainScreen = () => {
+const DiaryMainScreen = () => {
   const navigation = useNavigation<NavigationProp>();
 
   return (
@@ -86,3 +86,5 @@ export const DiaryMainScreen = () => {
     </SafeAreaView>
   );
 };
+
+export default DiaryMainScreen;

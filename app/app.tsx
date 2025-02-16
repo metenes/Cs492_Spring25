@@ -12,8 +12,8 @@ const App: React.FC<AppProps> = ({ hideSplashScreen }: AppProps) => {
     const prepareApp = async () => {
       try {
         // Perform any async tasks like loading resources or checking auth state
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
-        await hideSplashScreen(); // Call the hideSplashScreen function
+        await new Promise(resolve => setTimeout(resolve, 1000));  // Simulated delay
+        await hideSplashScreen();                                 // Call the hideSplashScreen function
       } catch (e) {
         console.warn("Error hiding splash screen:", e);
       }

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { StyleSheet, View, TextInput, TouchableOpacity, Text } from "react-native";
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { StackNavigationProp } from '@react-navigation/stack';;
+import { CreditCard, Calendar, Lock, Building } from 'lucide-react';
 
 type RootStackParamList = {
   AddPaymentMethod: undefined;
@@ -9,7 +10,7 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'AddPaymentMethod'>;
 
-export const AddPaymentMethodScreen = () => {
+export const PaymentMethodAddScreen = () => {
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
@@ -88,4 +89,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddPaymentMethodScreen;
+export default PaymentMethodAddScreen
