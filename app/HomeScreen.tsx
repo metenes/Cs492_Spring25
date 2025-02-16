@@ -4,6 +4,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { useNavigation } from "@react-navigation/native";
 import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList } from "./types/types"; // Import the route types
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // import BottomNavigation from './BottomNavigation';
 
@@ -70,10 +71,12 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Entries</Text>
-        <View style={styles.streakContainer}>
-          <Text style={styles.streakText}>3</Text>
-          <Icon name="droplet" size={20} color="#000" />
-        </View>
+        {/* Streak button navigates to the Calendar */}
+        <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate('DiaryMain')}>
+          <Text style={styles.streakText}>5</Text>
+          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
+          {/* <Icon name="droplet" size={20} color="#000" /> */}
+        </TouchableOpacity>
       </View>
       
       <View style={styles.tabContainer}>
