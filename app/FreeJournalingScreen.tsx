@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -13,6 +13,8 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import { Audio } from "expo-av"; // 👈 For microphone permission
 
 type RootStackParamList = {
   FreeJournaling: undefined;
@@ -25,9 +27,20 @@ const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
   const navigation = useNavigation<NavigationProp>();
 
-  // Function to pick multiple images from the gallery
+  useEffect(() => {
+    requestPermissions();
+  }, []);
+
+  // Request permissions for Media Library & Microphone
+  const requestPermissions = async () => {
+    await MediaLibrary.requestPermissionsAsync();
+    await Audio.requestPermissionsAsync();
+  };
+
+  // Pick multiple images from the gallery
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -43,7 +56,7 @@ const FreeJournalingScreen = () => {
     }
   };
 
-  // Function to remove an image after confirmation
+  // Remove an image from the selection
   const removeImage = (uri: string) => {
     setImageUris(imageUris.filter((image) => image !== uri));
     setSelectedImage(null); // Close modal after deletion
@@ -55,7 +68,7 @@ const FreeJournalingScreen = () => {
         {/* Journal Entry Section */}
         <View
           style={{
-            flex: 2, // Adjusted flex so text area stays prominent
+            flex: 2,
             backgroundColor: "#F5F5F5",
             padding: 20,
             borderRadius: 12,
@@ -76,10 +89,12 @@ const FreeJournalingScreen = () => {
               textAlignVertical: "top",
             }}
             multiline
-            placeholder="Write your thoughts..."
+            placeholder="Write your thoughts... (or tap the mic button on your keyboard) 🎤"
             placeholderTextColor="#666"
             value={content}
             onChangeText={setContent}
+            keyboardType="default"
+            returnKeyType="done"
           />
         </View>
 
