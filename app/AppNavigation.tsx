@@ -20,9 +20,9 @@ import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
 
 import ChatbotScreen from "./ChatbotScreen";
-import  DiaryMainScreen  from "./DiaryMainScreen";
+import DiaryMainScreen from "./DiaryMainScreen";
 
-import  FreeJournalingScreen  from "./FreeJournalingScreen";
+import FreeJournalingScreen from "./FreeJournalingScreen";
 import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
 import ActivityLogScreen from "./ActivityLogScreen";
@@ -37,7 +37,7 @@ import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
-/* 
+
 // Create Bottom Tab Navigator
 const Tab = createBottomTabNavigator();
 
@@ -49,7 +49,7 @@ type RootTabParamList = {
   Settings: undefined;
 };
 
-
+/* 
 // Screens that will have bottom navigation
 const BottomTabs = () => {
   return (
@@ -95,13 +95,27 @@ const AppNavigation = () => {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login" >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen} 
+          options={{ headerShown: false }} // Removes the back button from Home
+        />
+
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Activity" component={ActivityScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
-        <Stack.Screen name="DiaryMain" component={DiaryMainScreen} />
+        {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
+        {/* Fix the Header Title for DiaryMain */}
+        <Stack.Screen 
+          name="DiaryMain" 
+          component={DiaryMainScreen} 
+          options={{ headerTitle: 'Calendar', headerShown: false }} 
+        />
+        
+        
         <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
        
