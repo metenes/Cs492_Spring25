@@ -1,45 +1,43 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { ArrowLeft } from "lucide-react-native";
-
-import { StackNavigationProp } from '@react-navigation/stack'; // Binding element 'navigation' implicitly has an 'any' type. 
+import { ArrowLeft, ArrowRight } from "lucide-react-native";
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from "./types/types";
-/**
- * NAVIGATION ERROR 
- * "Binding element 'navigation' implicitly has an 'any' type",
- * happens because TypeScript doesn't know the 
- * type of the navigation prop being passed into your component.
- */
+import { useNavigation } from '@react-navigation/native';
 
 // Define the navigation prop type for the screen
 type PaymentMethodSettingScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
   'PaymentMethodSettingScreen'
 >;
-type PaymentMethodSettingScreenProp = {
+
+type PaymentMethodSettingScreenProps = {
   navigation: PaymentMethodSettingScreenNavigationProp;
 };
 
-export const PaymentMethodSettingScreen : React.FC<PaymentMethodSettingScreenProp>= ({ navigation }) => {
+export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>Payment Options</Text>
-      </View>
-
-      <TouchableOpacity style={styles.addButton}>
+      {/* Header */}
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <ArrowLeft size={24} />
+      </TouchableOpacity>
+      <Text style={styles.headerText}>Payment Options</Text>
+      
+      {/* Add Payment Button */}
+      <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("PaymentMethodAddScreen")}>
         <Text style={styles.addButtonText}>Add Payment Option</Text>
+        <ArrowRight size={20} color="white" />
       </TouchableOpacity>
 
+      {/* Subscription Details */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Your Subscription</Text>
         <Text style={styles.description}>
-          Your subscription will automatically renew on 01.01.2025. A fee of 29.99 TL will be charged.
+          Your subscription will automatically renew on 01.01.2025. A fee of 29,99 TL will be charged.
         </Text>
 
+        {/* Payment Method */}
         <Text style={styles.sectionTitle}>Method of Payment</Text>
         <View style={styles.paymentMethod}>
           <Text style={styles.paymentText}>MASTERCARD - 1234</Text>
@@ -48,9 +46,12 @@ export const PaymentMethodSettingScreen : React.FC<PaymentMethodSettingScreenPro
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.viewHistoryButton} onPress={() => navigation.navigate("PaymentMethodSettingScreen")}>
+        {/* Navigation to Payment History */}
+        <TouchableOpacity style={styles.viewHistoryButton} onPress={() => navigation.navigate("PaymentMethodHistory")}>
           <Text style={styles.viewHistoryText}>View Payment History</Text>
         </TouchableOpacity>
+        
+        {/* Cancel Subscription */}
         <TouchableOpacity style={styles.cancelButton}>
           <Text style={styles.cancelText}>Cancel Subscription</Text>
         </TouchableOpacity>
@@ -60,21 +61,20 @@ export const PaymentMethodSettingScreen : React.FC<PaymentMethodSettingScreenPro
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  backButton: { padding: 8 },
-  headerText: { flex: 1, textAlign: "center", fontSize: 20, fontWeight: "bold" },
-  addButton: { backgroundColor: "black", padding: 14, borderRadius: 10, alignItems: "center", marginBottom: 16 },
-  addButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
-  card: { backgroundColor: "white", padding: 16, borderRadius: 10, shadowOpacity: 0.1, shadowRadius: 3 },
+  container: { flex: 1, backgroundColor: "white", padding: 16, alignItems: "center" },
+  backButton: { position: "absolute", top: 16, left: 16, padding: 8 },
+  headerText: { fontSize: 22, fontWeight: "bold", textAlign: "center", marginTop: 50, marginBottom: 20 },
+  addButton: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "black", padding: 14, borderRadius: 10, width: "100%", marginBottom: 16 },
+  addButtonText: { color: "white", fontSize: 16, fontWeight: "bold", flex: 1, textAlign: "center" },
+  card: { backgroundColor: "white", padding: 16, borderRadius: 10, shadowOpacity: 0.1, shadowRadius: 3, width: "100%" },
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  description: { fontSize: 14, color: "#6B7280", marginBottom: 16 },
+  description: { fontSize: 14, color: "#6B7280", marginBottom: 16, textAlign: "left" },
   paymentMethod: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  paymentText: { fontSize: 14 },
+  paymentText: { fontSize: 14, fontWeight: "bold" },
   changeText: { fontSize: 14, color: "#3B82F6" },
-  viewHistoryButton: { backgroundColor: "black", padding: 14, borderRadius: 10, alignItems: "center", marginBottom: 8 },
+  viewHistoryButton: { backgroundColor: "black", padding: 14, borderRadius: 10, alignItems: "center", marginBottom: 8, width: "100%" },
   viewHistoryText: { color: "white", fontSize: 16, fontWeight: "bold" },
-  cancelButton: { borderWidth: 1, borderColor: "black", padding: 14, borderRadius: 10, alignItems: "center" },
+  cancelButton: { borderWidth: 1, borderColor: "black", padding: 14, borderRadius: 10, alignItems: "center", width: "100%" },
   cancelText: { fontSize: 16, fontWeight: "bold" },
 });
 

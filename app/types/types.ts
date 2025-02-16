@@ -8,5 +8,7 @@ export type RootStackParamList = {
     Settings: undefined;
     PaymentMethodHistoryScreen: undefined;
     PaymentMethodSettingScreen: undefined;
+    PaymentMethodAddScreen: undefined;
+    PaymentMethodsScreen: undefined;
   };
   

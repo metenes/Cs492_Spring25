@@ -34,7 +34,7 @@ import BottomNavigation from "./BottomNavigation";
 import { PaymentMethodsScreen } from "./PaymentMethodsScreen";
 import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
-
+import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 /* 
@@ -110,6 +110,8 @@ const AppNavigation = () => {
        
         <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
         <Stack.Screen name="PaymentMethodsScreen" component={PaymentMethodsScreen} />
+        <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
+        <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
