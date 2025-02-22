@@ -10,5 +10,6 @@ export type RootStackParamList = {
     PaymentMethodSettingScreen: undefined;
     PaymentMethodAddScreen: undefined;
     PaymentMethodsScreen: undefined;
+    Dashboard: undefined;
   };
   

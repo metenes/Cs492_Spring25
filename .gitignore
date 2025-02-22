@@ -89,3 +89,4 @@ web-build/
 
 # Yarn
 .yarn/*
+/myenv

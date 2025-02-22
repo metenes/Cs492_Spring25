@@ -1,4 +1,4 @@
-const API_URL = "http://10.0.2.2:5000"; // Android Emulator
+const API_URL = "http://192.168.1.65:5000"; 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 
 export const analyzeSentiment = async (text: string) => {
@@ -42,29 +42,52 @@ export const sendMessage = async (message: string) => {
 };
 
 export const loginUser = async (email: string, password: string) => {
-  const response = await fetch(`${API_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) {
-    throw new Error("Invalid email or password");
+  try {
+    const response = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    console.log("loginUser() response.ok: ", response.ok);
+    console.log("loginUser() response.status: ", response.status);
+    console.log("loginUser() response.headers: ", response.headers);
+
+    const responseData = await response.json(); // Await JSON parsing
+    console.log("loginUser() response data: ", responseData);
+
+    if (!response.ok) {
+      throw new Error(responseData.message || "Invalid email or password");
+    }
+
+    return responseData; 
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error; 
   }
-  return await response.json();
 };
 
+
 export const registerUser = async (email: string, password: string) => {
-  console.log("registerUser() ... ")
-  const response = await fetch(`${API_URL}/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) {
-    console.log("registerUser() failed DONE... ")
-    throw new Error("Registration failed");
+  console.log("registerUser() email: , password  ", email, password);
+  try {
+    const response = await fetch(`${API_URL}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log("registerUser() failed DONE... response: ", errorData);
+      throw new Error(`Registration failed: ${errorData.error}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("registerUser() error: ", error);
+    throw error;
   }
-  return await response.json();
 };
 
 // Fetch the user's profile information
