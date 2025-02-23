@@ -1,31 +1,23 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, Animated, Easing } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useNavigation } from "@react-navigation/native";
-import Icon from 'react-native-vector-icons/Feather';
-import { RootStackParamList } from "./types/types"; // Import the route types
+import Icon from "react-native-vector-icons/Feather";
+import { RootStackParamList } from "./types/types";
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import BottomNavigation from './BottomNavigation';
+import { ScrollView } from "react-native";
 
-/*
-BottomNavigation Error Need to be fixed ...
-
-Invariant Violation: View config getter callback for component `path`
- must be a function (received `undefined`). Make sure to 
- start component names with a capital letter.
-
-This error is located at:
-    in path
-    in svg
-    ... 
-*/
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
+import { useEffect } from "react";
 
 
 type Entry = {
   id: string;
   date: string;
-  type: 'journal' | 'checkin';
+  type: "freeform journal" | "checkin" | "guided journal";
   subtitle: string;
 };
 
@@ -34,16 +26,74 @@ type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
-  // Example, Need to get to DB for this adjust by yourself ...
+  // Animation state for the floating menu
+  const [isMenuOpen, setMenuOpen] = useState(false);
+  const menuPosition = useState(new Animated.Value(0))[0];
+  const rotation = useState(new Animated.Value(0))[0];
+
+  useFocusEffect(
+    useCallback(() => {
+      // Reset everything as soon as the screen is focused
+      setMenuOpen(false);
+      menuPosition.setValue(0);
+      rotation.setValue(0);
+    }, [])
+  );  
+
   const entries: Entry[] = [
-    { id: '1', date: 'December 18', type: 'journal', subtitle: 'Journal Entry' },
-    { id: '2', date: 'December 18', type: 'checkin', subtitle: 'Check-in' },
-    { id: '3', date: 'December 14', type: 'journal', subtitle: 'Journal Entry' },
-    { id: '4', date: 'December 2', type: 'journal', subtitle: 'Journal Entry' },
-    { id: '5', date: 'November 30', type: 'journal', subtitle: 'Journal Entry' },
-    { id: '6', date: 'November 27', type: 'checkin', subtitle: 'Check-in' },
-    { id: '7', date: 'November 25', type: 'journal', subtitle: 'Journal Entry' },
+    { id: "1", date: "December 18", type: "freeform journal", subtitle: "Freeform Journal Entry" },
+    { id: "2", date: "December 18", type: "checkin", subtitle: "Check-in" },
+    { id: "3", date: "December 14", type: "freeform journal", subtitle: "Freeform Journal Entry" },
+    { id: "4", date: "December 2", type: "guided journal", subtitle: "Guided Journal Entry" },
+    { id: "5", date: "November 30", type: "guided journal", subtitle: "Guided Journal Entry" },
+    { id: "6", date: "November 27", type: "checkin", subtitle: "Check-in" },
+    { id: "7", date: "November 25", type: "freeform journal", subtitle: "Freeform Journal Entry" },
   ];
+
+  const toggleMenu = () => {
+    if (isMenuOpen) {
+      // Close animation
+      Animated.parallel([
+        Animated.timing(menuPosition, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotation, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMenuOpen(false));
+    } else {
+      setMenuOpen(true);
+      // Open animation
+      Animated.parallel([
+        Animated.timing(menuPosition, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotation, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const menuTranslateY = menuPosition.interpolate({
+    inputRange: [0, 1],
+    outputRange: [80, 0], // Menu slides up (not down!)
+  });
+
+  const rotationInterpolate = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"], // Smooth 45° rotation (plus → cross)
+  });
 
   const renderTab = (title: string, isActive: boolean) => (
     <TouchableOpacity style={[styles.tab, isActive && styles.activeTab]}>
@@ -54,10 +104,10 @@ const HomeScreen = () => {
   const renderEntry = ({ item }: { item: Entry }) => (
     <TouchableOpacity style={styles.entryItem}>
       <View style={styles.entryIcon}>
-        {item.type === 'journal' ? (
-          <Icon name="edit-2" size={20} color="#000" />
-        ) : (
+        {item.type === "checkin" ? (
           <Icon name="smile" size={20} color="#000" />
+        ) : (
+          <Icon name="edit-2" size={20} color="#000" />
         )}
       </View>
       <View style={styles.entryContent}>
@@ -69,37 +119,87 @@ const HomeScreen = () => {
 
   return (
     <>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Your Entries</Text>
-          {/* Streak button navigates to the Calendar */}
-          <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate('DiaryMain')}>
-            <Text style={styles.streakText}>5</Text>
-            <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
-            {/* <Icon name="droplet" size={20} color="#000" /> */}
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.tabContainer}>
-          {renderTab('All Entries', true)}
-          {renderTab('Journals', false)}
-          {renderTab('Check-ins', false)}
-          {renderTab('Categories', false)}
-        </View>
-
-        <FlatList
-          data={entries}
-          renderItem={renderEntry}
-          keyExtractor={(item) => item.id}
-          style={styles.list}
-        />
-
-        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('FreeJournaling')}>
-          <Icon name="plus" size={24} color="#FFF" />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Your Entries</Text>
+        <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate("DiaryMain")}>
+          <Text style={styles.streakText}>5</Text>
+          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
         </TouchableOpacity>
-      
-      </SafeAreaView>
-      <BottomNavigation activeScreen="Home" />
+      </View>
+
+      <View>
+      <ScrollView 
+      horizontal
+      showsHorizontalScrollIndicator={false} 
+      contentContainerStyle={styles.tabContainer}
+      >
+        {renderTab("All Entries", true)}
+        {renderTab("Check-ins", false)}
+        {renderTab("Freeform Journals", false)}
+        {renderTab("Guided Journals", false)}
+      </ScrollView>
+      </View>
+
+      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item.id} style={styles.list} />
+
+      {/* Floating Action Button (FAB) + Dropdown Menu */}
+      <View style={styles.fabContainer}>
+        {/* Drop-up menu */}
+        {isMenuOpen && (
+          <Animated.View style={[styles.menu, { transform: [{ translateY: menuTranslateY }] }]}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                console.log("Check-in Selected");
+              }}
+            >
+              <Icon name="message-circle" size={20} color="black" /> {/* message-square de kullanabiliriz */}
+              <Text style={styles.menuText}>Chatbot</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                console.log("Check-in Selected");
+              }}
+            >
+              <Icon name="smile" size={20} color="black" />
+              <Text style={styles.menuText}>Check-in</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                navigation.navigate("FreeJournaling");
+              }}
+            >
+              <Icon name="edit-2" size={20} color="black" />
+              <Text style={styles.menuText}>New Journal</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                console.log("Check-in Selected");
+              }}
+            >
+              <Icon name="book-open" size={20} color="black" />
+              <Text style={styles.menuText}>Prompts</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* FAB Toggle Button */}
+        <Animated.View style={[styles.fab, { transform: [{ rotate: rotationInterpolate }] }]}>
+          <TouchableOpacity onPress={toggleMenu}>
+            <Icon name="plus" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </SafeAreaView>
+    <BottomNavigation activeScreen="Home" />
     </>
   );
 };
@@ -107,32 +207,36 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   streakText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   tabContainer: {
-    flexDirection: 'row',
+    /* flexDirection: "row",
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 8, */
+    flexDirection: "row",
+    paddingHorizontal: 10, 
+    paddingVertical: 5, 
+    alignItems: "center",
   },
   tab: {
     paddingVertical: 8,
@@ -141,20 +245,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   activeTab: {
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   tabText: {
-    color: '#666',
+    color: "#666",
   },
   activeTabText: {
-    color: '#fff',
+    color: "#fff",
   },
   list: {
     flex: 1,
   },
   entryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
@@ -162,37 +266,51 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   entryContent: {
     flex: 1,
   },
-  entryDate: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  entrySubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  fab: {
-    position: 'absolute',
+  fabContainer: {
+    position: "absolute",
     right: 16,
     bottom: 16,
+    alignItems: "center",
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menu: {
+    position: "absolute",
+    bottom: 70,
+    backgroundColor: "white",
+    borderRadius: 12,
+    paddingVertical: 10,
+    width: 160,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    right: 10
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuText: {
+    marginLeft: 10,
+    fontSize: 16,
   },
 });
 
