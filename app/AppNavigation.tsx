@@ -35,6 +35,8 @@ import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 import Dashboard from "./screens/Dashboard";
+
+import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -125,6 +127,8 @@ const AppNavigation = () => {
         <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
         <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
         <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
+
+        <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
