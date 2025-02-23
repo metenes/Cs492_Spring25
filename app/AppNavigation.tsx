@@ -35,6 +35,7 @@ import { PaymentMethodsScreen } from "./PaymentMethodsScreen";
 import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
+import Dashboard from "./screens/Dashboard";
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -115,7 +116,7 @@ const AppNavigation = () => {
           options={{ headerTitle: 'Calendar', headerShown: false }} 
         />
         
-        
+        <Stack.Screen name="Dashboard" component={Dashboard} />
         <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
        

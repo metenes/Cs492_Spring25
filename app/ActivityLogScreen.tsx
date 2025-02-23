@@ -12,7 +12,7 @@ const ActivityLogScreen = () => {
     const getActivities = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
-        const data = await fetchActivities(token);
+        const data = await fetchActivities(token || "NULL");
         setActivities(data.activities);
       } catch (error) {
         console.error("Error fetching activities:", error);

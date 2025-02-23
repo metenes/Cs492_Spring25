@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+// import * as ImagePicker from "expo-image-picker";
+// import * as MediaLibrary from "expo-media-library";
 import { Audio } from "expo-av"; // 👈 For microphone permission
 
 type RootStackParamList = {
@@ -36,12 +36,13 @@ const FreeJournalingScreen = () => {
 
   // Request permissions for Media Library & Microphone
   const requestPermissions = async () => {
-    await MediaLibrary.requestPermissionsAsync();
+    // await MediaLibrary.requestPermissionsAsync();
     await Audio.requestPermissionsAsync();
   };
 
   // Pick multiple images from the gallery
   const pickImage = async () => {
+    /*
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -49,11 +50,12 @@ const FreeJournalingScreen = () => {
       aspect: [4, 3],
       quality: 1,
     });
-
+   
+ 
     if (!result.canceled) {
       const selectedUris = result.assets.map((asset) => asset.uri);
       setImageUris([...imageUris, ...selectedUris]); // Append new images
-    }
+    } */ 
   };
 
   // Remove an image from the selection
