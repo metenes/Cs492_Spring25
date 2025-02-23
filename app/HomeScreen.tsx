@@ -94,7 +94,7 @@ const HomeScreen = () => {
           style={styles.list}
         />
 
-        <TouchableOpacity style={styles.fab}>
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('FreeJournaling')}>
           <Icon name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
       
