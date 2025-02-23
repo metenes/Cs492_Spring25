@@ -26,8 +26,8 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     try {
-      const response = await loginUser(email, password);
-  
+      //const response = await loginUser(email, password);
+      const response = { access_token: "random" }
       if (!response.access_token) {
         Alert.alert("Error", "No access token received!");
         throw new Error("No access token received");
