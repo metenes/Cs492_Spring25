@@ -21,14 +21,21 @@ const emotions = [
   "Anger", "Annoyance", "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief", "Jealousy", "Sadness", "Confusion", 
   "Curiosity", "Desire", "Neutral", "Remorse", "Surprise", "Realization"
 ];
-const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-const toggleEmotion =  (emotion: string) => {
-  setSelectedEmotions((prevSelected) =>
-    prevSelected.includes(emotion)
-      ? prevSelected.filter((e) => e !== emotion) // Remove if already selected
-      : [...prevSelected, emotion] // Add if not selected
-  );
+const [selectedEmotions, setSelectedEmotions] = useState<string[]>(["Amusement"]);
+
+const toggleEmotion = (emotion: string) => {
+  setSelectedEmotions((prevSelected) => {
+    if (prevSelected.includes(emotion)) {
+      return prevSelected.filter((e) => e !== emotion); // Remove if already selected
+    } else if (prevSelected.length < 4) {
+      return [...prevSelected, emotion]; // Add if not selected and under limit
+    } else {
+      Alert.alert("Limit Reached", "You can only select up to 4 emotions at a time.");
+      return prevSelected;
+    }
+  });
 };
+
 const [sentimentData, setSentimentData] = useState([]);
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState(null);

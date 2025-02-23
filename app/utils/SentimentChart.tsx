@@ -14,6 +14,8 @@ const fetchSentimentData = async (
   endDate: Date,
   selectedEmotions: string[]
 ): Promise<SentimentData[]> => {
+  
+
   try {
     console.log("Fetching data for:", { startDate, endDate, selectedEmotions });
 
@@ -43,35 +45,26 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions }) => 
   if (selectedEmotions.length === 0) {
     return <></>; // Ensuring a JSX return, even if no emotions are selected
   }
-
-  // Function to generate grayscale colors (from light grey to almost white)
-  const generateLighterGrayscaleColors = (total: number): string[] => {
-    const minShade = 150; // Start from a lighter grey (150 out of 255)
-    const maxShade = 240; // Stop at almost white (240 out of 255)
-
-    return Array.from({ length: total }, (_, i) => {
-      const shade = Math.floor(minShade + (i / (total - 1)) * (maxShade - minShade)); // Spread shades evenly
-      return `rgb(${shade}, ${shade}, ${shade})`;
-    });
-  };
-
-  // Generate grayscale colors for only 4 emotions
-  const grayscaleColors = generateLighterGrayscaleColors(4);
+  const pastelColors = ["#FFB6C1", "#ADD8E6", "#FFDAB9", "#98FB98"]; 
 
   // Map only the **selected emotions** to lighter grayscale colors
   const emotionColors: Record<string, string> = Object.fromEntries(
-    selectedEmotions.map((emotion, index) => [emotion, grayscaleColors[index]])
+    selectedEmotions.map((emotion, index) => [emotion, pastelColors[index]])
   );
+  
 
   const chartData = {
     labels: ["Feb 1", "Feb 2", "Feb 3"], // X-axis labels
     datasets: selectedEmotions.map((emotion) => ({
       data: Array(3).fill(0).map(() => Math.random() * 10), // Placeholder random Y-values
-      color: (opacity = 1) => emotionColors[emotion] || `rgba(200, 200, 200, ${opacity})`, // Default light grey
+      color: (opacity = 1) => emotionColors[emotion] || `rgba(200, 200, 200, ${opacity})`, // Line color
       strokeWidth: 2, // Line thickness
+      fillShadowGradient: emotionColors[emotion] || `rgba(255, 182, 193, 0.5)`, 
+      fillShadowGradientOpacity: 0.4, // Slightly more visible fill (adjustable)
     })),
     legend: selectedEmotions.length > 0 ? selectedEmotions : ["No Data"], // Display selected emotions
   };
+  
 
   return (
     <LineChart
