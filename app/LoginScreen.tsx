@@ -29,6 +29,7 @@ const LoginScreen = () => {
       const response = await loginUser(email, password);
   
       if (!response.access_token) {
+        Alert.alert("Error", "No access token received!");
         throw new Error("No access token received");
       }
   

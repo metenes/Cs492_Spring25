@@ -1,4 +1,6 @@
-const API_URL = "http://192.168.1.73:5000"; 
+
+const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+// const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 
 export const analyzeSentiment = async (text: string) => {
