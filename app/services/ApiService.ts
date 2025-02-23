@@ -1,4 +1,6 @@
-const API_URL = "http://10.0.2.2:5000"; // Android Emulator
+
+const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+// const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 
 export const analyzeSentiment = async (text: string) => {
@@ -20,7 +22,28 @@ export const analyzeSentiment = async (text: string) => {
     return { error: "Failed to analyze sentiment." };
   }
 };
-
+// for dashboard
+export const fetchSentimentAnalysis = async (token: string, startDate: string, endDate: string, interval: string = "monthly", emotions: string[] = []) => {
+  try {
+    const emotionsQuery = emotions.length > 0 ? `&emotions=${emotions.join(",")}` : "";
+    const response = await fetch(`${API_URL}/api/sentiment-analysis?start_date=${startDate}&end_date=${endDate}&interval=${interval}${emotionsQuery}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching sentiment analysis:", error);
+    return { error: "Failed to fetch sentiment analysis." };
+  }
+};
 export const sendMessage = async (message: string) => {
   try {
     const response = await fetch(`${API_URL}/chat`, {
@@ -42,29 +65,52 @@ export const sendMessage = async (message: string) => {
 };
 
 export const loginUser = async (email: string, password: string) => {
-  const response = await fetch(`${API_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) {
-    throw new Error("Invalid email or password");
+  try {
+    const response = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    console.log("loginUser() response.ok: ", response.ok);
+    console.log("loginUser() response.status: ", response.status);
+    console.log("loginUser() response.headers: ", response.headers);
+
+    const responseData = await response.json(); // Await JSON parsing
+    console.log("loginUser() response data: ", responseData);
+
+    if (!response.ok) {
+      throw new Error(responseData.message || "Invalid email or password");
+    }
+
+    return responseData; 
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error; 
   }
-  return await response.json();
 };
 
+
 export const registerUser = async (email: string, password: string) => {
-  console.log("registerUser() ... ")
-  const response = await fetch(`${API_URL}/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) {
-    console.log("registerUser() failed DONE... ")
-    throw new Error("Registration failed");
+  console.log("registerUser() email: , password  ", email, password);
+  try {
+    const response = await fetch(`${API_URL}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log("registerUser() failed DONE... response: ", errorData);
+      throw new Error(`Registration failed: ${errorData.error}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("registerUser() error: ", error);
+    throw error;
   }
-  return await response.json();
 };
 
 // Fetch the user's profile information

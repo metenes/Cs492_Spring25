@@ -7,7 +7,6 @@ from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
 from flask_mail import Mail, Message
 from bson.objectid import ObjectId
-import datetime
 import os
 import pymongo
 import certifi
@@ -22,12 +21,13 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 CORS(app)
 
+SECRET_KEY = "sentioSecretKey"
 # Load ML Model
 model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your_secret_key")
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 # datetime.timedelta(days=1)
 
@@ -48,6 +48,7 @@ bcrypt = Bcrypt(app)
 # MongoDB Connection (Using `retryWrites=true&w=majority` for SSL fix)
 # MONGO_URI = "mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/mydb?retryWrites=true&w=majority&tls=true&tlsCAFile=<path_to_ca_file>"
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
+
 try:
     client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
     db = client["mydb"]
@@ -59,8 +60,9 @@ try:
 except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
     exit(1)
+
 # ---------------------------------------
-# **Time classification 
+#  Time classification 
 # ---------------------------------------
 def get_period_of_day(timestamp):
     hour = timestamp.hour
@@ -71,6 +73,18 @@ def get_period_of_day(timestamp):
     return 'Evening'
 
 # ---------------------------------------
+# Function to create a JWT token
+# ---------------------------------------
+
+#def create_access_token(user_id):
+#    payload = {
+#        'user_id': user_id,
+#        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time (1 hour)
+#    }
+#    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+#    return token
+
+# ---------------------------------------
 #  **Fixing Register Endpoint**
 # ---------------------------------------
 @app.route("/register", methods=["POST"])
@@ -79,8 +93,9 @@ def register():
         data = request.json
         email = data.get("email")
         password = data.get("password")
-
+        print("here")
         if not email or not password:
+            print("Email and password are required")
             return jsonify({"error": "Email and password are required"}), 400
 
         # Check if the user already exists
@@ -88,11 +103,12 @@ def register():
             return jsonify({"error": "User already exists"}), 400
 
         # Hash password before saving
+        registration_time = datetime.now()
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = {
             "email": email,
             "password": hashed_password,
-            "created_at": datetime.datetime.utcnow(),
+            "created_at": registration_time,
         }
         users_collection.insert_one(new_user)
         print("register ended ... ")
@@ -123,10 +139,33 @@ def login():
             return jsonify({"error": "Invalid credentials"}), 401
 
         # Generate JWT token
-        access_token = create_access_token(identity=str(user["_id"]))
+        access_token = create_access_token(identity=str(user["_id"]))  # You can pass user ID as string
+
         return jsonify({"access_token": access_token}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------
+#  **Protected Route**
+# ---------------------------------------
+@app.route("/protected", methods=["GET"])
+@jwt_required()
+def protected():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({"error": "Token is missing"}), 401
+    
+    try:
+        # Decode the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['user_id']
+        return jsonify({"message": f"Welcome user {user_id}!"}), 200
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token has expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+
 
 # ---------------------------------------
 #  **Profile Route**
@@ -190,9 +229,76 @@ def forgot_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --------------------------------------- Sentiment Analysis  ---------------------------------------
-# Our model , we got the .pt files
-
+@app.route("/api/sentiment-analysis", methods=["GET"])
+@jwt_required()
+def sentiment_analysis():
+    try:
+        user_id = get_jwt_identity()
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+        
+        user_id = ObjectId(user_id)
+        start_date_str = request.args.get("start_date")
+        end_date_str = request.args.get("end_date")
+        interval = request.args.get("interval", "monthly")
+        emotions = request.args.get("emotions") #if no emotions are provided, all emotions will be considered
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({"error": "start_date and end_date are required"}), 400
+        
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        
+        if interval not in ["daily", "weekly", "monthly"]:
+            return jsonify({"error": "Invalid interval. Use 'daily', 'weekly', or 'monthly'"}), 400
+        
+        emotion_filter = emotions.split(",") if emotions else None
+        
+        # Define grouping key for MongoDB aggregation
+        if interval == "daily":
+            date_group = {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}}
+        elif interval == "weekly":
+            date_group = {"$isoWeekYear": "$timestamp", "$isoWeek": "$timestamp"}
+        else:  # monthly
+            date_group = {"$dateToString": {"format": "%Y-%m", "date": "$timestamp"}}
+        
+        pipeline = [
+            {"$match": {"user_id": user_id, "timestamp": {"$gte": start_date, "$lte": end_date}}},
+            {"$unwind": "$emotions"},
+        ]
+        
+        if emotion_filter:
+            pipeline.append({"$match": {"emotions.emotion_name": {"$in": emotion_filter}}})
+        
+        pipeline.extend([
+            {"$group": {
+                "_id": {"time_period": date_group, "emotion_name": "$emotions.emotion_name"},
+                "total_percentage": {"$sum": "$emotions.percentage"},
+                "entry_count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.time_period": 1}}
+        ])
+        
+        sentiment_data = list(sentiments_collection.aggregate(pipeline))
+        
+        response = {
+            "start_date": start_date_str,
+            "end_date": end_date_str,
+            "interval": interval,
+            "emotion_analysis": [
+                {
+                    "time_period": item["_id"]["time_period"],
+                    "emotion_name": item["_id"]["emotion_name"],
+                    "total_percentage": round(item["total_percentage"], 1),
+                    "entry_count": item["entry_count"]
+                }
+                for item in sentiment_data
+            ]
+        }
+        
+        return jsonify(response), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -308,9 +414,10 @@ def get_current_mood():
 # ---------------------------------------
 # Define Request Model
 try:
+    TOKENIZER_NAME = "bert-base-uncased"  # Define the variable before usage
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
     model = AutoModelForCausalLM.from_pretrained(TOKENIZER_NAME)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device("cpu")))
+    # model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device("cpu")))
     model.eval()
     print("✅ Model Loaded Successfully!")
 except Exception as e:
@@ -329,6 +436,34 @@ async def chat(request: ChatRequest):
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
+
+
+# --------------------------------------- Model Analysis  ---------------------------------------
+# We use API
+
+# ---------------------------------------
+#  **Sentimental Analysis Model**
+# ---------------------------------------
+# Define Request Model
+import torch
+import boto3
+
+s3 = boto3.client('s3')
+s3.download_file('sentiobucket', 'model.pt', '/tmp/model.pt')
+model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
+
+# Look db_info.txt for aws credentials
+# s3 = boto3.client(
+#   's3',
+#    aws_access_key_id="YOUR_ACCESS_KEY",
+#    aws_secret_access_key="YOUR_SECRET_KEY",
+#    region_name="YOUR_REGION"
+# )
+
+# Add to upper part if necessary
+# aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+# aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+# aws_region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")  # Change this to your AWS region
 
 
 if __name__ == "__main__":

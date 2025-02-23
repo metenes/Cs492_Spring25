@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet } from "react-native";
 import { fetchActivities } from "./services/ApiService";
 import { useAuth } from "./auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import BottomNavigation from './BottomNavigation';
 
 const ActivityLogScreen = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const ActivityLogScreen = () => {
     const getActivities = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
-        const data = await fetchActivities(token);
+        const data = await fetchActivities(token || "NULL");
         setActivities(data.activities);
       } catch (error) {
         console.error("Error fetching activities:", error);
@@ -29,14 +30,17 @@ const ActivityLogScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Activity Log</Text>
-      <FlatList
-        data={activities}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => index.toString()}
-      />
-    </View>
+    <>
+      <View style={styles.container}>
+        <Text style={styles.title}>Activity Log</Text>
+        <FlatList
+          data={activities}
+          renderItem={renderItem}
+          keyExtractor={(item, index) => index.toString()}
+        />
+      </View>
+      <BottomNavigation activeScreen="ActivityLog" />
+    </>
   );
 };
 

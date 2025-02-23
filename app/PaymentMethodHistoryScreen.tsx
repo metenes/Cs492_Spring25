@@ -1,15 +1,9 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { ArrowLeft, CreditCard } from "lucide-react-native";
-
-import { StackNavigationProp } from '@react-navigation/stack'; // Binding element 'navigation' implicitly has an 'any' type. 
+import { ArrowLeft } from "lucide-react-native";
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from "./types/types";
-/**
- * NAVIGATION ERROR 
- * "Binding element 'navigation' implicitly has an 'any' type",
- * happens because TypeScript doesn't know the 
- * type of the navigation prop being passed into your component.
- */
+import BottomNavigation from "./BottomNavigation";
 
 // Define the navigation prop type for the screen
 type PaymentMethodHistoryScreenNavigationProp = StackNavigationProp<
@@ -20,64 +14,56 @@ type PaymentMethodHistoryScreenProps = {
   navigation: PaymentMethodHistoryScreenNavigationProp;
 };
 
-const PaymentMethodHistoryScreen : React.FC<PaymentMethodHistoryScreenProps>= ({ navigation }) => {
+const PaymentMethodHistoryScreen: React.FC<PaymentMethodHistoryScreenProps> = ({ navigation }) => {
   const payments = [
-    { amount: 29.99, status: "Paid", date: "01.12.2024", type: "Subscription fee" },
-    { amount: 29.99, status: "Paid", date: "01.11.2024", type: "Subscription fee" },
-    { amount: 29.99, status: "Paid", date: "01.10.2024", type: "Subscription fee" },
+    { amount: "₺29,99", status: "Paid", date: "01.12.2024", type: "Subscription fee" },
+    { amount: "₺29,99", status: "Paid", date: "01.11.2024", type: "Subscription fee" },
+    { amount: "₺29,99", status: "Paid", date: "01.10.2024", type: "Subscription fee" },
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+    <>
+      <View style={styles.container}>
+        {/* Header */}
+        <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
           <ArrowLeft size={24} />
         </TouchableOpacity>
         <Text style={styles.headerText}>Payment History</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {payments.map((payment, index) => (
-          <View key={index} style={styles.paymentCard}>
-            <View>
-              <Text style={styles.amount}>${payment.amount}</Text>
-              <View style={styles.statusContainer}>
-                <Text style={styles.statusDot}>●</Text>
-                <Text style={styles.status}>{payment.status}</Text>
-              </View>
+        
+        <ScrollView contentContainerStyle={styles.content}>
+          {payments.map((payment, index) => (
+            <View key={index} style={styles.paymentCard}>
+              <Text style={styles.amount}>{payment.amount}</Text>
+              <Text style={styles.status}><Text style={styles.greenDot}>●</Text> {payment.status}</Text>
               <Text style={styles.type}>{payment.type}</Text>
+              <Text style={styles.feeDate}>Fee date</Text>
+              <Text style={styles.date}>{payment.date}</Text>
             </View>
-            <Text style={styles.date}>{payment.date}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+          ))}
+        </ScrollView>
+      </View>
+      <BottomNavigation activeScreen="PaymentMethodHistoryScreen" />
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 16 },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  backButton: { padding: 8 },
-  headerText: { flex: 1, textAlign: "center", fontSize: 20, fontWeight: "bold" },
+  container: { flex: 1, backgroundColor: "white", padding: 16, paddingTop: 8 },
+  backButton: { position: "absolute", top: 16, left: 16, padding: 8 },
+  headerText: { fontSize: 22, fontWeight: "bold", textAlign: "center", marginTop: 40, marginBottom: 16 },
   content: { paddingBottom: 20 },
   paymentCard: {
     backgroundColor: "white",
     padding: 16,
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
   amount: { fontSize: 18, fontWeight: "bold" },
-  statusContainer: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  statusDot: { color: "green", fontSize: 14, marginRight: 4 },
-  status: { fontSize: 14, color: "green" },
-  type: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-  date: { fontSize: 14, color: "#6B7280" },
+  status: { fontSize: 14, fontWeight: "bold", color: "#000", marginTop: 4 },
+  greenDot: { color: "green" },
+  type: { fontSize: 14, fontStyle: "italic", color: "#6B7280", marginTop: 2 },
+  feeDate: { fontSize: 12, color: "#6B7280", marginTop: 8 },
+  date: { fontSize: 14, color: "#000" },
 });
 
 export default PaymentMethodHistoryScreen;
