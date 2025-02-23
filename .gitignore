@@ -90,5 +90,3 @@ web-build/
 # Yarn
 .yarn/*
 /myenv
-yarn.lock
-package-lock.json

@@ -1,8 +1,10 @@
-const API_URL = "http://192.168.0.22:5000"; 
-// const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP. 
+
+const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+// const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
+// const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 
 export const analyzeSentiment = async (text: string) => {
-  /*try {
+  try {
     const response = await fetch(`${API_URL}/analyze`, {
       method: "POST",
       headers: {
@@ -18,12 +20,11 @@ export const analyzeSentiment = async (text: string) => {
   } catch (error) {
     console.error("Error analyzing sentiment:", error);
     return { error: "Failed to analyze sentiment." };
-  }*/
-  return "analyzeSentiment() not implemented";
+  }
 };
 
 export const sendMessage = async (message: string) => {
-  /*try {
+  try {
     const response = await fetch(`${API_URL}/chat`, {
       method: "POST",
       headers: {
@@ -39,12 +40,11 @@ export const sendMessage = async (message: string) => {
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
-  }*/
-  return "sendMessage() not implemented";
+  }
 };
 
 export const loginUser = async (email: string, password: string) => {
-  /*try {
+  try {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -66,13 +66,12 @@ export const loginUser = async (email: string, password: string) => {
   } catch (error) {
     console.error("Login error:", error);
     throw error; 
-  }*/
-  return "loginUser() not implemented";
+  }
 };
 
 
 export const registerUser = async (email: string, password: string) => {
-  /*console.log("registerUser() email: , password  ", email, password);
+  console.log("registerUser() email: , password  ", email, password);
   try {
     const response = await fetch(`${API_URL}/register`, {
       method: "POST",
@@ -90,13 +89,12 @@ export const registerUser = async (email: string, password: string) => {
   } catch (error) {
     console.error("registerUser() error: ", error);
     throw error;
-  }*/
-  return "registerUser() not implemented";
+  }
 };
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
-  /*const response = await fetch(`${API_URL}/profile`, {
+  const response = await fetch(`${API_URL}/profile`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`, 
@@ -107,13 +105,12 @@ export const fetchProfile = async (token: string) => {
     throw new Error(`Failed to fetch profile: ${response.statusText}`);
   }
 
-  return await response.json();*/
-  return "fetchProfile() not implemented";
+  return await response.json();  
 };
 
 // Update the user's password
 export const updatePassword = async (token: string, newPassword: string) => {
-  /*const response = await fetch(`${API_URL}/update-password`, {
+  const response = await fetch(`${API_URL}/update-password`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`, // Include the JWT token in the Authorization header
@@ -126,12 +123,11 @@ export const updatePassword = async (token: string, newPassword: string) => {
     throw new Error(`Failed to update password: ${response.statusText}`);
   }
 
-  return await response.json(); // Return success message*/
-  return "updatePassword() not implemented";
+  return await response.json(); // Return success message
 };
 
 export const logActivity = async (token: string, activity: string) => {
-  /*const response = await fetch(`${API_URL}/activity`, {
+  const response = await fetch(`${API_URL}/activity`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -139,21 +135,19 @@ export const logActivity = async (token: string, activity: string) => {
     },
     body: JSON.stringify({ activity }),
   });
-  return response.json();*/
-  return "logActivity() not implemented";
+  return response.json();
 };
 
 export const fetchActivities = async (token: string) => {
-  /*const response = await fetch(`${API_URL}/activity`, {
+  const response = await fetch(`${API_URL}/activity`, {
     method: "GET",
     headers: { "Authorization": `Bearer ${token}` },
   });
-  return response.json();*/
-  return "fetchActivities() not implemented";
+  return response.json();
 };
 
 export const resetPassword = async (email: string) => {
-  /*const response = await fetch(`${API_URL}/forgot-password`, {
+  const response = await fetch(`${API_URL}/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -165,6 +159,5 @@ export const resetPassword = async (email: string) => {
     throw new Error(`Failed to send reset link: ${response.statusText}`);
   }
 
-  return await response.json(); // Return success message*/
-  return "resetPassword() not implemented";
+  return await response.json(); // Return success message
 };
