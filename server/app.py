@@ -7,7 +7,6 @@ from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
 from flask_mail import Mail, Message
 from bson.objectid import ObjectId
-import datetime
 import os
 import pymongo
 import certifi
@@ -104,11 +103,12 @@ def register():
             return jsonify({"error": "User already exists"}), 400
 
         # Hash password before saving
+        registration_time = datetime.now()
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = {
             "email": email,
             "password": hashed_password,
-            "created_at": datetime.datetime.utcnow(),
+            "created_at": registration_time,
         }
         users_collection.insert_one(new_user)
         print("register ended ... ")
