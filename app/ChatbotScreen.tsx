@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, Button, FlatList, Text, StyleSheet } from "react-native";
 import { sendMessage } from "./services/ApiService";
+import BottomNavigation from './BottomNavigation';
 
 // Define the type for each message
 interface Message {
@@ -30,20 +31,23 @@ const ChatbotScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(_, index) => index.toString()}
-      />
-      <TextInput
-        style={styles.input}
-        value={input}
-        onChangeText={setInput}
-        placeholder="Type your message..."
-      />
-      <Button title="Send" onPress={handleSend} />
-    </View>
+    <>
+      <View style={styles.container}>
+        <FlatList
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(_, index) => index.toString()}
+        />
+        <TextInput
+          style={styles.input}
+          value={input}
+          onChangeText={setInput}
+          placeholder="Type your message..."
+        />
+        <Button title="Send" onPress={handleSend} />
+      </View>
+      <BottomNavigation activeScreen="Chatbot" />
+    </>
   );
 };
 
