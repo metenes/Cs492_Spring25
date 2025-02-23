@@ -1,4 +1,4 @@
-const API_URL = "http://192.168.1.65:5000"; 
+const API_URL = "http://192.168.1.73:5000"; 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 
 export const analyzeSentiment = async (text: string) => {
