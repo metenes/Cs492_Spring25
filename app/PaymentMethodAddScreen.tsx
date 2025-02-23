@@ -3,6 +3,7 @@ import { StyleSheet, View, TextInput, TouchableOpacity, Text } from "react-nativ
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArrowLeft } from "lucide-react-native";
+import BottomNavigation from "./BottomNavigation";
 
 // Define navigation types
 type RootStackParamList = {
@@ -21,71 +22,74 @@ export const PaymentMethodAddScreen = () => {
   const navigation = useNavigation<NavigationProp>();
 
   return (
-    <View style={styles.container}>
-      {/* Header with Back Button */}
-      <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
-        <ArrowLeft size={24} />
-      </TouchableOpacity>
-      <Text style={styles.headerText}>Add Payment</Text>
+    <>
+      <View style={styles.container}>
+        {/* Header with Back Button */}
+        <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
+          <ArrowLeft size={24} />
+        </TouchableOpacity>
+        <Text style={styles.headerText}>Add Payment</Text>
 
-      {/* Cardholder Name */}
-      <Text style={styles.label}>Name on Card</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Name on card"
-        value={cardholderName}
-        onChangeText={setCardholderName}
-      />
+        {/* Cardholder Name */}
+        <Text style={styles.label}>Name on Card</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Name on card"
+          value={cardholderName}
+          onChangeText={setCardholderName}
+        />
 
-      {/* Card Number */}
-      <Text style={styles.label}>Card Number</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Card Number"
-        value={cardNumber}
-        onChangeText={setCardNumber}
-        keyboardType="number-pad"
-      />
+        {/* Card Number */}
+        <Text style={styles.label}>Card Number</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Card Number"
+          value={cardNumber}
+          onChangeText={setCardNumber}
+          keyboardType="number-pad"
+        />
 
-      {/* Expiry Date & CVV */}
-      <View style={styles.row}>
-        <View style={styles.flex1}>
-          <Text style={styles.label}>Expiry Date</Text>
-          <TextInput
-            style={[styles.input, styles.marginRight]}
-            placeholder="MM / YY"
-            value={expiry}
-            onChangeText={setExpiry}
-          />
+        {/* Expiry Date & CVV */}
+        <View style={styles.row}>
+          <View style={styles.flex1}>
+            <Text style={styles.label}>Expiry Date</Text>
+            <TextInput
+              style={[styles.input, styles.marginRight]}
+              placeholder="MM / YY"
+              value={expiry}
+              onChangeText={setExpiry}
+            />
+          </View>
+          <View>
+            <Text style={styles.label}>CVV</Text>
+            <TextInput
+              style={[styles.input, styles.cvvInput]}
+              placeholder="***"
+              value={cvv}
+              onChangeText={setCvv}
+              keyboardType="number-pad"
+              secureTextEntry
+            />
+          </View>
         </View>
-        <View>
-          <Text style={styles.label}>CVV</Text>
-          <TextInput
-            style={[styles.input, styles.cvvInput]}
-            placeholder="***"
-            value={cvv}
-            onChangeText={setCvv}
-            keyboardType="number-pad"
-            secureTextEntry
-          />
-        </View>
+
+        {/* Billing Address */}
+        <Text style={styles.label}>Billing Address</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Billing Address"
+          value={billingAddress}
+          onChangeText={setBillingAddress}
+          multiline
+        />
+
+        {/* Save Button */}
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("PaymentMethodSettingScreen")}>
+          <Text style={styles.buttonText}>Save</Text>
+        </TouchableOpacity>
       </View>
-
-      {/* Billing Address */}
-      <Text style={styles.label}>Billing Address</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Billing Address"
-        value={billingAddress}
-        onChangeText={setBillingAddress}
-        multiline
-      />
-
-      {/* Save Button */}
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("PaymentMethodSettingScreen")}>
-        <Text style={styles.buttonText}>Save</Text>
-      </TouchableOpacity>
-    </View>
+      <BottomNavigation activeScreen="PaymentMethodAddScreen" />
+    </>
   );
 };
 

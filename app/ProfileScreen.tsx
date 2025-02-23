@@ -3,6 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
 import { useAuth } from "./auth/AuthContext";
 import { fetchProfile, updatePassword } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import BottomNavigation from "./BottomNavigation";
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
@@ -47,24 +48,27 @@ const ProfileScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.label}>Email: {email}</Text>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="New Password"
-        value={newPassword}
-        secureTextEntry
-        onChangeText={setNewPassword}
-      />
-      <Button
-        title={loading ? "Updating..." : "Update Password"}
-        onPress={handleUpdatePassword}
-        disabled={loading}
-      />
-      <Button title="Logout" onPress={handleLogout} color="red" />
-    </View>
+    <>
+      <View style={styles.container}>
+        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.label}>Email: {email}</Text>
+        
+        <TextInput
+          style={styles.input}
+          placeholder="New Password"
+          value={newPassword}
+          secureTextEntry
+          onChangeText={setNewPassword}
+        />
+        <Button
+          title={loading ? "Updating..." : "Update Password"}
+          onPress={handleUpdatePassword}
+          disabled={loading}
+        />
+        <Button title="Logout" onPress={handleLogout} color="red" />
+      </View>
+      <BottomNavigation activeScreen="Profile" />
+    </>
   );
 };
 

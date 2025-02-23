@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import SentimentCard from "./components/SentimentCard";
 import { analyzeSentiment } from "./services/ApiService";
+import BottomNavigation from "./BottomNavigation";
 
 const JournalScreen = () => {
   const [entry, setEntry] = useState("");
@@ -13,18 +14,21 @@ const JournalScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Journal Your Day</Text>
-      <TextInput
-        style={styles.input}
-        multiline
-        placeholder="Write your thoughts..."
-        value={entry}
-        onChangeText={setEntry}
-      />
-      <Button title="Analyze Sentiment" onPress={handleAnalyze} />
-      {sentiment && <SentimentCard sentiment={sentiment} />}
-    </View>
+    <>
+      <View style={styles.container}>
+        <Text style={styles.title}>Journal Your Day</Text>
+        <TextInput
+          style={styles.input}
+          multiline
+          placeholder="Write your thoughts..."
+          value={entry}
+          onChangeText={setEntry}
+        />
+        <Button title="Analyze Sentiment" onPress={handleAnalyze} />
+        {sentiment && <SentimentCard sentiment={sentiment} />}
+      </View>
+      <BottomNavigation activeScreen="Journal" />
+    </>
   );
 };
 

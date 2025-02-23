@@ -13,6 +13,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
+import BottomNavigation from "@/BottomNavigation";
 
 const SentimentAnalysisPage: React.FC = () => {
 const emotions = [
@@ -35,7 +36,7 @@ const [items, setItems] = useState([
   { label: "Week", value: "Week" },
   { label: "Month", value: "Month" },
   { label: "Year", value: "Year" },
-]);
+  ]);
   const [sentimentEntries, setSentimentEntries] = useState([
     { date: "Today", emotion: "Happiness", details: "Excitement, Joy, and more" },
     { date: "Yesterday", emotion: "Joy", details: "Gratitude, Love" },
@@ -102,79 +103,78 @@ const [items, setItems] = useState([
     setShowEndPicker(false); // Close modal after selection
   };
   
-  
-
   return (
-    
+    <>
     <View style={styles.container}>
       
       <View style={styles.dateRangeContainer}>
-      <DateTimePicker 
-                  value={selectedStartDate} 
-                  mode="date" 
-                  display="default" 
-                  onChange={handleStartDateChange} 
-      />
-     <DateTimePicker 
-        value={selectedEndDate} 
-        mode="date" 
-        display="default" 
-        onChange={handleEndDateChange} 
-     />
+        <DateTimePicker 
+                      value={selectedStartDate} 
+                      mode="date" 
+                      display="default" 
+                      onChange={handleStartDateChange} 
+          />
+        <DateTimePicker 
+            value={selectedEndDate} 
+            mode="date" 
+            display="default" 
+            onChange={handleEndDateChange} 
+        />
       </View>
-      <View>
-      <ScrollView 
-  horizontal 
-  showsHorizontalScrollIndicator={false} 
-  style={styles.entriesScroll}
-  contentContainerStyle={{ flexGrow: 0 }} // Prevents it from expanding too much
->
 
-          {sentimentEntries.map((entry, index) => (
-            <Pressable key={index} style={styles.entryCard}>
-              <Text style={styles.entryDate}>{entry.date}</Text>
-              <Text style={styles.entryEmotion}>{entry.emotion}</Text>
-              <Text style={styles.entryDetails}>{entry.details}</Text>
-            </Pressable>
-          ))}
+      <View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.entriesScroll}
+          contentContainerStyle={{ flexGrow: 0 }} // Prevents it from expanding too much
+        >
+
+            {sentimentEntries.map((entry, index) => (
+              <Pressable key={index} style={styles.entryCard}>
+                <Text style={styles.entryDate}>{entry.date}</Text>
+                <Text style={styles.entryEmotion}>{entry.emotion}</Text>
+                <Text style={styles.entryDetails}>{entry.details}</Text>
+              </Pressable>
+            ))}
         </ScrollView>
       </View>
-  <DropDownPicker
-    open={open}
-    value={selectedTimeRange}
-    items={items}
-    setOpen={setOpen}
-    setValue={setSelectedTimeRange}
-    setItems={setItems}
-    style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "ccc", width: Dimensions.get('window').width / 3 }}
-  />
-  <View style={styles.container2}>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
-  {emotions.map((emotion, index) => {
-  const isSelected = selectedEmotions.includes(emotion);
-  return (
-    <Pressable
-      key={index}
-      style={[
-        styles.chip,
-        isSelected ? styles.chipSelected : styles.chipUnselected,
-      ]}
-      onPress={() => toggleEmotion(emotion)}
-    >
-      <Text style={[styles.chipText, !isSelected && styles.chipTextUnselected]}>
-        {emotion}
-      </Text>
-    </Pressable>
-  );
-})}
-      </ScrollView>
+      <DropDownPicker
+        open={open}
+        value={selectedTimeRange}
+        items={items}
+        setOpen={setOpen}
+        setValue={setSelectedTimeRange}
+        setItems={setItems}
+        style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "ccc", width: Dimensions.get('window').width / 3 }}
+      />
+      <View style={styles.container2}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
+        {emotions.map((emotion, index) => {
+        const isSelected = selectedEmotions.includes(emotion);
+        return (
+          <Pressable
+            key={index}
+            style={[
+              styles.chip,
+              isSelected ? styles.chipSelected : styles.chipUnselected,
+            ]}
+            onPress={() => toggleEmotion(emotion)}
+          >
+            <Text style={[styles.chipText, !isSelected && styles.chipTextUnselected]}>
+              {emotion}
+            </Text>
+          </Pressable>
+        );
+        })}
+        </ScrollView>
       </View>
       <View style={{ marginVertical: 20 }}>
-  <SentimentChart selectedEmotions={selectedEmotions} />
-</View>
-
+        <SentimentChart selectedEmotions={selectedEmotions} />
+      </View>
     </View>
-    
+    <BottomNavigation activeScreen="Dashboard" />
+    </>
   );
 };
 

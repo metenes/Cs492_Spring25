@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-nati
 import { ArrowLeft } from "lucide-react-native";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from "./types/types";
+import BottomNavigation from "./BottomNavigation";
 
 // Define the navigation prop type for the screen
 type PaymentMethodHistoryScreenNavigationProp = StackNavigationProp<
@@ -21,25 +22,28 @@ const PaymentMethodHistoryScreen: React.FC<PaymentMethodHistoryScreenProps> = ({
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <ArrowLeft size={24} />
-      </TouchableOpacity>
-      <Text style={styles.headerText}>Payment History</Text>
-      
-      <ScrollView contentContainerStyle={styles.content}>
-        {payments.map((payment, index) => (
-          <View key={index} style={styles.paymentCard}>
-            <Text style={styles.amount}>{payment.amount}</Text>
-            <Text style={styles.status}><Text style={styles.greenDot}>●</Text> {payment.status}</Text>
-            <Text style={styles.type}>{payment.type}</Text>
-            <Text style={styles.feeDate}>Fee date</Text>
-            <Text style={styles.date}>{payment.date}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+    <>
+      <View style={styles.container}>
+        {/* Header */}
+        <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
+          <ArrowLeft size={24} />
+        </TouchableOpacity>
+        <Text style={styles.headerText}>Payment History</Text>
+        
+        <ScrollView contentContainerStyle={styles.content}>
+          {payments.map((payment, index) => (
+            <View key={index} style={styles.paymentCard}>
+              <Text style={styles.amount}>{payment.amount}</Text>
+              <Text style={styles.status}><Text style={styles.greenDot}>●</Text> {payment.status}</Text>
+              <Text style={styles.type}>{payment.type}</Text>
+              <Text style={styles.feeDate}>Fee date</Text>
+              <Text style={styles.date}>{payment.date}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+      <BottomNavigation activeScreen="PaymentMethodHistoryScreen" />
+    </>
   );
 };
 

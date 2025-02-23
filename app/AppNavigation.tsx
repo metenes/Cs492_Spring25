@@ -31,7 +31,6 @@ import ActivityLogScreen from "./ActivityLogScreen";
 import BottomNavigation from "./BottomNavigation";
 
 // Payment Method Navigations 
-import { PaymentMethodsScreen } from "./PaymentMethodsScreen";
 import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
@@ -94,7 +93,7 @@ const BottomTabs = () => {
 const AppNavigation = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" >
+      <Stack.Navigator initialRouteName="PaymentMethodHistory" >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
         <Stack.Screen 
@@ -124,7 +123,6 @@ const AppNavigation = () => {
         <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
        
         <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
-        <Stack.Screen name="PaymentMethodsScreen" component={PaymentMethodsScreen} />
         <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
         <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
       </Stack.Navigator>

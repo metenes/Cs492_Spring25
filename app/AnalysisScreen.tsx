@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
 // import { LineChart } from "react-native-chart-kit";
+import BottomNavigation from './BottomNavigation';
 
 export const AnalysisScreen = () => {
   const [moodTrends, setMoodTrends] = useState([]);
@@ -75,6 +76,7 @@ export const AnalysisScreen = () => {
           </>
         )}
       </ScrollView>
+      <BottomNavigation activeScreen="AnalysisScreen" />
     </View>
   );
 };
