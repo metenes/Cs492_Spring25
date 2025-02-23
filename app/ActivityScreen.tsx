@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet } from "react-native";
 import { fetchActivities } from "./services/ApiService";
 import { useAuth } from "./auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import BottomNavigation from './BottomNavigation';
 
 // Define the type for Activity
 interface Activity {
@@ -40,14 +41,17 @@ const ActivityScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Activity Log</Text>
-      <FlatList
-        data={activities}
-        renderItem={renderItem}
-        keyExtractor={(_, index) => index.toString()}
-      />
-    </View>
+    <>
+      <View style={styles.container}>
+        <Text style={styles.title}>Activity Log</Text>
+        <FlatList
+          data={activities}
+          renderItem={renderItem}
+          keyExtractor={(_, index) => index.toString()}
+        />
+      </View>
+      <BottomNavigation activeScreen="Activity" />
+    </>
   );
 };
 

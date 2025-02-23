@@ -18,7 +18,7 @@ import ActivityScreen from "./ActivityScreen";
 import SettingsScreen from "./SettingsScreen";
 import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
-
+import PasswordResetScreen from "./PasswordResetScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 
@@ -31,7 +31,6 @@ import ActivityLogScreen from "./ActivityLogScreen";
 import BottomNavigation from "./BottomNavigation";
 
 // Payment Method Navigations 
-import { PaymentMethodsScreen } from "./PaymentMethodsScreen";
 import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
@@ -102,7 +101,7 @@ const AppNavigation = () => {
           component={HomeScreen} 
           options={{ headerShown: false }} // Removes the back button from Home
         />
-
+        <Stack.Screen name="ForgotPassword" component={PasswordResetScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Activity" component={ActivityScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -124,7 +123,6 @@ const AppNavigation = () => {
         <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
        
         <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
-        <Stack.Screen name="PaymentMethodsScreen" component={PaymentMethodsScreen} />
         <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
         <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
       </Stack.Navigator>

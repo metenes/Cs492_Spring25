@@ -29,6 +29,7 @@ const LoginScreen = () => {
       const response = await loginUser(email, password);
   
       if (!response.access_token) {
+        Alert.alert("Error", "No access token received!");
         throw new Error("No access token received");
       }
   
@@ -81,7 +82,7 @@ const LoginScreen = () => {
       <Text style={styles.signUpLink} onPress={() => navigation.navigate("Register")}>
         Sign up
       </Text>
-      <Text style={styles.forgotPasswordText} onPress={() => Alert.alert("Reset Password")}>
+      <Text style={styles.forgotPasswordText} onPress={() => navigation.navigate("ForgotPassword")}>
         Forgot your password?
       </Text>
     </View>

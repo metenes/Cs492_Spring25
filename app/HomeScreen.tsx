@@ -6,7 +6,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList } from "./types/types"; // Import the route types
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-// import BottomNavigation from './BottomNavigation';
+import BottomNavigation from './BottomNavigation';
 
 /*
 BottomNavigation Error Need to be fixed ...
@@ -68,37 +68,39 @@ const HomeScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Your Entries</Text>
-        {/* Streak button navigates to the Calendar */}
-        <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate('DiaryMain')}>
-          <Text style={styles.streakText}>5</Text>
-          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
-          {/* <Icon name="droplet" size={20} color="#000" /> */}
+    <>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Your Entries</Text>
+          {/* Streak button navigates to the Calendar */}
+          <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate('DiaryMain')}>
+            <Text style={styles.streakText}>5</Text>
+            <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
+            {/* <Icon name="droplet" size={20} color="#000" /> */}
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.tabContainer}>
+          {renderTab('All Entries', true)}
+          {renderTab('Journals', false)}
+          {renderTab('Check-ins', false)}
+          {renderTab('Categories', false)}
+        </View>
+
+        <FlatList
+          data={entries}
+          renderItem={renderEntry}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+        />
+
+        <TouchableOpacity style={styles.fab}>
+          <Icon name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
-      </View>
       
-      <View style={styles.tabContainer}>
-        {renderTab('All Entries', true)}
-        {renderTab('Journals', false)}
-        {renderTab('Check-ins', false)}
-        {renderTab('Categories', false)}
-      </View>
-
-      <FlatList
-        data={entries}
-        renderItem={renderEntry}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-      />
-
-      <TouchableOpacity style={styles.fab}>
-        <Icon name="plus" size={24} color="#FFF" />
-      </TouchableOpacity>
-    
-      
-    </SafeAreaView>
+      </SafeAreaView>
+      <BottomNavigation activeScreen="Home" />
+    </>
   );
 };
 

@@ -1,71 +1,46 @@
-import React from "react";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { NavigationContainer } from "@react-navigation/native";
-import { View, Text } from "react-native";
-import { Home, BarChart, User, Settings } from "lucide-react-native";
+import React from 'react';
+import { View, TouchableOpacity } from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
+import { useNavigation } from '@react-navigation/native';
 
-// Import your screen components
-import  DiaryMainScreen from "./DiaryMainScreen";
-import AnalysisScreen from "./AnalysisScreen"
-import  ProfileScreen from "./ProfileScreen";
-import SettingsScreen  from "./SettingsScreen";
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { RootStackParamList } from './types/types';
 
-const Tab = createBottomTabNavigator();
+type BottomNavigationProp = BottomTabNavigationProp<RootStackParamList, 'Home'>;
 
-const BottomNavigation = () => {
-    return (
-     
-          <Tab.Navigator
-            screenOptions={{
-              headerShown: false,
-              tabBarStyle: { backgroundColor: "white", height: 60 },
-              tabBarActiveTintColor: "#3B82F6",
-              tabBarInactiveTintColor: "gray",
-            }}
-          >
-            <Tab.Screen
-              name="Diary"
-              component={DiaryMainScreen}
-              options={{
-                tabBarIcon: ({ focused, size, color }) => (
-                  <Home size={size}  />
-                ),
-              }}
-            />
-            <Tab.Screen
-              name="Analysis"
-              component={AnalysisScreen}
-              options={{
-                tabBarIcon: ({ focused, size, color }) => (
-                  <BarChart size={size}  />
-                ),
-              }}
-            />
-            <Tab.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{
-                tabBarIcon: ({ focused, size, color }) => (
-                  <User size={size}  />
-                ),
-              }}
-            />
-            <Tab.Screen
-              name="Settings"
-              component={SettingsScreen}
-              options={{
-                tabBarIcon: ({ focused, size, color }) => (
-                  <Settings size={size} />
-                ),
-              }}
-            />
-          </Tab.Navigator>
-       
-      );
-    };
+const BottomNavigation = ({ activeScreen }: { activeScreen: keyof RootStackParamList }) => {
+  const navigation = useNavigation<BottomNavigationProp>();
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('Home')}>
+        <Icon name="book" size={24} color={activeScreen === 'Home' ? "#2196F3" : "#B0B0B0"} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('Dashboard')}>
+        <Icon name="bar-chart-2" size={24} color={activeScreen === 'Dashboard' ? "#2196F3" : "#B0B0B0"} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('Profile')}>
+        <Icon name="user" size={24} color={activeScreen === 'Profile' ? "#2196F3" : "#B0B0B0"} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => navigation.navigate('Settings')}>
+        <Icon name="settings" size={24} color={activeScreen === 'Settings' ? "#2196F3" : "#B0B0B0"} />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+import { StyleSheet } from 'react-native';
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FFF',
+    borderTopColor: '#E0E0E0',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 'auto',
+    paddingVertical: 16,
+  },
+});
 
 export default BottomNavigation;
-
-
-
-

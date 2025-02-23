@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { ArrowLeft, ArrowRight } from "lucide-react-native";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from "./types/types";
-import { useNavigation } from '@react-navigation/native';
+import BottomNavigation from "./BottomNavigation";
 
 // Define the navigation prop type for the screen
 type PaymentMethodSettingScreenNavigationProp = StackNavigationProp<
@@ -17,46 +17,49 @@ type PaymentMethodSettingScreenProps = {
 
 export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProps> = ({ navigation }) => {
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <ArrowLeft size={24} />
-      </TouchableOpacity>
-      <Text style={styles.headerText}>Payment Options</Text>
-      
-      {/* Add Payment Button */}
-      <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("PaymentMethodAddScreen")}>
-        <Text style={styles.addButtonText}>Add Payment Option</Text>
-        <ArrowRight size={20} color="white" />
-      </TouchableOpacity>
+    <>
+      <View style={styles.container}>
+        {/* Header */}
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} />
+        </TouchableOpacity>
+        <Text style={styles.headerText}>Payment Options</Text>
+        
+        {/* Add Payment Button */}
+        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("PaymentMethodAddScreen")}>
+          <Text style={styles.addButtonText}>Add Payment Option</Text>
+          <ArrowRight size={20} color="white" />
+        </TouchableOpacity>
 
-      {/* Subscription Details */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Your Subscription</Text>
-        <Text style={styles.description}>
-          Your subscription will automatically renew on 01.01.2025. A fee of 29,99 TL will be charged.
-        </Text>
+        {/* Subscription Details */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Your Subscription</Text>
+          <Text style={styles.description}>
+            Your subscription will automatically renew on 01.01.2025. A fee of 29,99 TL will be charged.
+          </Text>
 
-        {/* Payment Method */}
-        <Text style={styles.sectionTitle}>Method of Payment</Text>
-        <View style={styles.paymentMethod}>
-          <Text style={styles.paymentText}>MASTERCARD - 1234</Text>
-          <TouchableOpacity>
-            <Text style={styles.changeText}>Change it</Text>
+          {/* Payment Method */}
+          <Text style={styles.sectionTitle}>Method of Payment</Text>
+          <View style={styles.paymentMethod}>
+            <Text style={styles.paymentText}>MASTERCARD - 1234</Text>
+            <TouchableOpacity>
+              <Text style={styles.changeText}>Change it</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Navigation to Payment History */}
+          <TouchableOpacity style={styles.viewHistoryButton} onPress={() => navigation.navigate("PaymentMethodHistory")}>
+            <Text style={styles.viewHistoryText}>View Payment History</Text>
+          </TouchableOpacity>
+          
+          {/* Cancel Subscription */}
+          <TouchableOpacity style={styles.cancelButton}>
+            <Text style={styles.cancelText}>Cancel Subscription</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Navigation to Payment History */}
-        <TouchableOpacity style={styles.viewHistoryButton} onPress={() => navigation.navigate("PaymentMethodHistory")}>
-          <Text style={styles.viewHistoryText}>View Payment History</Text>
-        </TouchableOpacity>
-        
-        {/* Cancel Subscription */}
-        <TouchableOpacity style={styles.cancelButton}>
-          <Text style={styles.cancelText}>Cancel Subscription</Text>
-        </TouchableOpacity>
       </View>
-    </View>
+      <BottomNavigation activeScreen="PaymentMethodSettingScreen" />
+    </>
   );
 };
 

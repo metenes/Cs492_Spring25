@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, Switch, Button, StyleSheet } from "react-native";
+import BottomNavigation from "./BottomNavigation";
 
 const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
@@ -15,14 +16,17 @@ const SettingsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
-      <View style={styles.setting}>
-        <Text>Dark Mode</Text>
-        <Switch value={darkMode} onValueChange={toggleDarkMode} />
+    <>
+      <View style={styles.container}>
+        <Text style={styles.title}>Settings</Text>
+        <View style={styles.setting}>
+          <Text>Dark Mode</Text>
+          <Switch value={darkMode} onValueChange={toggleDarkMode} />
+        </View>
+        <Button title="Logout" onPress={handleLogout} />
       </View>
-      <Button title="Logout" onPress={handleLogout} />
-    </View>
+      <BottomNavigation activeScreen="Settings" />
+    </>
   );
 };
 
