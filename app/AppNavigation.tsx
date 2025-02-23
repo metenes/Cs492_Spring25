@@ -18,7 +18,7 @@ import ActivityScreen from "./ActivityScreen";
 import SettingsScreen from "./SettingsScreen";
 import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
-
+import PasswordResetScreen from "./PasswordResetScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 
@@ -95,7 +95,7 @@ const BottomTabs = () => {
 const AppNavigation = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="PaymentMethodHistory" >
+      <Stack.Navigator initialRouteName="Dashboard" >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
         <Stack.Screen 
@@ -103,7 +103,7 @@ const AppNavigation = () => {
           component={HomeScreen} 
           options={{ headerShown: false }} // Removes the back button from Home
         />
-
+        <Stack.Screen name="ForgotPassword" component={PasswordResetScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Activity" component={ActivityScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />

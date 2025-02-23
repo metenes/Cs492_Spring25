@@ -22,6 +22,7 @@ const fetchSentimentData = async (
       { date: "2025-02-01", counts: { Joy: 5, Anger: 2, Sadness: 3 } },
       { date: "2025-02-02", counts: { Joy: 7, Anger: 1, Sadness: 4 } },
       { date: "2025-02-03", counts: { Joy: 3, Anger: 4, Sadness: 2 } },
+      { date: "2025-03-03", counts: { Joy: 3, Anger: 4, Sadness: 2 } },
     ];
   } catch (error) {
     console.error("Error fetching sentiment data:", error);
@@ -33,19 +34,41 @@ const fetchSentimentData = async (
 interface SentimentChartProps {
   selectedEmotions: string[];
 }
-
+const emotions = [
+  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude", "Joy", "Love", "Optimism", "Pride", "Relief", 
+  "Anger", "Annoyance", "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief", "Jealousy", "Sadness", "Confusion", 
+  "Curiosity", "Desire", "Neutral", "Remorse", "Surprise", "Realization"
+];
 const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions }) => {
   if (selectedEmotions.length === 0) {
-    return <></>; // ✅ Ensuring a JSX return, even if no emotions are selected
+    return <></>; // Ensuring a JSX return, even if no emotions are selected
   }
 
+  // Function to generate grayscale colors (from light grey to almost white)
+  const generateLighterGrayscaleColors = (total: number): string[] => {
+    const minShade = 150; // Start from a lighter grey (150 out of 255)
+    const maxShade = 240; // Stop at almost white (240 out of 255)
+
+    return Array.from({ length: total }, (_, i) => {
+      const shade = Math.floor(minShade + (i / (total - 1)) * (maxShade - minShade)); // Spread shades evenly
+      return `rgb(${shade}, ${shade}, ${shade})`;
+    });
+  };
+
+  // Generate grayscale colors for only 4 emotions
+  const grayscaleColors = generateLighterGrayscaleColors(4);
+
+  // Map only the **selected emotions** to lighter grayscale colors
+  const emotionColors: Record<string, string> = Object.fromEntries(
+    selectedEmotions.map((emotion, index) => [emotion, grayscaleColors[index]])
+  );
+
   const chartData = {
-    labels: selectedEmotions.length > 0 ? ["Feb 1", "Feb 2", "Feb 3"] : [], // X-axis labels based on selected emotions
+    labels: ["Feb 1", "Feb 2", "Feb 3"], // X-axis labels
     datasets: selectedEmotions.map((emotion) => ({
       data: Array(3).fill(0).map(() => Math.random() * 10), // Placeholder random Y-values
-      color: (opacity = 1) =>
-        `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${opacity})`, // Random color
-      strokeWidth: 2,
+      color: (opacity = 1) => emotionColors[emotion] || `rgba(200, 200, 200, ${opacity})`, // Default light grey
+      strokeWidth: 2, // Line thickness
     })),
     legend: selectedEmotions.length > 0 ? selectedEmotions : ["No Data"], // Display selected emotions
   };
@@ -53,27 +76,24 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions }) => 
   return (
     <LineChart
       data={chartData}
-      width={Dimensions.get("window").width - 32}
-      height={250} 
+      width={Dimensions.get("window").width }
+      height={Dimensions.get("window").height / 3} 
       chartConfig={{
         backgroundColor: "#FFFFFF", // White background
         backgroundGradientFrom: "#FFFFFF",
         backgroundGradientTo: "#FFFFFF",
         decimalPlaces: 1,
-        color: (opacity = 1, index = 0) => {
-          const colors = ["#7C2020FF", "#1E88E5", "#43A047", "#FDD835", "#8E24AA"]; // Example colors per emotion
-          return colors[index % colors.length]; // Assign each line a unique color
-        },
-        labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Black labels
+        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Black labels
+        labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Black label text
         style: { borderRadius: 12 },
         propsForDots: {
           r: 5, 
-          strokeWidth: 2,
-          stroke: "#84505000", // Example fixed color for dots
+          strokeWidth: 1,
+          stroke: "#000000", // Dots in black
         },
         propsForBackgroundLines: {
-          stroke: "#BB5757FF", // Light grey grid lines
-          strokeDasharray: "4 4", 
+          stroke: "#CCCCCC", // Light grey grid lines
+          strokeDasharray: "5 5", 
         },
       }}
       bezier
@@ -86,9 +106,8 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions }) => 
       }}
     />
   );
-  
-  
-  
 };
+
+
 
 export { SentimentChart, fetchSentimentData };

@@ -22,7 +22,28 @@ export const analyzeSentiment = async (text: string) => {
     return { error: "Failed to analyze sentiment." };
   }
 };
-
+// for dashboard
+export const fetchSentimentAnalysis = async (token: string, startDate: string, endDate: string, interval: string = "monthly", emotions: string[] = []) => {
+  try {
+    const emotionsQuery = emotions.length > 0 ? `&emotions=${emotions.join(",")}` : "";
+    const response = await fetch(`${API_URL}/api/sentiment-analysis?start_date=${startDate}&end_date=${endDate}&interval=${interval}${emotionsQuery}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching sentiment analysis:", error);
+    return { error: "Failed to fetch sentiment analysis." };
+  }
+};
 export const sendMessage = async (message: string) => {
   try {
     const response = await fetch(`${API_URL}/chat`, {
