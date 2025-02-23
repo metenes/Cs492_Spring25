@@ -17,6 +17,11 @@ from flask import Flask, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime, timedelta
+# Face Analysis
+import cv2
+import numpy as np
+import base64
+from deepface import DeepFace
 
 app = Flask(__name__)
 CORS(app)
@@ -231,7 +236,36 @@ def forgot_password():
 
 # --------------------------------------- Sentiment Analysis  ---------------------------------------
 # Our model , we got the .pt files
+# ---------------------------------------
+#  **Emotions Facel Analysis**
+# ---------------------------------------
+def analyze_emotion(image_path):
+    try:
+        # Load image
+        image = cv2.imread(image_path)
+        if image is None:
+            return "Error loading image"
 
+        # Perform emotion analysis
+        result = DeepFace.analyze(image, actions=["emotion"], enforce_detection=False)
+        emotion = result[0]["dominant_emotion"]
+        return emotion
+    except Exception as e:
+        print("Emotion analysis error:", str(e))
+        return "Error analyzing emotion"
+
+@app.route("/emotion", methods=["POST"])
+def emotion():
+    try:
+        data = request.json
+        image_path = data["image"]
+        emotion = analyze_emotion(image_path)
+        return jsonify({"emotion": emotion})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -359,6 +393,7 @@ except Exception as e:
 # Define Request Model
 class ChatRequest(BaseModel):
     user_input: str
+
 # Chatbot API Endpoint
 @app.post("/chat")
 async def chat(request: ChatRequest):
@@ -372,12 +407,12 @@ async def chat(request: ChatRequest):
 
 
 # --------------------------------------- Model Analysis  ---------------------------------------
-# We use API
+# We use AWS API 
 
 # ---------------------------------------
 #  **Sentimental Analysis Model**
 # ---------------------------------------
-# Define Request Model
+# Define Request Model from AWS cloud, no processing to be done inside local machine
 import torch
 import boto3
 
@@ -396,8 +431,70 @@ model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
 # Add to upper part if necessary
 # aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
 # aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-# aws_region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")  # Change this to your AWS region
+# aws_region = os.getenv("AWS_DEFAULT_REGION", "me-south-1") 
 
+# Lambada Fast exec. 
+def lambda_handler(event, context):
+    input_text = event["text"]
+    output = model(input_text)
+    return {"prediction": output}
+ 
+# Lambada Fast predict.  
+@app.route('/predict', methods=['POST'])
+def predict():
+    user_id = request.json["user_id"]
+    input_text = request.json["text"]
+    # Load personalized or global model
+    model_path = f"s3://sentiobucket/models/{user_id}/"
+    
+    model = torch.load(model_path)
+    response = model(input_text)
+    
+    return jsonify({"response": response})
+
+# Trend analysis 
+@app.route('/community-trends', methods=['GET'])
+def community_trends():
+    pipeline = [
+        {"$group": {
+            "_id": "$sentiments.emotion",
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    stats = list(db.users.aggregate(pipeline))
+    return jsonify(stats)
+
+
+# ---------------------------------------
+#  **Continiues Trainig  Model**
+# ---------------------------------------
+#  Personalized AI
+#  Train wth Sagamaker Pipeline on cloud 
+
+sagemaker = boto3.client('sagemaker')
+
+def train_personal_model(user_id):
+    response = sagemaker.create_training_job(
+        TrainingJobName=f"user-model-{user_id}",
+        AlgorithmSpecification={"TrainingImage": "your-custom-image"},
+        InputDataConfig=[{"ChannelName": "train", "DataSource": {"S3DataSource": {"S3Uri": f"s3://your-bucket/{user_id}/data.json"}}}],
+        OutputDataConfig={"S3OutputPath": f"s3://your-bucket/models/{user_id}/"},
+        ResourceConfig={"InstanceType": "ml.m5.large", "InstanceCount": 1, "VolumeSizeInGB": 10},
+        StoppingCondition={"MaxRuntimeInSeconds": 3600}
+    )
+    return response 
+
+#  Global AI
+#  Train wth Sagamaker Pipeline on cloud 
+stepfunctions = boto3.client('stepfunctions')
+
+def start_global_ai_training():
+    response = stepfunctions.start_execution(
+        stateMachineArn="arn:aws:states:us-east-1:123456789012:stateMachine:GlobalAIUpdate",
+        input="{}"
+    )
+    return response
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
