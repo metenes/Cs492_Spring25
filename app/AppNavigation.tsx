@@ -21,6 +21,7 @@ import RegisterScreen from "./RegisterScreen";
 import PasswordResetScreen from "./PasswordResetScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
+import CheckInScreen from "./CheckInScreen";
 
 import FreeJournalingScreen from "./FreeJournalingScreen";
 import JournalScreen from "./JournalScreen";
@@ -35,6 +36,7 @@ import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 import Dashboard from "./screens/Dashboard";
+
 
 import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 // Create the stack navigator
@@ -120,6 +122,7 @@ const AppNavigation = () => {
         <Stack.Screen name="Dashboard" component={Dashboard} />
         <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
+        <Stack.Screen name="CheckIn" component={CheckInScreen} />
        
         <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
         <Stack.Screen name="BottomNavigation" component={BottomNavigation} />

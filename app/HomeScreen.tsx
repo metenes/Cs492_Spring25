@@ -162,7 +162,7 @@ const HomeScreen = () => {
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Check-in Selected");
+                navigation.navigate("CheckIn");
               }}
             >
               <Icon name="smile" size={20} color="black" />
@@ -182,7 +182,7 @@ const HomeScreen = () => {
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Check-in Selected");
+                navigation.navigate("FreeJournaling");
               }}
             >
               <Icon name="book-open" size={20} color="black" />
