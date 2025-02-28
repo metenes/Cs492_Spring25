@@ -102,6 +102,8 @@
     "react-native-safe-area-context": "^5.2.0",
     "react-native-screens": "^4.6.0",
     "react-native-svg": "15.8.0",
+    "react-native-svg-converter": "^0.1.2",
+    "react-native-svg-transformer": "^1.5.0",
     "react-native-vector-icons": "^10.2.0",
     "react-native-vision-camera": "^4.6.4",
     "react-native-web": "~0.19.6",

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { ArrowLeft } from "lucide-react-native";
+// import { ArrowLeft } from "lucide-react-native";
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from "./types/types";
 import BottomNavigation from "./BottomNavigation";
@@ -20,13 +20,13 @@ const PaymentMethodHistoryScreen: React.FC<PaymentMethodHistoryScreenProps> = ({
     { amount: "₺29,99", status: "Paid", date: "01.11.2024", type: "Subscription fee" },
     { amount: "₺29,99", status: "Paid", date: "01.10.2024", type: "Subscription fee" },
   ];
-
+// <ArrowLeft size={24} />
   return (
     <>
       <View style={styles.container}>
         {/* Header */}
         <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
-          <ArrowLeft size={24} />
+          
         </TouchableOpacity>
         <Text style={styles.headerText}>Payment History</Text>
         

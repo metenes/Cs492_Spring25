@@ -465,7 +465,6 @@ def community_trends():
     stats = list(db.users.aggregate(pipeline))
     return jsonify(stats)
 
-
 # ---------------------------------------
 #  **Continiues Trainig  Model**
 # ---------------------------------------

@@ -10,6 +10,28 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
+import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
+
+
+/*
+
+      <View style={styles.dateRangeContainer}>
+        <DateTimePicker 
+                      value={selectedStartDate} 
+                      mode="date" 
+                      display="default" 
+                      onChange={handleStartDateChange} 
+          />
+        <DateTimePicker 
+            value={selectedEndDate} 
+            mode="date" 
+            display="default" 
+            onChange={handleEndDateChange} 
+        />
+      </View>
+
+*/ 
+
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
@@ -78,6 +100,23 @@ const [items, setItems] = useState([
     }
     setShowStartPicker(false); // Close modal after selection
   };
+
+  const showDatePicker = (mode: "start" | "end") => {
+    DateTimePickerAndroid.open({
+      value: mode === "start" ? selectedStartDate : selectedEndDate,
+      mode: "date",
+      display: "default",
+      onChange: (event, date) => {
+        if (date) {
+          if (mode === "start") {
+            handleStartDateChange(event, date);
+          } else {
+            handleEndDateChange(event, date);
+          }
+        }
+      },
+    });
+  };
   
   // Handles selecting an end date
   const handleEndDateChange = (event: any, date?: Date) => {
@@ -107,20 +146,22 @@ const [items, setItems] = useState([
     <>
     <View style={styles.container}>
       
-      <View style={styles.dateRangeContainer}>
-        <DateTimePicker 
-                      value={selectedStartDate} 
-                      mode="date" 
-                      display="default" 
-                      onChange={handleStartDateChange} 
-          />
-        <DateTimePicker 
-            value={selectedEndDate} 
-            mode="date" 
-            display="default" 
-            onChange={handleEndDateChange} 
-        />
-      </View>
+
+
+          <View style={styles.dateRangeContainer}>
+      <Pressable style={styles.dateButton} onPress={() => showDatePicker("start")}>
+        <Text style={styles.dateText}>
+          {selectedStartDate.toDateString()}
+        </Text>
+      </Pressable>
+      
+      <Pressable style={styles.dateButton} onPress={() => showDatePicker("end")}>
+        <Text style={styles.dateText}>
+          {selectedEndDate.toDateString()}
+        </Text>
+      </Pressable>
+    </View>
+
 
       <View>
         <ScrollView 
