@@ -1,200 +1,144 @@
 import boto3
-import json
-from datetime import datetime
-from bson import ObjectId
-from pymongo import MongoClient
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from pydantic import BaseModel
-from fastapi import FastAPI, BackgroundTasks
-from sklearn.metrics import classification_report
+import json
+import asyncio
 import logging
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 from pymongo import MongoClient
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from pydantic import BaseModel
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from bson import ObjectId
+import uvicorn
+import torch.nn as nn
+import torch.optim as optim
+from io import BytesIO
 
-# Initialize AWS clients
+# LOGGING SETUP
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# AWS SERVICES SETUP
 sagemaker = boto3.client('sagemaker')
 s3 = boto3.client('s3')
 stepfunctions = boto3.client('stepfunctions')
 
-# Initialize MongoDB
+# MONGODB SETUP
 mongo_client = MongoClient('mongodb://localhost:27017/')
-db = mongo_client['sentiment_db']
+db = mongo_client['ai_training_db']
 
-class UserInteraction(BaseModel):
-    user_id: str
-    text: str
-    sentiment: dict
-    emotion: str
-    timestamp: datetime = datetime.utcnow()
+# AWS STORAGE S3 PATHS
+S3_BUCKET = "sentiobucket"
+BASE_MODEL_PATH = f"s3://{S3_BUCKET}/models/" 
+BASE_MODEL = f"s3://{S3_BUCKET}/models/model.pt"
+PERSONAL_MODELS = f"{BASE_MODEL_PATH}/personal_models/"
+GLOBAL_MODELS = f"{BASE_MODEL_PATH}/global_model/"
+MODEL_PATH = "models/model.pt"
 
-class TrainingPipeline:
-    def __init__(self):
-        self.s3_bucket = 'your-ai-bucket'
-        self.base_model_path = f's3://{self.s3_bucket}/base_model/'
-        self.personal_models_path = f's3://{self.s3_bucket}/personal_models/'
-        
-    async def collect_interaction_data(self, interaction: UserInteraction):
-        """Store user interaction data for training"""
-        # Store in MongoDB
-        db.interactions.insert_one(interaction.dict())
-        
-        # Store in S3 for training
-        user_data_path = f'user_data/{interaction.user_id}/{interaction.timestamp.strftime("%Y-%m")}.json'
-        s3.put_object(
-            Bucket=self.s3_bucket,
-            Key=user_data_path,
-            Body=json.dumps(interaction.dict())
-        )
-
-    async def trigger_personal_training(self, user_id: str):
-        """Trigger personalized model training for a user"""
-        training_job_name = f"personal-training-{user_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        
-        # Configure SageMaker training job
-        response = sagemaker.create_training_job(
-            TrainingJobName=training_job_name,
-            AlgorithmSpecification={
-                'TrainingImage': 'your-custom-training-image',
-                'TrainingInputMode': 'File'
-            },
-            InputDataConfig=[
-                {
-                    'ChannelName': 'training',
-                    'DataSource': {
-                        'S3DataSource': {
-                            'S3Uri': f's3://{self.s3_bucket}/user_data/{user_id}/',
-                            'S3DataType': 'S3Prefix'
-                        }
-                    }
-                }
-            ],
-            OutputDataConfig={
-                'S3OutputPath': f'{self.personal_models_path}{user_id}/'
-            },
-            ResourceConfig={
-                'InstanceType': 'ml.m5.xlarge',
-                'InstanceCount': 1,
-                'VolumeSizeInGB': 30
-            },
-            StoppingCondition={
-                'MaxRuntimeInSeconds': 3600
-            },
-            HyperParameters={
-                'learning_rate': '0.001',
-                'batch_size': '32',
-                'epochs': '10'
-            }
-        )
-        return response
-
-    async def trigger_global_training(self):
-        """Trigger global model training using all user data"""
-        # Start Step Functions workflow for global training
-        response = stepfunctions.start_execution(
-            stateMachineArn='arn:aws:states:region:account:stateMachine:GlobalTraining',
-            input=json.dumps({
-                'timestamp': datetime.now().isoformat(),
-                'training_type': 'global',
-                'data_path': f's3://{self.s3_bucket}/user_data/'
-            })
-        )
-        return response
-
-class AnalyticsPipeline:
-    @staticmethod
-    async def get_community_trends(timeframe: str = 'week'):
-        """Analyze community-wide trends"""
-        pipeline = [
-            {
-                '$match': {
-                    'timestamp': {
-                        '$gte': datetime.now() - timedelta(days=7 if timeframe == 'week' else 30)
-                    }
-                }
-            },
-            {
-                '$group': {
-                    '_id': {
-                        'emotion': '$emotion',
-                        'date': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$timestamp'}}
-                    },
-                    'count': {'$sum': 1},
-                    'avg_sentiment': {'$avg': '$sentiment.score'}
-                }
-            },
-            {'$sort': {'_id.date': -1, 'count': -1}}
-        ]
-        
-        results = list(db.interactions.aggregate(pipeline))
-        return results
-
-    @staticmethod
-    async def get_user_insights(user_id: str):
-        """Get personalized insights for a user"""
-        pipeline = [
-            {'$match': {'user_id': user_id}},
-            {
-                '$group': {
-                    '_id': None,
-                    'total_interactions': {'$sum': 1},
-                    'avg_sentiment': {'$avg': '$sentiment.score'},
-                    'common_emotions': {
-                        '$push': '$emotion'
-                    }
-                }
-            }
-        ]
-        
-        results = list(db.interactions.aggregate(pipeline))
-        return results[0] if results else None
-
-# FastAPI application
 app = FastAPI()
-training_pipeline = TrainingPipeline()
-analytics_pipeline = AnalyticsPipeline()
 
+def load_model():
+    """Download and load PyTorch model from S3"""
+    obj = s3.get_object(Bucket=S3_BUCKET, Key=MODEL_PATH)
+    model_data = BytesIO(obj["Body"].read())
+    
+    model = torch.load(model_data, map_location=torch.device("cpu"))
+    model.eval()
+    return model
+
+model = load_model()
+
+# AI TRAINING CLASS
+class AITraining:
+    """Handles AI training workflows, hyperparameter tuning, and model merging"""
+    
+    async def trigger_training(self, model_type: str, user_id: Optional[str] = None):
+        """Triggers training for personal or global AI models."""
+        try:
+            if model_type == 'personal' and user_id:
+                await self._train_personal_model(user_id)
+            elif model_type == 'global':
+                await self._train_global_model()
+            else:
+                raise ValueError("Invalid model type or missing user_id")
+        except Exception as e:
+            logger.error(f"Training error: {str(e)}")
+            raise
+
+    async def _train_personal_model(self, user_id: str):
+        """Triggers training for a personal AI model."""
+        job_name = f"personal-model-{user_id}-{datetime.now().strftime('%Y%m%d-%H%M')}"
+
+        training_params = {
+            'TrainingJobName': job_name,
+            'AlgorithmSpecification': {'TrainingImage': 'custom-training-image', 'TrainingInputMode': 'File'},
+            'HyperParameters': {'learning_rate': '0.001', 'epochs': '20', 'batch_size': '32'},
+            'InputDataConfig': [{'ChannelName': 'training', 'DataSource': {'S3DataSource': {'S3Uri': f"s3://{PERSONAL_MODELS}{user_id}/training/", 'S3DataType': 'S3Prefix'}}}],
+            'OutputDataConfig': {'S3OutputPath': f"s3://{PERSONAL_MODELS}{user_id}/output/"},
+            'ResourceConfig': {'InstanceType': 'ml.p3.2xlarge', 'InstanceCount': 1, 'VolumeSizeInGB': 50},
+            'StoppingCondition': {'MaxRuntimeInSeconds': 7200}
+        }
+
+        response = sagemaker.create_training_job(**training_params)
+        db.training_jobs.insert_one({'job_id': response['TrainingJobArn'], 'user_id': user_id, 'status': 'started', 'timestamp': datetime.utcnow()})
+        return response['TrainingJobArn']
+
+    async def _train_global_model(self):
+        """Triggers training for a global AI model using Federated Learning."""
+        job_name = f"global-model-{datetime.now().strftime('%Y%m%d-%H%M')}"
+
+        training_params = {
+            'TrainingJobName': job_name,
+            'AlgorithmSpecification': {'TrainingImage': 'custom-global-training', 'TrainingInputMode': 'File'},
+            'HyperParameters': {'learning_rate': '0.0005', 'epochs': '50', 'batch_size': '64'},
+            'InputDataConfig': [{'ChannelName': 'training', 'DataSource': {'S3DataSource': {'S3Uri': f"s3://{GLOBAL_MODELS}training/", 'S3DataType': 'S3Prefix'}}}],
+            'OutputDataConfig': {'S3OutputPath': f"s3://{GLOBAL_MODELS}output/"},
+            'ResourceConfig': {'InstanceType': 'ml.p3.8xlarge', 'InstanceCount': 2, 'VolumeSizeInGB': 100},
+            'StoppingCondition': {'MaxRuntimeInSeconds': 14400}
+        }
+
+        response = sagemaker.create_training_job(**training_params)
+        db.training_jobs.insert_one({'job_id': response['TrainingJobArn'], 'status': 'started', 'timestamp': datetime.utcnow()})
+        return response['TrainingJobArn']
+
+# API ENDPOINTS
 @app.post("/interaction")
-async def record_interaction(interaction: UserInteraction):
-    """Record user interaction and trigger training if needed"""
-    try:
-        # Store interaction data
-        await training_pipeline.collect_interaction_data(interaction)
-        
-        # Check if personal model needs updating
-        user_interactions = db.interactions.count_documents({'user_id': interaction.user_id})
-        if user_interactions % 100 == 0:  # Trigger training every 100 interactions
-            await training_pipeline.trigger_personal_training(interaction.user_id)
-            
-        # Check if global model needs updating
-        total_interactions = db.interactions.count_documents({})
-        if total_interactions % 1000 == 0:  # Trigger global training every 1000 interactions
-            await training_pipeline.trigger_global_training()
-            
-        return {"status": "success", "message": "Interaction recorded"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def record_interaction(user_id: str, text: str, sentiment: Dict[str, float], emotion: str):
+    """Store user interaction data."""
+    db.interactions.insert_one({'user_id': user_id, 'text': text, 'sentiment': sentiment, 'emotion': emotion, 'timestamp': datetime.utcnow()})
+    
+    # Trigger AI training dynamically
+    total_interactions = db.interactions.count_documents({})
+    if total_interactions % 1000 == 0:
+        ai_training = AITraining()
+        await ai_training.trigger_training('global')
 
-@app.get("/trends/{timeframe}")
-async def get_trends(timeframe: str):
-    """Get community trends for specified timeframe"""
-    try:
-        trends = await analytics_pipeline.get_community_trends(timeframe)
-        return {"trends": trends}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "success", "message": "Interaction recorded"}
 
-@app.get("/insights/{user_id}")
+@app.post("/emotion")
+async def record_emotion(user_id: str, type: str, emotion: str, confidence: float):
+    """Store emotion data for AI training."""
+    db.emotion_data.insert_one({'user_id': user_id, 'type': type, 'emotion': emotion, 'confidence': confidence, 'timestamp': datetime.utcnow()})
+    return {"status": "success", "message": "Emotion data recorded"}
+
+@app.post("/trigger-training")
+async def trigger_training(model_type: str, user_id: Optional[str] = None):
+    """API to manually trigger AI training."""
+    ai_training = AITraining()
+    await ai_training.trigger_training(model_type, user_id)
+    return {"status": "success", "message": "Training job started"}
+
+@app.get("/trends")
+async def get_trends():
+    """Get sentiment trends from all users."""
+    trends = list(db.interactions.aggregate([{'$group': {'_id': "$emotion", 'count': {'$sum': 1}}}]))
+    return {"trends": trends}
+
+@app.get("/personal-insights/{user_id}")
 async def get_user_insights(user_id: str):
-    """Get personalized insights for a user"""
-    try:
-        insights = await analytics_pipeline.get_user_insights(user_id)
-        return {"insights": insights}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Get AI-generated insights for a user."""
+    insights = list(db.interactions.find({'user_id': user_id}, {'_id': 0, 'text': 1, 'emotion': 1}))
+    return {"insights": insights}

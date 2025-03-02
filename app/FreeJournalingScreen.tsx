@@ -148,7 +148,7 @@ const FreeJournalingScreen = () => {
                 alignItems: "center",
                 flex: 1,
               }}
-              onPress={() => navigation.navigate("Saving", { content, imageUris })}
+              onPress={() => navigation.navigate("Home"/*"Saving", { content, imageUris }*/)}
             >
               <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
             </TouchableOpacity>

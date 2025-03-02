@@ -18,9 +18,10 @@ import ActivityScreen from "./ActivityScreen";
 import SettingsScreen from "./SettingsScreen";
 import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
-
+import PasswordResetScreen from "./PasswordResetScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
+import CheckInScreen from "./CheckInScreen";
 
 import FreeJournalingScreen from "./FreeJournalingScreen";
 import JournalScreen from "./JournalScreen";
@@ -35,6 +36,9 @@ import PaymentMethodAddScreen from "./PaymentMethodAddScreen";
 import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 import Dashboard from "./screens/Dashboard";
+
+
+import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -93,7 +97,7 @@ const BottomTabs = () => {
 const AppNavigation = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="PaymentMethodHistory" >
+      <Stack.Navigator initialRouteName="Dashboard" >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
         <Stack.Screen 
@@ -101,7 +105,7 @@ const AppNavigation = () => {
           component={HomeScreen} 
           options={{ headerShown: false }} // Removes the back button from Home
         />
-
+        <Stack.Screen name="ForgotPassword" component={PasswordResetScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Activity" component={ActivityScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -118,6 +122,7 @@ const AppNavigation = () => {
         <Stack.Screen name="Dashboard" component={Dashboard} />
         <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
+        <Stack.Screen name="CheckIn" component={CheckInScreen} />
        
         <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
         <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
@@ -125,6 +130,8 @@ const AppNavigation = () => {
         <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
         <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
         <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
+
+        <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

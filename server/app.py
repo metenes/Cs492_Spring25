@@ -92,6 +92,7 @@ def get_period_of_day(timestamp):
 # ---------------------------------------
 #  **Fixing Register Endpoint**
 # ---------------------------------------
+
 @app.route("/register", methods=["POST"])
 def register():
     try:
@@ -234,8 +235,77 @@ def forgot_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --------------------------------------- Sentiment Analysis  ---------------------------------------
-# Our model , we got the .pt files
+@app.route("/api/sentiment-analysis", methods=["GET"])
+@jwt_required()
+def sentiment_analysis():
+    try:
+        user_id = get_jwt_identity()
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+        
+        user_id = ObjectId(user_id)
+        start_date_str = request.args.get("start_date")
+        end_date_str = request.args.get("end_date")
+        interval = request.args.get("interval", "monthly")
+        emotions = request.args.get("emotions") #if no emotions are provided, all emotions will be considered
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({"error": "start_date and end_date are required"}), 400
+        
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        
+        if interval not in ["daily", "weekly", "monthly"]:
+            return jsonify({"error": "Invalid interval. Use 'daily', 'weekly', or 'monthly'"}), 400
+        
+        emotion_filter = emotions.split(",") if emotions else None
+        
+        # Define grouping key for MongoDB aggregation
+        if interval == "daily":
+            date_group = {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}}
+        elif interval == "weekly":
+            date_group = {"$isoWeekYear": "$timestamp", "$isoWeek": "$timestamp"}
+        else:  # monthly
+            date_group = {"$dateToString": {"format": "%Y-%m", "date": "$timestamp"}}
+        
+        pipeline = [
+            {"$match": {"user_id": user_id, "timestamp": {"$gte": start_date, "$lte": end_date}}},
+            {"$unwind": "$emotions"},
+        ]
+        
+        if emotion_filter:
+            pipeline.append({"$match": {"emotions.emotion_name": {"$in": emotion_filter}}})
+        
+        pipeline.extend([
+            {"$group": {
+                "_id": {"time_period": date_group, "emotion_name": "$emotions.emotion_name"},
+                "total_percentage": {"$sum": "$emotions.percentage"},
+                "entry_count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.time_period": 1}}
+        ])
+        
+        sentiment_data = list(sentiments_collection.aggregate(pipeline))
+        
+        response = {
+            "start_date": start_date_str,
+            "end_date": end_date_str,
+            "interval": interval,
+            "emotion_analysis": [
+                {
+                    "time_period": item["_id"]["time_period"],
+                    "emotion_name": item["_id"]["emotion_name"],
+                    "total_percentage": round(item["total_percentage"], 1),
+                    "entry_count": item["entry_count"]
+                }
+                for item in sentiment_data
+            ]
+        }
+        
+        return jsonify(response), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 # ---------------------------------------
 #  **Emotions Facel Analysis**
 # ---------------------------------------
