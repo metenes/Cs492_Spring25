@@ -24,6 +24,8 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "FreeJournaling">;
 
+const MAX_CHAR_COUNT = 10000; // ✅ Hard limit enforced
+
 const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
@@ -93,10 +95,39 @@ const FreeJournalingScreen = () => {
             placeholder="Write your thoughts... (or tap the mic button on your keyboard) 🎤"
             placeholderTextColor="#666"
             value={content}
-            onChangeText={setContent}
+            onChangeText={(text) => {
+              if (text.length <= MAX_CHAR_COUNT) {
+                setContent(text);
+              }
+            }}
             keyboardType="default"
             returnKeyType="done"
           />
+          {/* ✅ Character Counter */}
+          <Text
+            style={{
+              textAlign: "right",
+              fontSize: 14,
+              color: content.length >= MAX_CHAR_COUNT - 500 ? "red" : "#666", // 🔴 Warn if close to 10k chars
+              marginTop: 5,
+            }}
+          >
+            {content.length} / {MAX_CHAR_COUNT}
+          </Text>
+
+          {/* Hard Limit Warning when close to max */}
+          {content.length >= MAX_CHAR_COUNT - 500 && content.length < MAX_CHAR_COUNT && (
+            <Text style={{ color: "red", textAlign: "center", marginTop: 5 }}>
+              ⚠️ You're writing a wonderful entry! Just a heads-up, you're nearing the character limit.
+            </Text>
+          )}
+
+          {/* Hard Limit Reached Message */}
+          {content.length >= MAX_CHAR_COUNT && (
+            <Text style={{ color: "red", textAlign: "center", marginTop: 5, fontWeight: "bold" }}>
+              🚫 That’s an amazing entry! You've reached the limit, but you can always start a new one.
+            </Text>
+          )}
         </View>
 
         {/* Display Selected Images */}
