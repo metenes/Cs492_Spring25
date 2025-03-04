@@ -13,13 +13,28 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 
+import { loginUser } from "./services/ApiService";
 
-type Entry = {
+import { fetchJournalEntries } from "./services/ApiService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { format } from "date-fns";
+
+/* type Entry = {
   id: string;
   date: string;
   type: "freeform journal" | "checkin" | "guided journal";
   subtitle: string;
+}; */
+type Entry = {
+  _id: string;
+  content: string;
+  timestamp: string;
+  images?: string[];
+  category: string;
 };
+
+
+
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -40,7 +55,7 @@ const HomeScreen = () => {
     }, [])
   );  
 
-  const entries: Entry[] = [
+  /* const entries: Entry[] = [
     { id: "1", date: "December 18", type: "freeform journal", subtitle: "Freeform Journal Entry" },
     { id: "2", date: "December 18", type: "checkin", subtitle: "Check-in" },
     { id: "3", date: "December 14", type: "freeform journal", subtitle: "Freeform Journal Entry" },
@@ -48,7 +63,79 @@ const HomeScreen = () => {
     { id: "5", date: "November 30", type: "guided journal", subtitle: "Guided Journal Entry" },
     { id: "6", date: "November 27", type: "checkin", subtitle: "Check-in" },
     { id: "7", date: "November 25", type: "freeform journal", subtitle: "Freeform Journal Entry" },
-  ];
+  ]; */
+
+  const [entries, setEntries] = useState<Entry[]>([]);
+
+  const checkStoredToken = async () => {
+    const token = await AsyncStorage.getItem("userToken");
+    console.log("🔹 Token in AsyncStorage:", token);
+  };
+  
+  checkStoredToken();
+
+  const testLogin = async () => {
+    const email = "irem.akel@ug.bilkent.edu.tr"; // Your test email
+    const password = "password123"; // Your test password
+  
+    try {
+      const response = await loginUser(email, password);
+      console.log("✅ Received login response:", response);
+  
+      const storedToken = await AsyncStorage.getItem("userToken");
+      console.log("🔹 Token in AsyncStorage after login:", storedToken);
+    } catch (error) {
+      console.error("❌ Login test failed:", error);
+    }
+  };
+  testLogin();
+  
+  console.log("STARTING FROM HERE")
+
+  useEffect(() => {
+    const loadEntries = async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (token) {
+          console.log("🔹 Using token to fetch journal entries:", token);
+          const fetchedEntries = await fetchJournalEntries(token);
+      
+          console.log("Fetched entries:", fetchedEntries);
+            
+          if (fetchedEntries.length === 0) {
+            console.warn("⚠️ No journal entries found for user.");
+          }
+        
+          setEntries(fetchedEntries);
+          print(entries)
+        }
+      } catch (error) {
+        console.error("❌ Error loading journal entries:", error);
+      }
+    };
+  
+    loadEntries();
+  }, []);
+  
+  /* useEffect(() => {
+    const loadEntries = async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (token) {
+          const response = await fetchJournalEntries(token);
+          if (!response.error) {
+            setEntries(response.entries);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading journal entries:", error);
+      }
+    };
+
+    loadEntries();
+  }, []); */
+
+
 
   const toggleMenu = () => {
     if (isMenuOpen) {
@@ -101,7 +188,7 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderEntry = ({ item }: { item: Entry }) => (
+  /* const renderEntry = ({ item }: { item: Entry }) => (
     <TouchableOpacity style={styles.entryItem}>
       <View style={styles.entryIcon}>
         {item.type === "checkin" ? (
@@ -115,7 +202,21 @@ const HomeScreen = () => {
         <Text style={styles.entrySubtitle}>{item.subtitle}</Text>
       </View>
     </TouchableOpacity>
+  ); */
+
+  const renderEntry = ({ item }: { item: Entry }) => (
+    <TouchableOpacity style={styles.entryItem}>
+      <View style={styles.entryIcon}>
+        <Icon name="edit-2" size={20} color="#000" />
+      </View>
+      <View style={styles.entryContent}>
+        <Text style={styles.entryDate}>{format(new Date(item.timestamp), "EEEE, MMM d yyyy")}</Text>
+        <Text style={styles.entrySubtitle}>{item.category || "Freeform Journal"}</Text>
+      </View>
+    </TouchableOpacity>
   );
+  console.log("🔹 Entries state:", entries);
+
 
   return (
     <>
@@ -141,7 +242,9 @@ const HomeScreen = () => {
       </ScrollView>
       </View>
 
-      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item.id} style={styles.list} />
+      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item.id} style={styles.list} 
+        ListEmptyComponent={<Text>No journal entries found.</Text>}
+      />
 
       {/* Floating Action Button (FAB) + Dropdown Menu */}
       <View style={styles.fabContainer}>

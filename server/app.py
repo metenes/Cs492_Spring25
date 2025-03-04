@@ -58,10 +58,11 @@ try:
     client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
     db = client["mydb"]
     print("✅ Connected to MongoDB successfully!")
+    print("✅ Available collections:", db.list_collection_names())
     users_collection = db["users"]
     sentiments_collection = db["sentiments"]  # db sentiments 
     activities_collection = db["activities"]
-    print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
+    #print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
 except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
     exit(1)
@@ -132,6 +133,8 @@ def login():
         email = data.get("email")
         password = data.get("password")
 
+        print(f"🔹 Login Attempt: email={email}, password={password}")
+
         if not email or not password:
             return jsonify({"error": "Email and password are required"}), 400
 
@@ -146,6 +149,7 @@ def login():
 
         # Generate JWT token
         access_token = create_access_token(identity=str(user["_id"]))  # You can pass user ID as string
+        print(f"LOGIN {access_token}")
 
         return jsonify({"access_token": access_token}), 200
     except Exception as e:
@@ -305,37 +309,64 @@ def sentiment_analysis():
         return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
-# ---------------------------------------
-#  **Emotions Facel Analysis**
-# ---------------------------------------
-def analyze_emotion(image_path):
-    try:
-        # Load image
-        image = cv2.imread(image_path)
-        if image is None:
-            return "Error loading image"
 
-        # Perform emotion analysis
-        result = DeepFace.analyze(image, actions=["emotion"], enforce_detection=False)
-        emotion = result[0]["dominant_emotion"]
-        return emotion
-    except Exception as e:
-        print("Emotion analysis error:", str(e))
-        return "Error analyzing emotion"
-
-@app.route("/emotion", methods=["POST"])
-def emotion():
+@app.route("/save-journal-entry", methods=["POST"])
+@jwt_required()
+def save_journal_entry():
     try:
+        user_id = get_jwt_identity()
         data = request.json
-        image_path = data["image"]
-        emotion = analyze_emotion(image_path)
-        return jsonify({"emotion": emotion})
+        print(user_id)
+
+        if not data.get("content"):
+            return jsonify({"error": "Journal entry cannot be empty"}), 400
+
+        journal_entry = {
+            "user_id": ObjectId(user_id),
+            "content": data["content"],
+            "images": data.get("images", []),  # Save images if available
+            "category": data.get("category", "Freeform Journal"),
+            "timestamp": datetime.utcnow()
+        }
+
+        # Insert into MongoDB
+        inserted_entry = db.journal_entries.insert_one(journal_entry)
+        journal_entry["_id"] = str(inserted_entry.inserted_id)  # Convert ObjectId to string for response
+        journal_entry["user_id"] = str(journal_entry["user_id"]) 
+
+        return jsonify({"message": "Journal entry saved successfully", "entry": journal_entry}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+
+@app.route("/get-journal-entries", methods=["GET"])
+@jwt_required()
+def get_journal_entries():
+    try:
+        user_id = get_jwt_identity()
+        print("Fetching journal entries for user:", user_id)
+
+        # Retrieve user's journal entries from MongoDB
+        journal_entries = db.journal_entries.find({"user_id": ObjectId(user_id)})
+
+        # Convert entries to a list and serialize ObjectIds
+        entries_list = []
+        for entry in journal_entries:
+            entry["_id"] = str(entry["_id"])  # Convert ObjectId to string
+            entry["user_id"] = str(entry["user_id"])  # Convert user_id to string
+            entries_list.append(entry)
+
+        entries_list.reverse()
+
+        print("Fetched entries:", entries_list)  # Debugging
+
+        if not entries_list:
+            return jsonify({"message": "No journal entries found"}), 200
+
+        return jsonify({"entries": entries_list}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -487,8 +518,8 @@ import torch
 import boto3
 
 s3 = boto3.client('s3')
-s3.download_file('sentiobucket', 'model.pt', '/tmp/model.pt')
-model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
+#s3.download_file('sentiobucket', 'model.pt', '/tmp/model.pt')
+#model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
 
 # Look db_info.txt for aws credentials
 # s3 = boto3.client(
@@ -541,9 +572,9 @@ def community_trends():
 #  Personalized AI
 #  Train wth Sagamaker Pipeline on cloud 
 
-sagemaker = boto3.client('sagemaker')
+#sagemaker = boto3.client('sagemaker')
 
-def train_personal_model(user_id):
+""" def train_personal_model(user_id):
     response = sagemaker.create_training_job(
         TrainingJobName=f"user-model-{user_id}",
         AlgorithmSpecification={"TrainingImage": "your-custom-image"},
@@ -552,18 +583,18 @@ def train_personal_model(user_id):
         ResourceConfig={"InstanceType": "ml.m5.large", "InstanceCount": 1, "VolumeSizeInGB": 10},
         StoppingCondition={"MaxRuntimeInSeconds": 3600}
     )
-    return response 
+    return response  """
 
 #  Global AI
 #  Train wth Sagamaker Pipeline on cloud 
-stepfunctions = boto3.client('stepfunctions')
+#stepfunctions = boto3.client('stepfunctions')
 
-def start_global_ai_training():
+""" def start_global_ai_training():
     response = stepfunctions.start_execution(
         stateMachineArn="arn:aws:states:us-east-1:123456789012:stateMachine:GlobalAIUpdate",
         input="{}"
     )
-    return response
+    return response """
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

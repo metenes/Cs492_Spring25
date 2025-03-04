@@ -1,7 +1,8 @@
-
-const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+import AsyncStorage from "@react-native-async-storage/async-storage";
+//const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 // const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
+const API_URL = "http://10.203.122.69:5000";
 
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -82,6 +83,16 @@ export const loginUser = async (email: string, password: string) => {
     if (!response.ok) {
       throw new Error(responseData.message || "Invalid email or password");
     }
+
+    if (!responseData.access_token) {
+      console.error("❌ Login successful but no token received!");
+      throw new Error("No access token received.");
+    }
+
+    console.log("✅ Login successful. Token received:", responseData.access_token);
+
+    await AsyncStorage.setItem("userToken", responseData.access_token);
+    console.log("🔹 Token successfully saved to AsyncStorage!");
 
     return responseData; 
   } catch (error) {
@@ -181,4 +192,56 @@ export const resetPassword = async (email: string) => {
   }
 
   return await response.json(); // Return success message
+};
+
+export const saveJournalEntry = async (token: string, content: string, images?: string[], category: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) {
+      console.error("❌ No token found in AsyncStorage!");
+      throw new Error("Authentication error: No token found.");
+    }
+    console.log("✅ Using token for request:", token);
+
+    const response = await fetch(`${API_URL}/save-journal-entry`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content, images, category }),
+    });
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error saving journal entry:", error);
+    return { error: "Network error" };
+  }
+};
+
+export const fetchJournalEntries = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/get-journal-entries`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    console.log("API Response Status:", response.status);
+
+    if (!response.ok) {
+      console.error("❌ Failed to fetch journal entries:", responseData.error);
+      return { error: responseData.error };
+    }
+
+    const responseData = await response.json();
+    console.log("✅ Received Journal Entries:", responseData);
+
+    return responseData.entries; // Return journal entries for frontend
+    //return await response.json();
+  } catch (error) {
+    console.error("Error fetching journal entries:", error);
+    return { error: "Network error" };
+  }
 };

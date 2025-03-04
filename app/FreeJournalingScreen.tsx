@@ -12,10 +12,13 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-// import * as ImagePicker from "expo-image-picker";
-// import * as MediaLibrary from "expo-media-library";
+import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import { Audio } from "expo-av"; // For microphone permission
 import BottomNavigation from './BottomNavigation';
+
+import { saveJournalEntry } from "./services/ApiService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
   FreeJournaling: undefined;
@@ -43,7 +46,7 @@ const FreeJournalingScreen = () => {
 
   // Pick multiple images from the gallery
   const pickImage = async () => {
-    /*
+    
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -56,7 +59,7 @@ const FreeJournalingScreen = () => {
     if (!result.canceled) {
       const selectedUris = result.assets.map((asset) => asset.uri);
       setImageUris([...imageUris, ...selectedUris]); // Append new images
-    } */ 
+    } 
   };
 
   // Remove an image from the selection
@@ -64,6 +67,50 @@ const FreeJournalingScreen = () => {
     setImageUris(imageUris.filter((image) => image !== uri));
     setSelectedImage(null); // Close modal after deletion
   };
+
+  const handleSaveEntry = async () => {
+    const token = await AsyncStorage.getItem("userToken"); // Ensure token is retrieved
+    if (!token) {
+      console.error("❌ No token found in AsyncStorage!");
+      alert("Authentication error. Please log in again.");
+      return;
+    }
+
+    console.log("✅ Token retrieved:", token); // Debugging
+    const entryData = { text: content, images: imageUris };
+
+    const response = await saveJournalEntry(token, content, imageUris);
+    console.log(response)
+    if (response.error) {
+      alert("Failed to save journal entry.");
+    } else {
+      alert("Journal entry saved successfully!");
+      navigation.navigate("Home");
+    }
+    /* if (!content.trim()) {
+      alert("Journal entry cannot be empty.");
+      return;
+    }
+  
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        console.error("Token is missing.");
+        return;
+      }
+  
+      const response = await saveJournalEntry(token, content, imageUris);
+  
+      if (response.error) {
+        alert("Failed to save journal entry.");
+      } else {
+        alert("Journal entry saved!");
+        navigation.navigate("Home"); // Redirect to Home after saving
+      }
+    } catch (error) {
+      console.error("Error saving journal entry:", error);
+    } */
+  };  
 
   return (
     <>
@@ -148,7 +195,8 @@ const FreeJournalingScreen = () => {
                 alignItems: "center",
                 flex: 1,
               }}
-              onPress={() => navigation.navigate("Home"/*"Saving", { content, imageUris }*/)}
+              //onPress={() => navigation.navigate("Home"/*"Saving", { content, imageUris }*/)}
+              onPress={handleSaveEntry}
             >
               <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
             </TouchableOpacity>
