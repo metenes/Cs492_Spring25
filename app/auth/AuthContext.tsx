@@ -37,11 +37,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
+export const storeToken = async (token: string) => {
+  try {
+      await AsyncStorage.setItem("userToken", token);
+  } catch (error) {
+      console.error("Error saving token:", error);
+  }
+};
+
+export const getToken = async () => {
+  try {
+      const token = await AsyncStorage.getItem("userToken");
+      console.log("🔹 Retrieved Token:", token);
+      return token;
+  } catch (error) {
+      console.error("Error retrieving token:", error);
+      return null;
+  }
+};
+
 // Custom hook for accessing the auth context
-export const useAuth = () => {
+export const useAuth = async () => {
   const context = useContext(AuthContext);
+  const token = await getToken();
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+  console.log("🔹 Token in AsyncStorage:", token);
+
   return context;
 };

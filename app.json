@@ -3,7 +3,7 @@
   "displayName": "Sentio",
   "expo": {
     "name": "Sentio",
-    "slug": "Sentio",
+    "slug": "sentio",
     "scheme": "sentio",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -68,10 +68,17 @@
         }
       ],
       "expo-font"
+      
     ],
     "experiments": {
       "tsconfigPaths": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "de3f67a9-9ce0-4d3f-b73b-762734032bcb"
+      }
+    },
+    "owner": "mmmsd"
   },
   "ignite": {
     "version": "10.0.5"

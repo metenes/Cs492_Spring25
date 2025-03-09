@@ -22,7 +22,7 @@ import PasswordResetScreen from "./PasswordResetScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 import CheckInScreen from "./CheckInScreen";
-
+import FaceEmotionScreen from "./FaceEmotionScreen";
 import FreeJournalingScreen from "./FreeJournalingScreen";
 import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
@@ -111,6 +111,8 @@ const AppNavigation = () => {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+        <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
+
         {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
         {/* Fix the Header Title for DiaryMain */}
         <Stack.Screen 

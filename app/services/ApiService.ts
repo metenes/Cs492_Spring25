@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-//const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
-// const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
+// const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+ const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
-const API_URL = "http://10.203.122.69:5000";
+// const API_URL = "http://10.203.122.69:5000";
 
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -194,7 +194,7 @@ export const resetPassword = async (email: string) => {
   return await response.json(); // Return success message
 };
 
-export const saveJournalEntry = async (token: string, content: string, images?: string[], category: string) => {
+export const saveJournalEntry = async (token: string, content: string, images?: string[], category?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) {
@@ -227,7 +227,7 @@ export const fetchJournalEntries = async (token: string) => {
         Authorization: `Bearer ${token}`,
       },
     });
-
+    const responseData = await response.json();
     console.log("API Response Status:", response.status);
 
     if (!response.ok) {
@@ -235,7 +235,7 @@ export const fetchJournalEntries = async (token: string) => {
       return { error: responseData.error };
     }
 
-    const responseData = await response.json();
+    
     console.log("✅ Received Journal Entries:", responseData);
 
     return responseData.entries; // Return journal entries for frontend

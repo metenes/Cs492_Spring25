@@ -1,100 +1,69 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
-import { Camera, useCameraDevices } from "react-native-vision-camera";
-import axios from "axios";
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { useState } from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const FaceEmotionScreen = () => {
-  const devices = useCameraDevices();
-  const cameraDevice =  devices.filter((device) => device.position === 'front')[0]; // Get the front camera
-  const [emotion, setEmotion] = useState("Detecting...");
-  const [capturing, setCapturing] = useState(false);
+export default function App() {
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [permission, requestPermission] = useCameraPermissions();
 
-  useEffect(() => {
-    (async () => {
-      const cameraPermission = await Camera.requestCameraPermission();
-      if (cameraPermission.toString() !== "authorized") {
-        alert("Camera permission denied");
-      }
-    })();
-  }, []);
+  if (!permission) {
+    // Camera permissions are still loading.
+    return <View />;
+  }
 
-  const captureAndAnalyze = async (camera: React.RefObject<Camera>) => {
-    if (!camera.current) return;
+  if (!permission.granted) {
+    // Camera permissions are not granted yet.
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <Button onPress={requestPermission} title="grant permission" />
+      </View>
+    );
+  }
 
-    try {
-        setCapturing(true);
-        const photo = await camera.current.takePhoto({
-          flash: 'off'
-        });
-
-      // Convert to Base64 and send to backend
-      // AWS 
-      const response = await axios.post("http://api/emotion", {
-        image: photo.path,
-      });
-
-      setEmotion(response.data.emotion);
-    } catch (error) {
-      console.error("Error capturing or analyzing image:", error);
-    } finally {
-      setCapturing(false);
-    }
-  };
-
-  // Create a ref for the camera
-  const cameraRef = React.useRef<Camera>(null);
-
-  if (!cameraDevice) return <Text>No camera found</Text>;
+  function toggleCameraFacing() {
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
+  }
 
   return (
     <View style={styles.container}>
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        device={cameraDevice}
-        isActive={true}
-        photo={true}
-      />
-      <Text style={styles.emotionText}>Emotion: {emotion}</Text>
-
-      <TouchableOpacity
-        style={[styles.captureButton, capturing && { backgroundColor: "#999" }]}
-        onPress={() => captureAndAnalyze(cameraRef)}
-        disabled={capturing}
-      >
-        <Text style={styles.buttonText}>
-          {capturing ? "Analyzing..." : "Capture Emotion"}
-        </Text>
-      </TouchableOpacity>
+      <CameraView style={styles.camera} facing={facing}>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
+            <Text style={styles.text}>Flip Camera</Text>
+          </TouchableOpacity>
+        </View>
+      </CameraView>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#fff"
+    justifyContent: 'center',
+  },
+  message: {
+    textAlign: 'center',
+    paddingBottom: 10,
   },
   camera: {
-    width: "100%",
-    height: 400
+    flex: 1,
   },
-  emotionText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    margin: 16
+  buttonContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: 'transparent',
+    margin: 64,
   },
-  captureButton: {
-    backgroundColor: "#000",
-    padding: 12,
-    borderRadius: 10
+  button: {
+    flex: 1,
+    alignSelf: 'flex-end',
+    alignItems: 'center',
   },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16
+  text: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
   },
 });
-
-export default FaceEmotionScreen;

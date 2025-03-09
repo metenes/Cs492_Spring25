@@ -5,7 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
+import {storeToken} from './auth/AuthContext'
 import BottomNavigation from './BottomNavigation';
 import { ScrollView } from "react-native";
 
@@ -38,8 +38,8 @@ type Entry = {
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
-const HomeScreen = () => {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
+const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) => {
+  // const navigation = useNavigation<HomeScreenNavigationProp>();
 
   // Animation state for the floating menu
   const [isMenuOpen, setMenuOpen] = useState(false);
@@ -93,6 +93,14 @@ const HomeScreen = () => {
   console.log("STARTING FROM HERE")
 
   useEffect(() => {
+    const checkStoredToken = async () => {
+        const token = await AsyncStorage.getItem("userToken");
+        if (token) {
+            console.log("🔹 Found Token:", token);
+            storeToken(token); // ✅ Save token in state
+        }
+    };
+    checkStoredToken();
     const loadEntries = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
@@ -107,7 +115,7 @@ const HomeScreen = () => {
           }
         
           setEntries(fetchedEntries);
-          print(entries)
+          // print(entries)
         }
       } catch (error) {
         console.error("❌ Error loading journal entries:", error);
@@ -210,8 +218,8 @@ const HomeScreen = () => {
         <Icon name="edit-2" size={20} color="#000" />
       </View>
       <View style={styles.entryContent}>
-        <Text style={styles.entryDate}>{format(new Date(item.timestamp), "EEEE, MMM d yyyy")}</Text>
-        <Text style={styles.entrySubtitle}>{item.category || "Freeform Journal"}</Text>
+        <Text style={styles.entryContent}>{format(new Date(item.timestamp), "EEEE, MMM d yyyy")}</Text>
+        <Text style={styles.entryContent}>{item.category || "Freeform Journal"}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -242,7 +250,7 @@ const HomeScreen = () => {
       </ScrollView>
       </View>
 
-      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item.id} style={styles.list} 
+      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item._id} style={styles.list} 
         ListEmptyComponent={<Text>No journal entries found.</Text>}
       />
 
@@ -275,7 +283,8 @@ const HomeScreen = () => {
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                navigation.navigate("FreeJournaling");
+                console.log("Navigating to CheckIn...")
+                navigation.navigate("CheckIn");
               }}
             >
               <Icon name="edit-2" size={20} color="black" />
@@ -285,11 +294,24 @@ const HomeScreen = () => {
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
+                console.log("Navigating to FreeJournaling...")
+
                 navigation.navigate("FreeJournaling");
               }}
             >
               <Icon name="book-open" size={20} color="black" />
               <Text style={styles.menuText}>Prompts</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                console.log("Navigating to FaceEmotion...")
+                navigation.navigate("FaceEmotion");
+              }}
+            >
+              <Icon name="smile" size={20} color="black" />
+              <Text style={styles.menuText}>Face Analysis</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -411,10 +433,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
+/**/
   menuText: {
     marginLeft: 10,
     fontSize: 16,
   },
+  entryDate : {
+    
+  },
+
+  entrySubtitle :{
+
+  }
 });
 
 export default HomeScreen;
