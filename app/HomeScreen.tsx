@@ -284,7 +284,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               onPress={() => {
                 setMenuOpen(false);
                 console.log("Navigating to CheckIn...")
-                navigation.navigate("CheckIn");
+                navigation.navigate("FreeJournaling");
               }}
             >
               <Icon name="edit-2" size={20} color="black" />

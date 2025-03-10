@@ -2,9 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import mongoose from "mongoose" // for schema in MongoDB similar to table 
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
- const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
+ //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 // const API_URL = "http://10.203.122.69:5000";
+const API_URL = "http://139.179.206.4:5000"; // Melisa's API - LAN
 
 export const analyzeSentiment = async (text: string) => {
   try {
