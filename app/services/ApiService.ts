@@ -5,7 +5,7 @@ import mongoose from "mongoose" // for schema in MongoDB similar to table
  //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 // const API_URL = "http://10.203.122.69:5000";
-const API_URL = "http://139.179.206.4:5000"; // Melisa's API - LAN
+const API_URL = "http://172.20.10.2:5000"; // Melisa's API - LAN
 
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -26,28 +26,86 @@ export const analyzeSentiment = async (text: string) => {
     return { error: "Failed to analyze sentiment." };
   }
 };
-// for dashboard
-export const fetchSentimentAnalysis = async (token: string, startDate: string, endDate: string, interval: string = "monthly", emotions: string[] = []) => {
+
+
+
+export const fetchSentimentAnalysis = async (
+  start_date: string,   // Format: "YYYY-MM-DD"
+  end_date: string,     // Format: "YYYY-MM-DD"
+  interval: string = "monthly",  // "daily", "weekly", "monthly", or "yearly"
+  emotions?: string     // Optional: comma-separated list of emotion codes (e.g., "1,2,3")
+) => {
   try {
-    const emotionsQuery = emotions.length > 0 ? `&emotions=${emotions.join(",")}` : "";
-    const response = await fetch(`${API_URL}/api/sentiment-analysis?start_date=${startDate}&end_date=${endDate}&interval=${interval}${emotionsQuery}`, {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) {
+      throw new Error("No token found. Please log in.");
+    }
+
+    const params = new URLSearchParams();
+    params.append("start_date", start_date);
+    params.append("end_date", end_date);
+    params.append("interval", interval);
+    if (emotions) {
+      params.append("emotions", emotions);
+    }
+
+    const url = `${API_URL}/api/sentiment-analysis?${params.toString()}`;
+    console.log("Fetching sentiment analysis from URL:", url);
+
+    const response = await fetch(url, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-      },
+        "Authorization": `Bearer ${token}`
+      }
     });
-    
+
     if (!response.ok) {
+      console.error("API response not OK:", response.statusText);
       throw new Error(`Error: ${response.statusText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log("API sentiment analysis data:", data);
+    return data;
   } catch (error) {
     console.error("Error fetching sentiment analysis:", error);
     return { error: "Failed to fetch sentiment analysis." };
   }
 };
+
+
+
+export const fetchJournalEntriesWithDate = async (
+  start_date: string,
+  end_date: string
+) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) {
+      throw new Error("No token found. Please log in.");
+    }
+    const params = new URLSearchParams();
+    params.append("start_date", start_date);
+    params.append("end_date", end_date);
+
+    const response = await fetch(`${API_URL}/api/journal-entries?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching journal entries:", error);
+    return { error: "Failed to fetch journal entries." };
+  }
+};
+
 export const sendMessage = async (message: string) => {
   try {
     const response = await fetch(`${API_URL}/chat`, {
