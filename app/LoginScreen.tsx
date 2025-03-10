@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { loginUser } from "./services/ApiService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -26,14 +25,16 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     try {
-      //const response = await loginUser(email, password);
-      const response = { access_token: "random" }
+      const response = await loginUser(email, password);
+      // loginUser already saves the token as "userToken" in AsyncStorage
+   
+      
       if (!response.access_token) {
         Alert.alert("Error", "No access token received!");
         throw new Error("No access token received");
       }
   
-      await AsyncStorage.setItem("token", response.access_token);
+      // No need to save token again - it's already saved in the loginUser function
       Alert.alert("Success", "Logged in successfully!");
       navigation.navigate("Home");
     } catch (error: unknown) {
@@ -45,7 +46,6 @@ const LoginScreen = () => {
     }
   };
   
-
   return (
     <View style={styles.container}>
       {/* App Title */}

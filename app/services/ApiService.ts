@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import mongoose from "mongoose" // for schema in MongoDB similar to table 
+
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
- const API_URL = "http://192.168.1.65:5000"; // Bilkent Dorms - LAN 
+ const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // const API_URL = "http://192.168.x.x:5000"; // Use your machine's IP.
 // const API_URL = "http://10.203.122.69:5000";
 
@@ -101,28 +103,55 @@ export const loginUser = async (email: string, password: string) => {
   }
 };
 
+export const registerUser = async (email: string, password: string, dob: string) => {
+  console.log("registerUser() email, password, dob:", email, password, dob);
+  console.log(`Attempting to connect to: ${API_URL}/register`);
 
-export const registerUser = async (email: string, password: string) => {
-  console.log("registerUser() email: , password  ", email, password);
   try {
     const response = await fetch(`${API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, dob }),
     });
 
+    console.log("Register response status:", response.status);
+    console.log("Register response headers:", response.headers);
+
+    // Get the raw text first to debug
+    const responseText = await response.text();
+    console.log("Raw response:", responseText.substring(0, 200) + "..."); // Log first 200 chars
+
+    // If it's not valid JSON, don't try to parse it
     if (!response.ok) {
-      const errorData = await response.json();
-      console.log("registerUser() failed DONE... response: ", errorData);
-      throw new Error(`Registration failed: ${errorData.error}`);
+      if (responseText.includes("<html") || responseText.includes("<!DOCTYPE")) {
+        console.error("Received HTML instead of JSON");
+        throw new Error(`Registration failed: Server returned HTML instead of JSON. Status: ${response.status}`);
+      } else {
+        // Try to parse JSON if it looks like JSON
+        try {
+          const errorData = JSON.parse(responseText);
+          console.log("registerUser() failed response:", errorData);
+          throw new Error(`Registration failed: ${errorData.error || "Unknown error"}`);
+        } catch (parseError) {
+          console.error("Could not parse error response:", parseError);
+          throw new Error(`Registration failed with status ${response.status}. Response could not be parsed.`);
+        }
+      }
     }
 
-    return await response.json();
+    // If response was ok, try to parse the JSON
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Could not parse successful response:", parseError);
+      throw new Error("Registration succeeded but response was not valid JSON");
+    }
   } catch (error) {
-    console.error("registerUser() error: ", error);
+    console.error("registerUser() error:", error);
     throw error;
   }
 };
+
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
@@ -137,7 +166,17 @@ export const fetchProfile = async (token: string) => {
     throw new Error(`Failed to fetch profile: ${response.statusText}`);
   }
 
-  return await response.json();  
+  const responseData = await response.json();
+
+  // Make sure the profile data includes the new context information
+  return {
+    email: responseData.email,
+    profile_picture: responseData.profile_picture,
+    preferences: responseData.preferences,
+    last_login: responseData.last_login,
+    role: responseData.role,
+    account_status: responseData.account_status,
+  };
 };
 
 // Update the user's password
@@ -244,4 +283,21 @@ export const fetchJournalEntries = async (token: string) => {
     console.error("Error fetching journal entries:", error);
     return { error: "Network error" };
   }
+};
+
+export const updatePreferences = async (token: string, preferences: object) => {
+  const response = await fetch(`${API_URL}/update-preferences`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ preferences }), // Send updated preferences in the body
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update preferences: ${response.statusText}`);
+  }
+
+  return await response.json(); // Return updated preferences
 };

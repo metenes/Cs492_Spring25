@@ -5,6 +5,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
+# import bcrypt
 from flask_mail import Mail, Message
 from bson.objectid import ObjectId
 import os
@@ -22,6 +23,10 @@ import cv2
 import numpy as np
 import base64
 from deepface import DeepFace
+# User token 
+from functools import wraps
+from flask import request
+
 
 app = Flask(__name__)
 CORS(app)
@@ -50,6 +55,7 @@ mail = Mail(app)
 jwt = JWTManager(app)
 bcrypt = Bcrypt(app)
 
+# bcrypt.init_app(app) 
 # MongoDB Connection (Using `retryWrites=true&w=majority` for SSL fix)
 # MONGO_URI = "mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/mydb?retryWrites=true&w=majority&tls=true&tlsCAFile=<path_to_ca_file>"
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
@@ -66,6 +72,34 @@ try:
 except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
     exit(1)
+
+
+# ---------------------------------------
+#  User Token check 
+# ---------------------------------------
+
+# Middleware to verify token
+def token_required(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if not token:
+            return jsonify({"error": "Token is missing"}), 403
+
+        try:
+            # Decode the token using the SECRET_KEY
+            token = token.split(" ")[1]  # Extract token from "Bearer token" format
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            request.user = decoded  # Store decoded data in request for access in route
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorator
+
 
 # ---------------------------------------
 #  Time classification 
@@ -94,67 +128,131 @@ def get_period_of_day(timestamp):
 #  **Fixing Register Endpoint**
 # ---------------------------------------
 
-@app.route("/register", methods=["POST"])
+@app.route('/register', methods=['POST'])
 def register():
     try:
-        data = request.json
-        email = data.get("email")
-        password = data.get("password")
-        print("here")
-        if not email or not password:
-            print("Email and password are required")
-            return jsonify({"error": "Email and password are required"}), 400
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        email = data.get('email')
+        password = data.get('password')
+        dob = data.get('dob')
+        
+        if not email or not password or not dob:
+            return jsonify({"error": "Missing required fields (email, password, or dob)"}), 400
 
-        # Check if the user already exists
+        # Check if email already exists
         if users_collection.find_one({"email": email}):
-            return jsonify({"error": "User already exists"}), 400
+            return jsonify({"error": "Email already in use"}), 400
 
-        # Hash password before saving
-        registration_time = datetime.now()
-        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-        new_user = {
+        # Hash password - DO NOT USE
+        # For py-bcrypt: --> REMOVE EVERY INSTANCE OF THIS IF EXIST, RE-START SERVER DO NOT RELOAD EXPO
+        # import bcrypt
+        # hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+        # OR for flask-bcrypt:
+        #from flask_bcrypt import Bcrypt
+        #bcrypt = Bcrypt(app)
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+
+        # Set default preferences
+        preferences = "default"  # This was undefined in your original code
+
+        # Create user document
+        user = {
             "email": email,
             "password": hashed_password,
-            "created_at": registration_time,
+            "dob": dob,
+            "preferences": preferences,
+            "profile_picture": "",
+            "last_login": datetime.now(),
+            "created_at": datetime.now(),
+            "role": "user",
+            "account_status": "active",
+            "two_factor_enabled": False
         }
-        users_collection.insert_one(new_user)
-        print("register ended ... ")
-        return jsonify({"message": "User registered successfully"}), 201
+
+        # Insert into MongoDB
+        result = users_collection.insert_one(user)
+
+        # Create JWT token
+        # Create JWT token - using the proper method
+        # Option 1: If using PyJWT directly
+        # token = jwt.encode_key_loader({"user_id": str(result.inserted_id)}, SECRET_KEY, algorithm="HS256")
+        token = create_access_token(identity=str(result.inserted_id))
+
+        # If token is returned as bytes (depends on jwt version), decode it
+        if isinstance(token, bytes):
+            token = token.decode('utf-8')
+
+        return jsonify({
+            "access_token": token,
+            "user": {
+                "email": email,
+                "profile_picture": "",
+                "preferences": preferences,
+                "last_login": str(datetime.now()),  # Convert datetime to string for JSON serialization
+            }
+        }), 201
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Log the error for debugging
+        print(f"Registration error: {str(e)}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 # ---------------------------------------
 #  **Fixing Login Endpoint**
 # ---------------------------------------
-@app.route("/login", methods=["POST"])
-def login():
-    try:
-        data = request.json
-        email = data.get("email")
-        password = data.get("password")
 
-        print(f"🔹 Login Attempt: email={email}, password={password}")
+@app.route('/login', methods=['POST'])
+def login_user():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON or Content-Type header missing"}), 400
+        email = data.get('email')
+        password = data.get('password')
+
+        print(email)
+        print(password)
 
         if not email or not password:
-            return jsonify({"error": "Email and password are required"}), 400
-
-        # Fetch user from MongoDB
+            return jsonify({"error": "Email and password are required"})
+        
         user = users_collection.find_one({"email": email})
-        if not user:
-            return jsonify({"error": "Invalid credentials"}), 401
+        if not user or not bcrypt.check_password_hash(user['password'].encode('utf-8'),password):
+            return jsonify({"error": "Invalid email or password"}), 400
 
-        # Check password
-        if not bcrypt.check_password_hash(user["password"], password):
-            return jsonify({"error": "Invalid credentials"}), 401
+        # Generate JWT token using Flask-JWT-Extended
+        from flask_jwt_extended import create_access_token
+        token = create_access_token(identity=str(user['_id']))
 
-        # Generate JWT token
-        access_token = create_access_token(identity=str(user["_id"]))  # You can pass user ID as string
-        print(f"LOGIN {access_token}")
+        # Update last login time
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"last_login": str(datetime.now())}}
+        )
 
-        return jsonify({"access_token": access_token}), 200
+        response = jsonify({
+            "access_token": token,
+            "user": {
+                "email": user['email'],
+                "profile_picture": user.get('profile_picture', ''),
+                "preferences": user.get('preferences', {}),
+                "last_login": str(datetime.now()),
+            }
+        })
+            # Force content type
+        response.headers['Content-Type'] = 'application/json'
+        return response
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+            # Log the error server-side
+            print(f"Login error: {str(e)}")
+            # Return a proper JSON error response instead of letting Flask handle it
+            return jsonify({"error": "Server error during login", "details": str(e)}), 500
 
 # ---------------------------------------
 #  **Protected Route**
@@ -183,16 +281,56 @@ def protected():
 @app.route("/profile", methods=["GET"])
 @jwt_required()
 def profile():
+    token = request.headers.get('Authorization').split(" ")[1]
     try:
-        user_id = get_jwt_identity()
-        user = users_collection.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = decoded_token["user_id"]
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
 
-        if not user:
+        if user:
+            return jsonify({
+                "email": user['email'],
+                "profile_picture": user.get('profile_picture', ''),
+                "preferences": user.get('preferences', {}),
+                "last_login": user.get('last_login', datetime.now()),
+                "role": user.get('role', 'user'),
+                "account_status": user.get('account_status', 'active')
+            })
+        else:
             return jsonify({"error": "User not found"}), 404
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token has expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
 
-        return jsonify({"email": user["email"], "created_at": user["created_at"]}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+# ---------------------------------------
+#  **Preferences Update**
+# ---------------------------------------
+
+@app.route('/update-preferences', methods=['POST'])
+def update_preferences():
+    token = request.headers.get('Authorization').split(" ")[1]
+    data = request.get_json()
+    preferences = data.get('preferences')
+
+    try:
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = decoded_token["user_id"]
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"preferences": preferences}}
+        )
+
+        if result.modified_count > 0:
+            return jsonify({"message": "Preferences updated successfully"})
+        else:
+            return jsonify({"error": "Failed to update preferences"}), 400
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token has expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+
 
 # ---------------------------------------
 #  **Activity Logging**
@@ -210,7 +348,7 @@ def track_activity():
         activities_collection.insert_one({
             "user_id": user_id,
             "activity": activity,
-            "timestamp": datetime.datetime.utcnow()
+            "timestamp": datetime.now()
         })
 
         return jsonify({"message": "Activity logged successfully"}), 200

@@ -97,7 +97,7 @@ const BottomTabs = () => {
 const AppNavigation = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Dashboard" >
+      <Stack.Navigator initialRouteName="Login" >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
         <Stack.Screen 
