@@ -6,7 +6,7 @@ const API_URL = "http://10.203.122.69:5000";
 
 export const analyzeSentiment = async (text: string) => {
   try {
-    const response = await fetch(`${API_URL}/analyze`, {
+    const response = await fetch(`${API_URL}/journal/analyze`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -27,7 +27,7 @@ export const analyzeSentiment = async (text: string) => {
 export const fetchSentimentAnalysis = async (token: string, startDate: string, endDate: string, interval: string = "monthly", emotions: string[] = []) => {
   try {
     const emotionsQuery = emotions.length > 0 ? `&emotions=${emotions.join(",")}` : "";
-    const response = await fetch(`${API_URL}/api/sentiment-analysis?start_date=${startDate}&end_date=${endDate}&interval=${interval}${emotionsQuery}`, {
+    const response = await fetch(`${API_URL}/sentiment/api/sentiment-analysis?start_date=${startDate}&end_date=${endDate}&interval=${interval}${emotionsQuery}`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -67,7 +67,7 @@ export const sendMessage = async (message: string) => {
 
 export const loginUser = async (email: string, password: string) => {
   try {
-    const response = await fetch(`${API_URL}/login`, {
+    const response = await fetch(`${API_URL}/user/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -105,7 +105,7 @@ export const loginUser = async (email: string, password: string) => {
 export const registerUser = async (email: string, password: string) => {
   console.log("registerUser() email: , password  ", email, password);
   try {
-    const response = await fetch(`${API_URL}/register`, {
+    const response = await fetch(`${API_URL}/user/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -126,7 +126,7 @@ export const registerUser = async (email: string, password: string) => {
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
-  const response = await fetch(`${API_URL}/profile`, {
+  const response = await fetch(`${API_URL}/user/profile`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`, 
@@ -179,7 +179,7 @@ export const fetchActivities = async (token: string) => {
 };
 
 export const resetPassword = async (email: string) => {
-  const response = await fetch(`${API_URL}/forgot-password`, {
+  const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -203,7 +203,7 @@ export const saveJournalEntry = async (token: string, content: string, images?: 
     }
     console.log("✅ Using token for request:", token);
 
-    const response = await fetch(`${API_URL}/save-journal-entry`, {
+    const response = await fetch(`${API_URL}/journal/save-journal-entry`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -221,7 +221,7 @@ export const saveJournalEntry = async (token: string, content: string, images?: 
 
 export const fetchJournalEntries = async (token: string) => {
   try {
-    const response = await fetch(`${API_URL}/get-journal-entries`, {
+    const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,

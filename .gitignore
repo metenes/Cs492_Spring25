@@ -90,3 +90,4 @@ web-build/
 # Yarn
 .yarn/*
 /myenv
+__pycache__
