@@ -33,6 +33,8 @@ const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // New state variable for image picker warning
+  const [imagePickerWarning, setImagePickerWarning] = useState("");
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -40,17 +42,30 @@ const FreeJournalingScreen = () => {
     requestPermissions();
   }, []);
 
+  // Clear warning if image count drops below 5
+  useEffect(() => {
+    if (imageUris.length < 5 && imagePickerWarning) {
+      setImagePickerWarning("");
+    }
+  }, [imageUris]);
+
   // Request permissions for Media Library & Microphone
   const requestPermissions = async () => {
     await MediaLibrary.requestPermissionsAsync();
     await Audio.requestPermissionsAsync();
   };
 
-  // Pick multiple images from the gallery
+  // Pick multiple images from the gallery with a limit of 5 images in total
   const pickImage = async () => {
+    if (imageUris.length >= 5) {
+      setImagePickerWarning("You can only upload up to 5 images");
+      return;
+    }
+    const remaining = 5 - imageUris.length;
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
+      selectionLimit: remaining, // Limit the number of images the user can select
       allowsEditing: false,
       aspect: [4, 3],
       quality: 1,
@@ -59,8 +74,8 @@ const FreeJournalingScreen = () => {
     if (!result.canceled) {
       const selectedUris = result.assets.map((asset) => asset.uri);
       setImageUris([...imageUris, ...selectedUris]); // Append new images
-    } 
-    
+      setImagePickerWarning(""); // Clear warning if images are selected
+    }
   };
 
   // Remove an image from the selection
@@ -81,37 +96,14 @@ const FreeJournalingScreen = () => {
     const entryData = { text: content, images: imageUris };
 
     const response = await saveJournalEntry(token, content, imageUris);
-    console.log(response)
+    console.log(response);
     if (response.error) {
       alert("Failed to save journal entry.");
     } else {
       alert("Journal entry saved successfully!");
       navigation.navigate("Home");
     }
-    /* if (!content.trim()) {
-      alert("Journal entry cannot be empty.");
-      return;
-    }
-  
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        console.error("Token is missing.");
-        return;
-      }
-  
-      const response = await saveJournalEntry(token, content, imageUris);
-  
-      if (response.error) {
-        alert("Failed to save journal entry.");
-      } else {
-        alert("Journal entry saved!");
-        navigation.navigate("Home"); // Redirect to Home after saving
-      }
-    } catch (error) {
-      console.error("Error saving journal entry:", error);
-    } */
-  };  
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -196,7 +188,12 @@ const FreeJournalingScreen = () => {
             ))}
           </ScrollView>
         )}
-
+         {/* Image Picker Warning Message */}
+         {imagePickerWarning ? (
+          <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>
+            {imagePickerWarning}
+          </Text>
+        ) : null}
         {/* Button Container */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
           {/* Upload Image Button */}
@@ -228,6 +225,8 @@ const FreeJournalingScreen = () => {
             <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
           </TouchableOpacity>
         </View>
+
+       
 
         {/* Image Fullscreen Modal */}
         <Modal visible={!!selectedImage} transparent={true} animationType="fade">

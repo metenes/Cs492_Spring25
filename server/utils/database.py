@@ -3,7 +3,7 @@ import certifi
 import os
 import mongoengine
 # MongoDB Connection URI
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/")
+MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 
 # Initialize MongoDB connection
 def get_database():

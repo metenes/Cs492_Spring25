@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required
+from flask_jwt_extended import jwt_required
 from flask_bcrypt import Bcrypt
+# import bcrypt
 import os
 
 import torch
@@ -13,6 +14,9 @@ import cv2
 import numpy as np
 import base64
 from deepface import DeepFace
+# User token 
+from flask import request
+import jwt
 
 # importing the controller blueprints
 from controller.user_controller import user_bp
@@ -24,12 +28,12 @@ from controller.chat_controller import chat_bp
 from utils.database import db
 from utils.mail_config import mail
 from utils.load_model import model
+from utils.jwt_config import jwt_manager, SECRET_KEY
 
 
 app = Flask(__name__)
 CORS(app)
 
-SECRET_KEY = "sentioSecretKey"
 # Load ML Model
 model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 # if we need to use own fine tuning 
@@ -50,12 +54,10 @@ app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentiooffical@gmail.co
 app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR71456.")
 
 mail.init_app(app)
-jwt = JWTManager(app)
+jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-# ---------------------------------------
-# Function to create a JWT token
-# ---------------------------------------
+# bcrypt.init_app(app) 
 
 #def create_access_token(user_id):
 #    payload = {
@@ -140,19 +142,6 @@ def predict():
     response = model(input_text)
     
     return jsonify({"response": response})
-
-# Trend analysis 
-@app.route('/community-trends', methods=['GET'])
-def community_trends():
-    pipeline = [
-        {"$group": {
-            "_id": "$sentiments.emotion",
-            "count": {"$sum": 1}
-        }},
-        {"$sort": {"count": -1}}
-    ]
-    stats = list(db.users.aggregate(pipeline))
-    return jsonify(stats)
 
 # ---------------------------------------
 #  **Continiues Trainig  Model**

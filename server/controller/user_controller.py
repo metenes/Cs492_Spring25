@@ -8,6 +8,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from flask_mail import Message
 from utils.mail_config import mail
+from utils.jwt_config import decode_token
 
 # Initialize Blueprint for user routes
 user_bp = Blueprint("user_bp", __name__)
@@ -78,20 +79,30 @@ def login():
         return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------
+#  **Profile Route**
+# ---------------------------------------
 @user_bp.route("/profile", methods=["GET"])
 @jwt_required()
 def profile():
+    token = request.headers.get('Authorization').split(" ")[1]
     try:
-        user_id = get_jwt_identity()
-        user = users_collection.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+        user_id = decode_token(token)
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
 
-        if not user:
+        if user:
+            return jsonify({
+                "email": user['email'],
+                "profile_picture": user.get('profile_picture', ''),
+                "preferences": user.get('preferences', {}),
+                "last_login": user.get('last_login', datetime.now()),
+                "role": user.get('role', 'user'),
+                "account_status": user.get('account_status', 'active')
+            })
+        else:
             return jsonify({"error": "User not found"}), 404
-
-        return jsonify({"email": user["email"], "created_at": user["created_at"]}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # ---------------------------------------
 #  **Forgot Password**
@@ -112,5 +123,42 @@ def forgot_password():
         mail.send(msg)
 
         return jsonify({"message": "Password reset email sent"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+# Trend analysis 
+@user_bp.route('/community-trends', methods=['GET'])
+def community_trends():
+    pipeline = [
+        {"$group": {
+            "_id": "$sentiments.emotion",
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    stats = list(users_collection.aggregate(pipeline))
+    return jsonify(stats)
+
+@user_bp.route("/delete-user", methods=["DELETE"])
+@jwt_required()
+def delete_user():
+    try:
+        user_id = get_jwt_identity()  # Get user ID from JWT token
+
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+
+        # Find and delete the user from the database
+        result = users_collection.delete_one({"_id": ObjectId(user_id)})
+
+        if result.deleted_count == 0:
+            return jsonify({"error": "User not found"}), 404
+
+        # delete related journal entries for the user
+        from utils.database import journal_entries_collection
+        journal_entries_collection.delete_many({"user_id": user_id})
+        
+        return jsonify({"message": "User account deleted successfully"}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500

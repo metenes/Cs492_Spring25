@@ -12,7 +12,7 @@ export const AnalysisScreen = () => {
   useEffect(() => {
     const fetchMoodData = async () => {
       try {
-        const response = await fetch("https://your-backend-api.com/api/mood-analysis");
+        const response = await fetch("https://api/mood-analysis");
         const data = await response.json();
 
         setMoodTrends(data.moodTrends);

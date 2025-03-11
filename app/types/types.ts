@@ -16,5 +16,7 @@ export type RootStackParamList = {
     PaymentMethodHistoryScreen: undefined;
     PaymentMethodSettingScreen: undefined;
     PaymentMethodAddScreen: undefined;
+    FaceEmotion : undefined;
+    CheckIn: undefined;
   };
   

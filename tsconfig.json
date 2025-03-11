@@ -22,7 +22,7 @@
     "paths": {
       "@/*": ["./app/*"],
       "assets/*": ["./assets/*"],
-      // "react": [ "./node_modules/@types/react" ], // For the react "icon" 
+      //  "react": [ "./node_modules/@types/react" ], // For the react "icon" 
       
     },
     "typeRoots": [
