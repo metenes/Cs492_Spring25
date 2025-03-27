@@ -325,44 +325,40 @@ export const resetPassword = async (email: string) => {
   return await response.json(); // Return success message
 };
 
-export const saveJournalEntry = async (
-  content: string,
-  images?: string[],
-  category?: string
-) => {
+export const saveJournalEntry = async (content: string, images?: string[], category?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
-    // 1. First get sentiment analysis
+    // Get sentiment analysis
     const sentimentResult = await analyzeSentiment(content);
-    console.log("🔍 STEP 1 - Sentiment analysis result:", JSON.stringify(sentimentResult, null, 2));
     
-    // 2. Map the emotions - This is likely where -1 is being introduced
-    const mappedSentiments = sentimentResult.emotions.map((emotion, index) => {
-      // Log before mapping
-      console.log(`
-        🔄 STEP 2a - Before mapping emotion ${index}:
-        Code: ${emotion.code} (type: ${typeof emotion.code})
-        Label: ${emotion.label}
-        Score: ${emotion.score}
-      `);
+    // Sort all emotions by score
+    const sortedEmotions = sentimentResult.emotions
+      .sort((a, b) => b.score - a.score);
 
-      // Create mapped emotion
-      const mappedEmotion = {
-        emotion: parseInt(emotion.code), // Explicitly parse as integer
-        percentage: emotion.score
-      };
+    // Always take the highest scoring emotion
+    const dominantEmotion = sortedEmotions[0];
+    
+    // Get additional emotions that meet the threshold
+    const additionalEmotions = sortedEmotions
+      .slice(1)  // Skip the first one as we already have it
+      .filter(emotion => emotion.score >= 0.65);
 
-      // Log after mapping
-      console.log(`        🔄 STEP 2b - After mapping:`, mappedEmotion);
-      return mappedEmotion;
-    });
+    // Combine dominant emotion with additional high-scoring emotions
+    const selectedEmotions = [dominantEmotion, ...additionalEmotions];
 
-    // 3. Log the mapped sentiments
-    console.log("✅ STEP 3 - Mapped sentiments:", JSON.stringify(mappedSentiments, null, 2));
+    console.log("Dominant emotion:", dominantEmotion);
+    console.log("Additional emotions meeting threshold:", additionalEmotions);
+    
+    // Map the emotions
+    const mappedSentiments = selectedEmotions.map(emotion => ({
+      emotion: emotion.code,
+      percentage: emotion.score
+    }));
 
-    // 4. Create entry data
+    console.log("Final mapped sentiments:", mappedSentiments);
+
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
@@ -373,10 +369,8 @@ export const saveJournalEntry = async (
       journalSentiments: mappedSentiments
     };
 
-    // 5. Log the final data before sending
-    console.log("📦 STEP 4 - Data being sent to server:", JSON.stringify(entryData, null, 2));
+    console.log("Final data being sent:", JSON.stringify(entryData, null, 2));
 
-    // 6. Send the request
     const response = await fetch(`${API_URL}/journal/save-journal-entry`, {
       method: "POST",
       headers: {
@@ -387,6 +381,8 @@ export const saveJournalEntry = async (
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Server response:", errorText);
       throw new Error(`Error: ${response.statusText}`);
     }
 
