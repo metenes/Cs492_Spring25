@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
 from flask_cors import CORS
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
 # import bcrypt
 import os
@@ -25,16 +25,19 @@ from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
 # importing the database and mail configurations
-from utils.database import db
+from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
 from utils.load_model import model
 from utils.jwt_config import jwt_manager, SECRET_KEY
+from datetime import datetime
+from bson import ObjectId
 
 
 app = Flask(__name__)
 CORS(app)
 
 # Load ML Model
+
 model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
@@ -68,6 +71,69 @@ bcrypt = Bcrypt(app)
 #    return token
 
 
+# 1. First define the route
+@journal_bp.route("/save-journal-entry", methods=["POST"])
+@jwt_required()
+def save_journal_entry():
+    try:
+        print("🔵 Starting save_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}")
+        
+        data = request.get_json()
+        print(f"🔹 Received data: {data}")
+        
+        # Extract data from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images', [])
+        journal_sentiments = data.get('journalSentiments', [])
+        
+        print(f"🔹 Extracted content: {entry_content[:50]}...")  # First 50 chars
+        print(f"🔹 Entry date: {entry_date}")
+        print(f"🔹 Number of images: {len(images)}")
+        print(f"🔹 Sentiments: {journal_sentiments}")
+        
+        # Validate required fields
+        if not entry_content:
+            print("❌ No entry content provided")
+            return jsonify({"error": "Entry content is required"}), 400
+            
+        # Create new journal entry
+        new_entry = {
+            "entryContent": entry_content,
+            "entryDate": entry_date or datetime.utcnow().isoformat(),
+            "images": images,
+            "journalSentiments": journal_sentiments
+        }
+        print(f"🔹 Created new entry object: {new_entry}")
+        
+        # Update the document using $push to add to the journalEntries array
+        print(f"🔹 Attempting to save to MongoDB for user {user_id}")
+        result = journal_entries_collection.update_one(
+            {"userId": ObjectId(user_id)},
+            {
+                "$push": {
+                    "journalEntries": new_entry
+                }
+            },
+            upsert=True  # Create if doesn't exist
+        )
+        
+        print(f"✅ MongoDB update result: matched={result.matched_count}, modified={result.modified_count}, upserted_id={result.upserted_id}")
+        
+        return jsonify({
+            "message": "Journal entry saved successfully",
+            "entry": new_entry
+        }), 201
+        
+    except Exception as e:
+        print(f"❌ Error saving journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()  # Print full stack trace
+        return jsonify({"error": str(e)}), 500
+
+# 2. THEN register all blueprints
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")

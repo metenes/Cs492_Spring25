@@ -22,7 +22,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
   FreeJournaling: undefined;
-  Saving: { content: string; imageUris?: string[] };
+  Home: undefined;
+  // ... other routes
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "FreeJournaling">;
@@ -85,23 +86,21 @@ const FreeJournalingScreen = () => {
   };
 
   const handleSaveEntry = async () => {
-    const token = await AsyncStorage.getItem("userToken"); // Ensure token is retrieved
-    if (!token) {
-      console.error("❌ No token found in AsyncStorage!");
-      alert("Authentication error. Please log in again.");
-      return;
-    }
+    try {
+      // No need to get token here since ApiService handles it
+      const response = await saveJournalEntry(content, imageUris);
+      
+      if (response.error) {
+        alert("Failed to save journal entry.");
+        console.error("Error saving entry:", response.error);
+        return;
+      }
 
-    console.log("✅ Token retrieved:", token); // Debugging
-    const entryData = { text: content, images: imageUris };
-
-    const response = await saveJournalEntry(token, content, imageUris);
-    console.log(response);
-    if (response.error) {
-      alert("Failed to save journal entry.");
-    } else {
       alert("Journal entry saved successfully!");
-      navigation.navigate("Home");
+      navigation.navigate("FreeJournaling"); // Update this to match your navigation type
+    } catch (error) {
+      console.error("Error in handleSaveEntry:", error);
+      alert("An error occurred while saving the journal entry.");
     }
   };
 
@@ -165,7 +164,7 @@ const FreeJournalingScreen = () => {
           {/* Hard Limit Reached Message */}
           {content.length >= MAX_CHAR_COUNT && (
             <Text style={{ color: "red", textAlign: "center", marginTop: 5, fontWeight: "bold" }}>
-              🚫 That’s an amazing entry! You've reached the limit, but you can always start a new one.
+              🚫 That's an amazing entry! You've reached the limit, but you can always start a new one.
             </Text>
           )}
         </View>

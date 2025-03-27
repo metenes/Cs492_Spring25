@@ -6,8 +6,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // const API_URL = "http://10.203.122.69:5000";
 const API_URL = "http://172.20.10.2:5000"; // Melisa's API - LAN
 
+// Define the emotions array to match the backend
+const EMOTIONS = [
+  "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+  "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+  "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+  "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+  "sadness", "surprise", "neutral"
+];
+
 export const analyzeSentiment = async (text: string) => {
   try {
+    console.log("🚀 Starting analyzeSentiment with text:", text.substring(0, 50) + "...");
+    
     const response = await fetch(`${API_URL}/sentiment/analyze`, {
       method: "POST",
       headers: {
@@ -15,14 +26,37 @@ export const analyzeSentiment = async (text: string) => {
       },
       body: JSON.stringify({ text }),
     });
+
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
     }
-    const data = await response.json();
+
+    const rawText = await response.text();
+    console.log("📡 Raw response text:", rawText);
+
+    const data = JSON.parse(rawText);
+    console.log("🔍 Parsed sentiment data:", JSON.stringify(data, null, 2));
+
+    // Verify emotions array
+    if (!data.emotions || !Array.isArray(data.emotions)) {
+      console.error("❌ Invalid emotions data:", data);
+      throw new Error("Invalid emotions data received");
+    }
+
+    // Log each emotion object
+    data.emotions.forEach((emotion: any, index: number) => {
+      console.log(`Emotion ${index}:`, {
+        code: emotion.code,
+        type: typeof emotion.code,
+        label: emotion.label,
+        score: emotion.score
+      });
+    });
+
     return data;
   } catch (error) {
-    console.error("Error analyzing sentiment:", error);
-    return { error: "Failed to analyze sentiment." };
+    console.error("❌ Error in analyzeSentiment:", error);
+    throw error;
   }
 };
 
@@ -291,30 +325,80 @@ export const resetPassword = async (email: string) => {
   return await response.json(); // Return success message
 };
 
-export const saveJournalEntry = async (token: string, content: string, images?: string[], category?: string) => {
+export const saveJournalEntry = async (
+  content: string,
+  images?: string[],
+  category?: string
+) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
-    if (!token) {
-      console.error("❌ No token found in AsyncStorage!");
-      throw new Error("Authentication error: No token found.");
-    }
-    console.log("✅ Using token for request:", token);
+    if (!token) throw new Error("No token found");
 
+    // 1. First get sentiment analysis
+    const sentimentResult = await analyzeSentiment(content);
+    console.log("🔍 STEP 1 - Sentiment analysis result:", JSON.stringify(sentimentResult, null, 2));
+    
+    // 2. Map the emotions - This is likely where -1 is being introduced
+    const mappedSentiments = sentimentResult.emotions.map((emotion, index) => {
+      // Log before mapping
+      console.log(`
+        🔄 STEP 2a - Before mapping emotion ${index}:
+        Code: ${emotion.code} (type: ${typeof emotion.code})
+        Label: ${emotion.label}
+        Score: ${emotion.score}
+      `);
+
+      // Create mapped emotion
+      const mappedEmotion = {
+        emotion: parseInt(emotion.code), // Explicitly parse as integer
+        percentage: emotion.score
+      };
+
+      // Log after mapping
+      console.log(`        🔄 STEP 2b - After mapping:`, mappedEmotion);
+      return mappedEmotion;
+    });
+
+    // 3. Log the mapped sentiments
+    console.log("✅ STEP 3 - Mapped sentiments:", JSON.stringify(mappedSentiments, null, 2));
+
+    // 4. Create entry data
+    const entryData = {
+      entryContent: content,
+      entryDate: new Date().toISOString(),
+      images: images?.map(image => ({
+        fileName: `uploads/${image}`,
+        signedUrl: image
+      })) || [],
+      journalSentiments: mappedSentiments
+    };
+
+    // 5. Log the final data before sending
+    console.log("📦 STEP 4 - Data being sent to server:", JSON.stringify(entryData, null, 2));
+
+    // 6. Send the request
     const response = await fetch(`${API_URL}/journal/save-journal-entry`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify({ content, images, category }),
+      body: JSON.stringify(entryData),
     });
 
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    const savedEntry = await response.json();
+    return savedEntry;
+
   } catch (error) {
-    console.error("Error saving journal entry:", error);
-    return { error: "Network error" };
+    console.error("❌ Error in saveJournalEntry:", error);
+    throw error;
   }
 };
+
 
 export const fetchJournalEntries = async (token: string) => {
   try {

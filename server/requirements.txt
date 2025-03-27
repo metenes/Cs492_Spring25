@@ -4,3 +4,13 @@ torch
 flask-jwt-extended
 flask-cors
 flask-bcrypt
+flask-mail
+mongoengine
+python-dotenv
+opencv-python
+numpy
+deepface
+PyJWT
+boto3
+tensorflow
+sagemaker

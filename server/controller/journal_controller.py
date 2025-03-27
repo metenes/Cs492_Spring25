@@ -8,33 +8,6 @@ from bson import ObjectId
 journal_bp = Blueprint("journal_bp", __name__)
 
 
-@journal_bp.route("/save-journal-entry", methods=["POST"])
-@jwt_required()
-def save_journal_entry():
-    try:
-        user_id = get_jwt_identity()
-        data = request.json
-        print(user_id)
-
-        if not data.get("content"):
-            return jsonify({"error": "Journal entry cannot be empty"}), 400
-
-        journal_entry = {
-            "user_id": ObjectId(user_id),
-            "content": data["content"],
-            "images": data.get("images", []),  # Save images if available
-            "category": data.get("category", "Freeform Journal"),
-            "timestamp": datetime.utcnow()
-        }
-
-        # Insert into MongoDB
-        inserted_entry = journal_entries_collection.insert_one(journal_entry)
-        journal_entry["_id"] = str(inserted_entry.inserted_id)  # Convert ObjectId to string for response
-        journal_entry["user_id"] = str(journal_entry["user_id"]) 
-
-        return jsonify({"message": "Journal entry saved successfully", "entry": journal_entry}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 @journal_bp.route("/get-journal-entries", methods=["GET"])

@@ -4,10 +4,21 @@ from models.sentiment import Sentiment  # Import the Sentiment model
 from utils.database import sentiments_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
-from utils.load_model import model
+from utils.load_model import model, tokenizer
+import torch
+import torch.nn.functional as F
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
+
+# Your custom emotion labels
+EMOTIONS = [
+    "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+    "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+    "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+    "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+    "sadness", "surprise", "neutral"
+]
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -15,13 +26,60 @@ sentiments_bp = Blueprint("sentiments_bp", __name__)
 @sentiments_bp.route("/analyze", methods=["POST"])
 def analyze_sentiment():
     try:
-        text = request.json.get("text", "")
+        print("🔵 Starting sentiment analysis")
+        data = request.get_json()
+        text = data.get('text')
+        print(f"🔹 Analyzing text: {text[:50]}...")
+        
         if not text:
             return jsonify({"error": "No text provided"}), 400
-        result = model(text)
-        return jsonify(result[0])
+
+        # Tokenize the text
+        inputs = tokenizer(text, return_tensors="pt", padding="max_length", 
+                         truncation=True, max_length=128)
+        print("🔹 Text tokenized successfully")
+
+        # Get model prediction
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probabilities = torch.sigmoid(outputs.logits).squeeze()
+        
+        print(f"🔹 Raw probabilities shape: {probabilities.shape}")
+        
+        # Get emotions above threshold (0.3 as in your original code)
+        threshold = 0.3
+        emotions = []
+        for idx, prob in enumerate(probabilities):
+            if prob > threshold:
+                emotions.append({
+                    "code": idx,
+                    "label": EMOTIONS[idx],
+                    "score": float(prob)
+                })
+        
+        # If no emotions above threshold, get the top emotion
+        if not emotions:
+            max_idx = torch.argmax(probabilities).item()
+            emotions.append({
+                "code": max_idx,
+                "label": EMOTIONS[max_idx],
+                "score": float(probabilities[max_idx])
+            })
+        
+        # Sort emotions by score
+        emotions.sort(key=lambda x: x['score'], reverse=True)
+        print(f"✅ Detected emotions: {emotions}")
+        
+        return jsonify({
+            "text": text,
+            "emotions": emotions
+        })
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"❌ Error in sentiment analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to analyze sentiment"}), 500
     
 
 @sentiments_bp.route("/<timeframe>", methods=["GET"])
