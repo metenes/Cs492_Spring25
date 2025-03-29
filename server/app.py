@@ -1,3 +1,15 @@
+import os
+import pymongo
+import certifi
+import torch
+import json
+import logging
+import time
+import uuid
+# User token 
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, List, Optional, Any, Union
 from flask import Flask, request, jsonify
 from ml.sentiment_model import load_model, predict_sentiment
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
@@ -8,14 +20,10 @@ from pymongo import MongoClient
 # import bcrypt
 from flask_mail import Mail, Message
 from bson.objectid import ObjectId
-import os
-import pymongo
-import certifi
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import torch
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
+from pydantic import BaseModel, Field
 from flask import Flask, jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime, timedelta
 # Face Analysis
@@ -26,18 +34,80 @@ from deepface import DeepFace
 # User token 
 from functools import wraps
 from flask import request
+from botocore.exceptions import ClientError
+# Chat API from chat.py
+from chat import *
+
+# Models
+class User(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class UserInDB(User):
+    hashed_password: str
+    user_id: str
+    created_at: str
+    model_path: Optional[str] = None
+    model_version: int = 0
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: str
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    role: str = "user"
+    content: str
+
+class ChatHistory(BaseModel):
+    messages: List[ChatMessage] = []
+
+class ChatRequest(BaseModel):
+    message: str
+    update_model: bool = False  # Whether to update the model based on this interaction
+    context: Optional[Dict[str, Any]] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    conversation_id: str
+    model_version: int
+    model_updated: bool = False
+    inference_time: float = 0.0
+
+class ModelTrainingRequest(BaseModel):
+    training_data: List[Dict[str, str]]
+    hyperparameters: Optional[Dict[str, Any]] = None
+
+class ModelTrainingResponse(BaseModel):
+    job_id: str
+    status: str
+    estimated_completion_time: Optional[str] = None
+
+class ModelStatus(BaseModel):
+    user_id: str
+    model_path: str
+    model_version: int
+    last_updated: str
+    training_jobs: List[Dict[str, Any]] = []
+    performance_metrics: Optional[Dict[str, float]] = None
 
 
 app = Flask(__name__)
 CORS(app)
 
-SECRET_KEY = "sentioSecretKey"
+JWT_SECRET = os.getenv("JWT_SECRET", "sentioSecretKey")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 # Load ML Model
 model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 # datetime.timedelta(days=1)
 
@@ -73,7 +143,6 @@ except Exception as e:
     print(f"❌ Error connecting to MongoDB: {e}")
     exit(1)
 
-
 # ---------------------------------------
 #  User Token check 
 # ---------------------------------------
@@ -89,7 +158,7 @@ def token_required(f):
         try:
             # Decode the token using the SECRET_KEY
             token = token.split(" ")[1]  # Extract token from "Bearer token" format
-            decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             request.user = decoded  # Store decoded data in request for access in route
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401
@@ -129,14 +198,13 @@ def get_period_of_day(timestamp):
 # ---------------------------------------
 
 @app.route('/register', methods=['POST'])
-def register():
+async def register():
+    """Register a new user and initialize their model"""
     try:
         data = request.get_json()
-        
         # Validate required fields
         if not data:
             return jsonify({"error": "No data provided"}), 400
-            
         email = data.get('email')
         password = data.get('password')
         dob = data.get('dob')
@@ -157,12 +225,14 @@ def register():
         #from flask_bcrypt import Bcrypt
         #bcrypt = Bcrypt(app)
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        user_id = str(uuid.uuid4()) # random id for security 
 
         # Set default preferences
-        preferences = "default"  # This was undefined in your original code
+        preferences = "default"  
 
         # Create user document
         user = {
+            "_id" : user_id,
             "email": email,
             "password": hashed_password,
             "dob": dob,
@@ -172,17 +242,24 @@ def register():
             "created_at": datetime.now(),
             "role": "user",
             "account_status": "active",
-            "two_factor_enabled": False
+            "two_factor_enabled": False,
+            "model_version": 0 # Personal model update 
         }
 
         # Insert into MongoDB
-        result = users_collection.insert_one(user)
+        users_collection.insert_one(item=user,ConditionExpression="attribute_not_exists(user_id)" )
+
+        # Initialize user model
+        await initialize_user_model(user._id)
 
         # Create JWT token
         # Create JWT token - using the proper method
         # Option 1: If using PyJWT directly
         # token = jwt.encode_key_loader({"user_id": str(result.inserted_id)}, SECRET_KEY, algorithm="HS256")
-        token = create_access_token(identity=str(result.inserted_id))
+        
+        # for security, token expires within 24 hour 
+        token_expires = timedelta(minutes=JWT_EXPIRATION_MINUTES)
+        token = create_access_token(data={"sub": user_id}, expires_delta=token_expires )
 
         # If token is returned as bytes (depends on jwt version), decode it
         if isinstance(token, bytes):
@@ -202,6 +279,11 @@ def register():
         # Log the error for debugging
         print(f"Registration error: {str(e)}")
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    except Exception as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            raise HTTPException(status_code=400, detail="User already exists")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ---------------------------------------
 #  **Fixing Login Endpoint**
@@ -266,7 +348,7 @@ def protected():
     
     try:
         # Decode the token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
         user_id = payload['user_id']
         return jsonify({"message": f"Welcome user {user_id}!"}), 200
     except jwt.ExpiredSignatureError:
@@ -283,7 +365,7 @@ def protected():
 def profile():
     token = request.headers.get('Authorization').split(" ")[1]
     try:
-        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         user_id = decoded_token["user_id"]
         user = users_collection.find_one({"_id": ObjectId(user_id)})
 
@@ -315,7 +397,7 @@ def update_preferences():
     preferences = data.get('preferences')
 
     try:
-        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         user_id = decoded_token["user_id"]
         result = users_collection.update_one(
             {"_id": ObjectId(user_id)},
@@ -612,37 +694,6 @@ def get_current_mood():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --------------------------------------- Chatbot Analysis  ---------------------------------------
-# We use API
-
-# ---------------------------------------
-#  **Chatbot Analysis**
-# ---------------------------------------
-# Define Request Model
-try:
-    TOKENIZER_NAME = "bert-base-uncased"  # Define the variable before usage
-    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
-    model = AutoModelForCausalLM.from_pretrained(TOKENIZER_NAME)
-    # model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device("cpu")))
-    model.eval()
-    print("✅ Model Loaded Successfully!")
-except Exception as e:
-    print(f"❌ Model Load Error: {e}")
-
-# Define Request Model
-class ChatRequest(BaseModel):
-    user_input: str
-
-# Chatbot API Endpoint
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    try:
-        inputs = tokenizer.encode(request.user_input, return_tensors="pt")
-        output = model.generate(inputs, max_length=100, num_return_sequences=1)
-        response = tokenizer.decode(output[0], skip_special_tokens=True)
-        return {"response": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
 
 # --------------------------------------- Model Analysis  ---------------------------------------

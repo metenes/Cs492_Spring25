@@ -263,12 +263,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
+                navigation.navigate("Chatbot");
+
                 console.log("Check-in Selected");
               }}
             >
               <Icon name="message-circle" size={20} color="black" /> {/* message-square de kullanabiliriz */}
               <Text style={styles.menuText}>Chatbot</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -279,17 +282,19 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               <Icon name="smile" size={20} color="black" />
               <Text style={styles.menuText}>Check-in</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
                 console.log("Navigating to CheckIn...")
-                navigation.navigate("CheckIn");
+                navigation.navigate("FreeJournaling");
               }}
             >
               <Icon name="edit-2" size={20} color="black" />
               <Text style={styles.menuText}>New Journal</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -302,6 +307,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               <Icon name="book-open" size={20} color="black" />
               <Text style={styles.menuText}>Prompts</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -313,6 +319,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               <Icon name="smile" size={20} color="black" />
               <Text style={styles.menuText}>Face Analysis</Text>
             </TouchableOpacity>
+
           </Animated.View>
         )}
 
