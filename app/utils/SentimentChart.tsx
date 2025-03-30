@@ -16,7 +16,9 @@ interface RawSentiment {
   time_period: string;
   emotion: number;
   total_percentage: number;
+  percentage: number;
   entry_count: number;
+  count: number;
 }
 
 // Structure for our processed chart data.
@@ -108,7 +110,9 @@ const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment
         time_period: groupKey,
         emotion: parseInt(emotion),
         total_percentage: aggregation[groupKey][emotion].total_percentage,
+        percentage: aggregation[groupKey][emotion].total_percentage,
         entry_count: aggregation[groupKey][emotion].entry_count,
+        count: 0,
       });
     }
   }
@@ -121,28 +125,64 @@ const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment
  */
 const processData = (rawData: RawSentiment[], selectedEmotions: string[]): ProcessedChartData => {
   console.log("Raw sentiment data for chart:", rawData);
-  let labels = Array.from(new Set(rawData.map(item => item.time_period))).sort();
+  console.log("Selected emotions:", selectedEmotions);
+  
+  // First, aggregate counts by date and emotion
+  const aggregatedData = rawData.reduce((acc: { [key: string]: { [key: number]: number } }, item) => {
+    if (!acc[item.time_period]) {
+      acc[item.time_period] = {};
+    }
+    // Use count from the API response
+    const count = item.count || 0;  // Changed from entry_count to count
+    acc[item.time_period][item.emotion] = (acc[item.time_period][item.emotion] || 0) + count;
+    
+    console.log(`Aggregating - Date: ${item.time_period}, Emotion: ${item.emotion}, Count: ${count}, Total: ${acc[item.time_period][item.emotion]}`);
+    return acc;
+  }, {});
+
+  console.log("Aggregated data:", aggregatedData);
+
+  // Get unique sorted dates for labels
+  let labels = Object.keys(aggregatedData).sort();
   console.log("Time periods (labels):", labels);
 
   const datasets = selectedEmotions.map(emotionName => {
     const emotionCode = reverseEmotionMap[emotionName];
+    console.log(`Processing emotion: ${emotionName}, code: ${emotionCode}`);
+    
     const dataArray = labels.map(label => {
-      const item = rawData.find(r => r.time_period === label && r.emotion === emotionCode);
-      return item ? item.total_percentage : 0;
+      const count = aggregatedData[label]?.[emotionCode] || 0;
+      console.log(`Date: ${label}, Emotion: ${emotionName} (code: ${emotionCode}), Count: ${count}`);
+      return count;
     });
-    console.log(`Data for ${emotionName}:`, dataArray);
-    return { data: dataArray, emotion: emotionName };
+    
+    return { 
+      data: dataArray, 
+      emotion: emotionName 
+    };
   });
 
-  const filteredDatasets = datasets.filter(ds => ds.data.some(val => val > 0));
-  console.log("Filtered datasets:", filteredDatasets);
+  // Don't filter out empty datasets - show them with zeros
+  const filteredDatasets = datasets;
+  console.log("Datasets with counts:", filteredDatasets);
 
+  // Handle single data point differently
   if (labels.length === 1) {
-    labels = [labels[0], labels[0]];
+    const date = new Date(labels[0]);
+    const prevDate = new Date(date);
+    prevDate.setDate(date.getDate() - 1);
+    const nextDate = new Date(date);
+    nextDate.setDate(date.getDate() + 1);
+
+    labels = [
+      prevDate.toISOString().split('T')[0],
+      labels[0],
+      nextDate.toISOString().split('T')[0]
+    ];
+
     filteredDatasets.forEach(ds => {
-      ds.data = [ds.data[0], ds.data[0]];
+      ds.data = [0, ds.data[0], 0];
     });
-    console.log("Duplicated labels and datasets for single point:", { labels, filteredDatasets });
   }
 
   const chartDatasets = filteredDatasets.map(ds => ({
@@ -155,7 +195,7 @@ const processData = (rawData: RawSentiment[], selectedEmotions: string[]): Proce
   }));
 
   const processedData: ProcessedChartData = { labels, datasets: chartDatasets };
-  console.log("Processed chart data:", processedData);
+  console.log("Final processed chart data:", processedData);
   return processedData;
 };
 
@@ -195,26 +235,26 @@ const ModernSkeletonLoader: React.FC = () => {
 const renderEmptyTable = (selectedEmotions: string[], startDate: string, endDate: string, labels: string[]): JSX.Element => {
   return (
     <View style={styles.placeholderContainer}>
-     <Text style={styles.emptyTableHeader}>
-     Looks like this emotion hasn’t appeared in your entries yet! Keep journaling, and we’ll track it for you! ✨
-</Text>
-
-
+      <Text style={styles.emptyTableHeader}>
+        Looks like this emotion hasn't appeared in your entries yet! Keep journaling, and we'll track it for you! ✨
+      </Text>
       <View style={styles.table}>
         <View style={styles.tableRow}>
           <Text style={[styles.tableCell, styles.tableHeaderCell]}>Date</Text>
-          {selectedEmotions.map(emotion => (
-            <Text key={emotion} style={[styles.tableCell, styles.tableHeaderCell]}>
+          {selectedEmotions.map((emotion, index) => (
+            <Text key={`header-${emotion}-${index}`} style={[styles.tableCell, styles.tableHeaderCell]}>
               {emotion}
             </Text>
-          ))}  
+          ))}
         </View>
-        {labels.map(label => (
-          <View key={label} style={styles.tableRow}>
+        {labels.map((label, labelIndex) => (
+          <View key={`row-${label}-${labelIndex}`} style={styles.tableRow}>
             <Text style={styles.tableCell}>{label}</Text>
-            {selectedEmotions.map(emotion => (
-              <Text key={emotion} style={styles.tableCell}>0</Text>
-            ))}  
+            {selectedEmotions.map((emotion, emotionIndex) => (
+              <Text key={`cell-${emotion}-${labelIndex}-${emotionIndex}`} style={styles.tableCell}>
+                0
+              </Text>
+            ))}
           </View>
         ))}
       </View>
@@ -226,38 +266,56 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, inter
   const [chartData, setChartData] = useState<ProcessedChartData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
 
-  // Map each selected emotion to a pastel color.
-  const emotionColors: Record<string, string> = Object.fromEntries(
-    selectedEmotions.map((emotion, index) => [emotion, pastelColors[index % pastelColors.length]])
-  );
-  console.log("Selected emotions and colors:", emotionColors);
+  // Fix: Only create emotionColors if selectedEmotions is not empty
+  const emotionColors: Record<string, string> = selectedEmotions.length > 0 
+    ? Object.fromEntries(
+        selectedEmotions.map((emotion, index) => [
+          emotion, 
+          pastelColors[index % pastelColors.length]
+        ])
+      )
+    : {};
 
   useEffect(() => {
     const fetchData = async () => {
+      // Skip fetching if no emotions are selected
+      if (selectedEmotions.length === 0) {
+        setChartData(null);
+        setError("empty");
+        setLabels([]);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
         const response = await fetchSentimentAnalysis(startDate, endDate, interval);
         console.log("API response in SentimentChart:", response);
-        const rawEntries: any[] = response.emotion_analysis || response.entries || [];
-        let rawData: RawSentiment[] = [];
-        if (rawEntries.length > 0 && rawEntries[0].entryDate) {
-          rawData = aggregateJournalEntries(rawEntries, interval);
-        } else {
-          rawData = rawEntries;
-        }
-        let processed = processData(rawData, selectedEmotions);
-        if (processed.datasets.length === 0) {
-          // Use fallback chart data so an empty chart is shown.
-          processed = renderEmptyTable(selectedEmotions, startDate, endDate, processed.labels) as unknown as ProcessedChartData;
-          console.log("Using fallback chart data:", processed);
+        
+        const rawData: RawSentiment[] = response.emotion_analysis || [];
+        
+        if (!rawData || rawData.length === 0) {
           setError("empty");
+          setChartData(null);
+          setLabels([]);
+          return;
         }
-        setChartData(processed);
+
+        let processed = processData(rawData, selectedEmotions);
+        setLabels(processed.labels);
+        
+        if (processed.datasets.length === 0) {
+          setError("empty");
+          setChartData(null);
+        } else {
+          setChartData(processed);
+        }
       } catch (err: any) {
         console.error("Error in SentimentChart fetch:", err);
         setError(err.message);
+        setChartData(null);
       } finally {
         setLoading(false);
       }
@@ -287,13 +345,32 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, inter
       </View>
     );
   }
-  if (error === "empty" || !chartData || !chartData.datasets || chartData.datasets.length === 0) {
+  if (error === "empty" || !chartData) {
     return (
       <View style={styles.placeholderContainer}>
-        {renderEmptyTable(selectedEmotions, startDate, endDate, chartData?.labels || [])}
+        {renderEmptyTable(selectedEmotions, startDate, endDate, labels)}
       </View>
     );
   }
+
+  const chartConfig = {
+    backgroundColor: "#ffffff",
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientTo: "#ffffff",
+    decimalPlaces: 1,
+    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForLabels: {
+      fontSize: 12,
+    },
+    // Add y-axis configuration
+    yAxisLabel: "%",
+    yAxisSuffix: "%",
+    yAxisInterval: 20, // Interval between y-axis labels
+  };
 
   return (
     <View style={{ position: "relative" }}>

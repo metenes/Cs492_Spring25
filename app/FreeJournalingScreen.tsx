@@ -9,6 +9,7 @@ import {
   Image,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -34,8 +35,8 @@ const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  // New state variable for image picker warning
   const [imagePickerWarning, setImagePickerWarning] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -87,7 +88,7 @@ const FreeJournalingScreen = () => {
 
   const handleSaveEntry = async () => {
     try {
-      // No need to get token here since ApiService handles it
+      setIsSaving(true);
       const response = await saveJournalEntry(content, imageUris);
       
       if (response.error) {
@@ -97,12 +98,34 @@ const FreeJournalingScreen = () => {
       }
 
       alert("Journal entry saved successfully!");
-      navigation.navigate("FreeJournaling"); // Update this to match your navigation type
+      navigation.navigate("Home");
     } catch (error) {
       console.error("Error in handleSaveEntry:", error);
       alert("An error occurred while saving the journal entry.");
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  if (isSaving) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: 'rgba(255,255,255,0.8)', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 999
+      }}>
+        <ActivityIndicator size="large" color="#000" />
+        <Text style={{ marginTop: 20, fontSize: 16 }}>Saving your entry...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

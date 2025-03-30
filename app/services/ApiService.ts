@@ -2,9 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
  //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.104:5000";
+//const API_URL = "http://192.168.1.104:5000";
+
 // const API_URL = "http://10.203.122.69:5000";
-// const API_URL = "http://172.20.10.2:5000"; // Melisa's API - LAN
+const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -79,7 +80,7 @@ export const fetchSentimentAnalysis = async (
   start_date: string,   // Format: "YYYY-MM-DD"
   end_date: string,     // Format: "YYYY-MM-DD"
   interval: string = "monthly",  // "daily", "weekly", "monthly", or "yearly"
-  emotions?: string     // Optional: comma-separated list of emotion codes (e.g., "1,2,3")
+  emotions?: string     // Optional: comma-separated list of emotion codes
 ) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -95,6 +96,7 @@ export const fetchSentimentAnalysis = async (
       params.append("emotions", emotions);
     }
 
+    // Updated endpoint to match new data structure
     const url = `${API_URL}/journal/api/sentiment-analysis?${params.toString()}`;
     console.log("Fetching sentiment analysis from URL:", url);
 
@@ -120,7 +122,6 @@ export const fetchSentimentAnalysis = async (
   }
 };
 
-
 export const fetchJournalEntriesWithDate = async (
   start_date: string,
   end_date: string
@@ -134,6 +135,7 @@ export const fetchJournalEntriesWithDate = async (
     params.append("start_date", start_date);
     params.append("end_date", end_date);
 
+    // Updated endpoint to match new data structure
     const response = await fetch(`${API_URL}/journal/api/journal-entries?${params.toString()}`, {
       method: "GET",
       headers: {
@@ -141,10 +143,14 @@ export const fetchJournalEntriesWithDate = async (
         "Authorization": `Bearer ${token}`,
       },
     });
+    
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
     }
-    return await response.json();
+
+    const data = await response.json();
+    // Assuming the response now directly contains the journalEntries array
+    return data;
   } catch (error) {
     console.error("Error fetching journal entries:", error);
     return { error: "Failed to fetch journal entries." };
