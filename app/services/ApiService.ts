@@ -468,3 +468,29 @@ export const updatePreferences = async (token: string, preferences: object) => {
 
   return await response.json(); // Return updated preferences
 };
+
+export const saveDraft = async (content: string, images: string[] = []) => {
+  try {
+    await AsyncStorage.setItem('journalDraft', JSON.stringify({ content, images }));
+  } catch (error) {
+    console.error('Error saving draft:', error);
+  }
+};
+
+export const getDraft = async () => {
+  try {
+    const draft = await AsyncStorage.getItem('journalDraft');
+    return draft ? JSON.parse(draft) : null;
+  } catch (error) {
+    console.error('Error getting draft:', error);
+    return null;
+  }
+};
+
+export const clearDraft = async () => {
+  try {
+    await AsyncStorage.removeItem('journalDraft');
+  } catch (error) {
+    console.error('Error clearing draft:', error);
+  }
+};

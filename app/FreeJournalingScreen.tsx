@@ -18,7 +18,7 @@ import * as MediaLibrary from "expo-media-library";
 import { Audio } from "expo-av"; // 👈 For microphone permission
 import BottomNavigation from "./BottomNavigation"; // ✅ Import BottomNavigation
 
-import { saveJournalEntry } from "./services/ApiService";
+import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
@@ -86,6 +86,27 @@ const FreeJournalingScreen = () => {
     setSelectedImage(null); // Close modal after deletion
   };
 
+  // Load draft when screen mounts
+  useEffect(() => {
+    const loadDraft = async () => {
+      const draft = await getDraft();
+      if (draft) {
+        setContent(draft.content);
+        setImageUris(draft.images);
+      }
+    };
+    loadDraft();
+  }, []);
+
+  // Save draft when content or images change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveDraft(content, imageUris);
+    }, 1000); // Save draft 1 second after last change
+
+    return () => clearTimeout(timeoutId);
+  }, [content, imageUris]);
+
   const handleSaveEntry = async () => {
     try {
       setIsSaving(true);
@@ -93,10 +114,10 @@ const FreeJournalingScreen = () => {
       
       if (response.error) {
         alert("Failed to save journal entry.");
-        console.error("Error saving entry:", response.error);
         return;
       }
 
+      await clearDraft(); // Clear draft after successful save
       alert("Journal entry saved successfully!");
       navigation.navigate("Home");
     } catch (error) {
