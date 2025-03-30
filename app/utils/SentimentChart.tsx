@@ -1,106 +1,424 @@
-import React from "react";
-import { Dimensions } from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { Dimensions, Text, View, StyleSheet, Animated } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-
-// Define the structure for API response
-interface SentimentData {
-  date: string;
-  counts: Record<string, number>; // Emotion name as key, count as value
-}
-
-// Function to fetch sentiment data (Replace with actual API call)
-const fetchSentimentData = async (
-  startDate: Date,
-  endDate: Date,
-  selectedEmotions: string[]
-): Promise<SentimentData[]> => {
-  
-
-  try {
-    console.log("Fetching data for:", { startDate, endDate, selectedEmotions });
-
-    // Simulated API response (Replace with real API response)
-    return [
-      { date: "2025-02-01", counts: { Joy: 5, Anger: 2, Sadness: 3 } },
-      { date: "2025-02-02", counts: { Joy: 7, Anger: 1, Sadness: 4 } },
-      { date: "2025-02-03", counts: { Joy: 3, Anger: 4, Sadness: 2 } },
-      { date: "2025-03-03", counts: { Joy: 3, Anger: 4, Sadness: 2 } },
-    ];
-  } catch (error) {
-    console.error("Error fetching sentiment data:", error);
-    return [];
-  }
-};
+import { fetchSentimentAnalysis } from "../services/ApiService";
 
 // Props for SentimentChart component
 interface SentimentChartProps {
   selectedEmotions: string[];
+  interval: string;    // "daily", "weekly", "monthly", or "yearly"
+  startDate: string;   // Format: "YYYY-MM-DD"
+  endDate: string;     // Format: "YYYY-MM-DD"
 }
+
+// Structure for raw sentiment data from API.
+interface RawSentiment {
+  time_period: string;
+  emotion: number;
+  total_percentage: number;
+  entry_count: number;
+}
+
+// Structure for our processed chart data.
+interface ProcessedChartData {
+  labels: string[];
+  datasets: {
+    data: number[];
+    color: (opacity?: number) => string;
+    strokeWidth: number;
+    emotion: string;
+  }[];
+}
+
+// Emotions array and mapping (code → emotion name)
 const emotions = [
-  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude", "Joy", "Love", "Optimism", "Pride", "Relief", 
-  "Anger", "Annoyance", "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief", "Jealousy", "Sadness", "Confusion", 
-  "Curiosity", "Desire", "Neutral", "Remorse", "Surprise", "Realization"
+  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude",
+  "Joy", "Love", "Optimism", "Pride", "Relief", "Anger", "Annoyance",
+  "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief",
+  "Jealousy", "Sadness", "Confusion", "Curiosity", "Desire", "Neutral",
+  "Remorse", "Surprise", "Realization"
 ];
-const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions }) => {
-  if (selectedEmotions.length === 0) {
-    return <></>; // Ensuring a JSX return, even if no emotions are selected
+
+export const emotionMap: Record<number, string> = emotions.reduce(
+  (acc, emotion, index) => {
+    acc[index] = emotion;
+    return acc;
+  },
+  {} as Record<number, string>
+);
+
+// Reverse mapping: emotion name → code
+const reverseEmotionMap: Record<string, number> = Object.fromEntries(
+  Object.entries(emotionMap).map(([code, name]) => [name, parseInt(code)])
+);
+
+// Define a pastel color palette for the chart lines.
+const pastelColors = [
+  "#FFB6C1", "#ADD8E6", "#FFDAB9", "#98FB98", "#DDA0DD", "#87CEFA", "#90EE90", "#FFB347"
+];
+
+// Increase chart height to 300 so it's more prominent.
+const CHART_HEIGHT = 300;
+
+/**
+ * Returns a group key based on entryDate and selected interval.
+ */
+const getGroupKey = (entryDate: string, interval: string): string => {
+  const date = new Date(entryDate);
+  switch (interval) {
+    case "daily":
+      return date.toISOString().split("T")[0];
+    case "weekly":
+      const year = date.getFullYear();
+      const firstJan = new Date(year, 0, 1);
+      const pastDays = (date.getTime() - firstJan.getTime()) / 86400000;
+      const weekNumber = Math.ceil((pastDays + firstJan.getDay() + 1) / 7);
+      return `${year}-W${weekNumber}`;
+    case "yearly":
+      return date.getFullYear().toString();
+    case "monthly":
+    default:
+      return date.toISOString().slice(0, 7);
   }
-  const pastelColors = ["#FFB6C1", "#ADD8E6", "#FFDAB9", "#98FB98"]; 
+};
 
-  // Map only the **selected emotions** to lighter grayscale colors
-  const emotionColors: Record<string, string> = Object.fromEntries(
-    selectedEmotions.map((emotion, index) => [emotion, pastelColors[index]])
-  );
-  
+/**
+ * Aggregates raw journal entries into an array of RawSentiment objects.
+ */
+const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment[] => {
+  const aggregation: Record<string, Record<number, { total_percentage: number; entry_count: number }>> = {};
+  entries.forEach(entry => {
+    const groupKey = getGroupKey(entry.entryDate, interval);
+    if (!aggregation[groupKey]) {
+      aggregation[groupKey] = {};
+    }
+    (entry.journalSentiments || []).forEach((sentiment: any) => {
+      const emotion = sentiment.emotion;
+      if (!aggregation[groupKey][emotion]) {
+        aggregation[groupKey][emotion] = { total_percentage: 0, entry_count: 0 };
+      }
+      aggregation[groupKey][emotion].total_percentage += sentiment.percentage;
+      aggregation[groupKey][emotion].entry_count += 1;
+    });
+  });
+  const result: RawSentiment[] = [];
+  for (const groupKey in aggregation) {
+    for (const emotion in aggregation[groupKey]) {
+      result.push({
+        time_period: groupKey,
+        emotion: parseInt(emotion),
+        total_percentage: aggregation[groupKey][emotion].total_percentage,
+        entry_count: aggregation[groupKey][emotion].entry_count,
+      });
+    }
+  }
+  console.log("Aggregated journal entries:", result);
+  return result;
+};
 
-  const chartData = {
-    labels: ["Feb 1", "Feb 2", "Feb 3"], // X-axis labels
-    datasets: selectedEmotions.map((emotion) => ({
-      data: Array(3).fill(0).map(() => Math.random() * 10), // Placeholder random Y-values
-      color: (opacity = 1) => emotionColors[emotion] || `rgba(200, 200, 200, ${opacity})`, // Line color
-      strokeWidth: 2, // Line thickness
-      fillShadowGradient: emotionColors[emotion] || `rgba(255, 182, 193, 0.5)`, 
-      fillShadowGradientOpacity: 0.4, // Slightly more visible fill (adjustable)
-    })),
-    legend: selectedEmotions.length > 0 ? selectedEmotions : ["No Data"], // Display selected emotions
-  };
-  
+/**
+ * Processes raw aggregated data into a structure for the chart.
+ */
+const processData = (rawData: RawSentiment[], selectedEmotions: string[]): ProcessedChartData => {
+  console.log("Raw sentiment data for chart:", rawData);
+  let labels = Array.from(new Set(rawData.map(item => item.time_period))).sort();
+  console.log("Time periods (labels):", labels);
+
+  const datasets = selectedEmotions.map(emotionName => {
+    const emotionCode = reverseEmotionMap[emotionName];
+    const dataArray = labels.map(label => {
+      const item = rawData.find(r => r.time_period === label && r.emotion === emotionCode);
+      return item ? item.total_percentage : 0;
+    });
+    console.log(`Data for ${emotionName}:`, dataArray);
+    return { data: dataArray, emotion: emotionName };
+  });
+
+  const filteredDatasets = datasets.filter(ds => ds.data.some(val => val > 0));
+  console.log("Filtered datasets:", filteredDatasets);
+
+  if (labels.length === 1) {
+    labels = [labels[0], labels[0]];
+    filteredDatasets.forEach(ds => {
+      ds.data = [ds.data[0], ds.data[0]];
+    });
+    console.log("Duplicated labels and datasets for single point:", { labels, filteredDatasets });
+  }
+
+  const chartDatasets = filteredDatasets.map(ds => ({
+    data: ds.data,
+    color: (opacity = 1) =>
+      pastelColors[selectedEmotions.indexOf(ds.emotion) % pastelColors.length] ||
+      `rgba(200,200,200,${opacity})`,
+    strokeWidth: 2,
+    emotion: ds.emotion,
+  }));
+
+  const processedData: ProcessedChartData = { labels, datasets: chartDatasets };
+  console.log("Processed chart data:", processedData);
+  return processedData;
+};
+
+/**
+ * A modern Skeleton Loader with a shimmer effect.
+ */
+const ModernSkeletonLoader: React.FC = () => {
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [shimmerAnim]);
+
+  const translateX = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-Dimensions.get("window").width, Dimensions.get("window").width]
+  });
 
   return (
-    <LineChart
-      data={chartData}
-      width={Dimensions.get("window").width }
-      height={Dimensions.get("window").height / 3} 
-      chartConfig={{
-        backgroundColor: "#FFFFFF", // White background
-        backgroundGradientFrom: "#FFFFFF",
-        backgroundGradientTo: "#FFFFFF",
-        decimalPlaces: 1,
-        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Black labels
-        labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Black label text
-        style: { borderRadius: 12 },
-        propsForDots: {
-          r: 5, 
-          strokeWidth: 1,
-          stroke: "#000000", // Dots in black
-        },
-        propsForBackgroundLines: {
-          stroke: "#CCCCCC", // Light grey grid lines
-          strokeDasharray: "5 5", 
-        },
-      }}
-      bezier
-      withShadow
-      withInnerLines
-      withOuterLines
-      style={{
-        borderRadius: 12,
-        elevation: 2, 
-      }}
-    />
+    <View style={styles.skeletonContainer}>
+      <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }] }]} />
+      <Text style={styles.skeletonText}>Loading chart...</Text>
+    </View>
   );
 };
 
+/**
+ * Renders a fallback table when no sentiment data is available.
+ * This table displays headers (Date + selected emotions) and rows with zeros.
+ */
+const renderEmptyTable = (selectedEmotions: string[], startDate: string, endDate: string, labels: string[]): JSX.Element => {
+  return (
+    <View style={styles.placeholderContainer}>
+     <Text style={styles.emptyTableHeader}>
+     Looks like this emotion hasn’t appeared in your entries yet! Keep journaling, and we’ll track it for you! ✨
+</Text>
 
 
-export { SentimentChart, fetchSentimentData };
+      <View style={styles.table}>
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCell, styles.tableHeaderCell]}>Date</Text>
+          {selectedEmotions.map(emotion => (
+            <Text key={emotion} style={[styles.tableCell, styles.tableHeaderCell]}>
+              {emotion}
+            </Text>
+          ))}  
+        </View>
+        {labels.map(label => (
+          <View key={label} style={styles.tableRow}>
+            <Text style={styles.tableCell}>{label}</Text>
+            {selectedEmotions.map(emotion => (
+              <Text key={emotion} style={styles.tableCell}>0</Text>
+            ))}  
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, interval, startDate, endDate }) => {
+  const [chartData, setChartData] = useState<ProcessedChartData | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Map each selected emotion to a pastel color.
+  const emotionColors: Record<string, string> = Object.fromEntries(
+    selectedEmotions.map((emotion, index) => [emotion, pastelColors[index % pastelColors.length]])
+  );
+  console.log("Selected emotions and colors:", emotionColors);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchSentimentAnalysis(startDate, endDate, interval);
+        console.log("API response in SentimentChart:", response);
+        const rawEntries: any[] = response.emotion_analysis || response.entries || [];
+        let rawData: RawSentiment[] = [];
+        if (rawEntries.length > 0 && rawEntries[0].entryDate) {
+          rawData = aggregateJournalEntries(rawEntries, interval);
+        } else {
+          rawData = rawEntries;
+        }
+        let processed = processData(rawData, selectedEmotions);
+        if (processed.datasets.length === 0) {
+          // Use fallback chart data so an empty chart is shown.
+          processed = renderEmptyTable(selectedEmotions, startDate, endDate, processed.labels) as unknown as ProcessedChartData;
+          console.log("Using fallback chart data:", processed);
+          setError("empty");
+        }
+        setChartData(processed);
+      } catch (err: any) {
+        console.error("Error in SentimentChart fetch:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [startDate, endDate, interval, selectedEmotions]);
+
+  // If no emotion is selected, show a placeholder with fixed height.
+  if (selectedEmotions.length === 0) {
+    return (
+      <View style={styles.placeholderContainer}>
+        <Text style={styles.placeholderText}>
+  Pick an emotion to track your journey! Your feelings shape your story ✨
+</Text>
+
+      </View>
+    );
+  }
+
+  if (loading) {
+    return <ModernSkeletonLoader />;
+  }
+  if (error && error !== "empty") {
+    return (
+      <View style={styles.placeholderContainer}>
+        <Text style={styles.placeholderText}>Error: {error}</Text>
+      </View>
+    );
+  }
+  if (error === "empty" || !chartData || !chartData.datasets || chartData.datasets.length === 0) {
+    return (
+      <View style={styles.placeholderContainer}>
+        {renderEmptyTable(selectedEmotions, startDate, endDate, chartData?.labels || [])}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ position: "relative" }}>
+     <LineChart
+  data={{
+    labels: chartData.labels,
+    datasets: chartData.datasets.map((dataset, index) => ({
+      ...dataset,
+      color: (opacity = 1) => pastelColors[index % pastelColors.length], // ✅ Ensures each line has a unique color
+    })),
+    legend: chartData.datasets.map(ds => ds.emotion),
+  }}
+  width={Dimensions.get("window").width - 32}
+  height={CHART_HEIGHT}
+  chartConfig={{
+    backgroundColor: "#FFFFFF",
+    backgroundGradientFrom: "#FFFFFF",
+    backgroundGradientTo: "#FFFFFF",
+    decimalPlaces: 1,
+    color: (opacity = 1) => `rgba(68, 68, 68, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(68, 68, 68, ${opacity})`,
+    style: { borderRadius: 12 },
+
+    // 🚀 **Make the area under the line completely transparent**
+    fillShadowGradientFromOpacity: 0, 
+    fillShadowGradientToOpacity: 0, 
+
+    // ✅ Ensures dots are styled properly
+    propsForDots: {
+      r: "4",
+      strokeWidth: "2",
+      stroke: "#FFFFFF", // White stroke for better contrast
+    },
+
+    // ✅ Softer background grid lines
+    propsForBackgroundLines: {
+      stroke: "rgba(200, 200, 200, 0.3)",
+      strokeDasharray: "5 5",
+    },
+  }}
+  bezier
+  withShadow
+  withInnerLines
+  withOuterLines
+  style={{
+    borderRadius: 12,
+    marginVertical: 8,
+  }}
+/>
+
+
+
+
+
+
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  skeletonContainer: {
+    width: Dimensions.get("window").width - 32,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 12,
+    marginVertical: 8,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    height: 350,
+  },
+  skeletonShimmer: {
+    position: "absolute",
+    width: "100%",
+    height: 350,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+  },
+  skeletonText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  placeholderContainer: {
+    padding: 16,
+    height: 370, // fixed height for consistency
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontSize: 18,
+    color: "#888",
+    textAlign: "center",
+  },
+  emptyTableContainer: {
+    width: "100%",
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#CCCCCC",
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+    marginTop: 8,
+  },
+  emptyTableHeader: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  table: {
+    width: "100%",
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderColor: "#EEEEEE",
+  },
+  tableCell: {
+    fontSize: 14,
+    color: "#666",
+    flex: 1,
+    textAlign: "center",
+  },
+  tableHeaderCell: {
+    fontWeight: "bold",
+  },
+});
+
+export { SentimentChart };

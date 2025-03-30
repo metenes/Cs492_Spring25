@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
 
 // Define the context properties
 interface AuthContextProps {
@@ -15,7 +16,20 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 interface AuthProviderProps {
   children: React.ReactNode;
 }
- 
+/*  */
+
+export const storeToken = async (token: string) => {
+  try {
+    await AsyncStorage.setItem("userToken", token);
+    console.log("✅ Token successfully stored:", token);
+    return true; // Indicate success
+  } catch (error) {
+    console.error("❌ Error storing token:", error);
+    return false; // Indicate failure
+  }
+};
+
+
 // Retrieve the token from AsyncStorage
 export const getToken = async (): Promise<string | null> => {
   try {
@@ -70,10 +84,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Logout: Remove token and reset state
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem("userToken");
-      setToken(null);
-      console.log("✅ Logged out");
-    } catch (error) {
+      await AsyncStorage.removeItem("userToken"); 
+    }
+    catch (error) {
       console.error("❌ Error removing token:", error);
     }
   };

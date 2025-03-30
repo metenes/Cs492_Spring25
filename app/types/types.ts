@@ -18,5 +18,6 @@ export type RootStackParamList = {
     PaymentMethodAddScreen: undefined;
     FaceEmotion : undefined;
     CheckIn: undefined;
+    NotificationSettingsScreen: undefined; 
   };
   

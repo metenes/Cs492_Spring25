@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, Animated, Easing } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -12,8 +11,6 @@ import { ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
-
-import { loginUser } from "./services/ApiService";
 
 import { fetchJournalEntries } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,13 +24,12 @@ import { format } from "date-fns";
 }; */
 type Entry = {
   _id: string;
-  content: string;
-  timestamp: string;
+  entryContent: string;
+  entryDate: string;
+  createdAt?: string;
   images?: string[];
-  category: string;
+  journalSentiments?: any[];
 };
-
-
 
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
@@ -45,6 +41,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [isMenuOpen, setMenuOpen] = useState(false);
   const menuPosition = useState(new Animated.Value(0))[0];
   const rotation = useState(new Animated.Value(0))[0];
+  // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
   useFocusEffect(
     useCallback(() => {
@@ -73,7 +70,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   };
   
   checkStoredToken();
-
+/*
   const testLogin = async () => {
     const email = "irem.akel@ug.bilkent.edu.tr"; // Your test email
     const password = "password123"; // Your test password
@@ -88,7 +85,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       console.error("❌ Login test failed:", error);
     }
   };
-  testLogin();
+*/
+  //testLogin();
   
   console.log("STARTING FROM HERE")
 
@@ -98,6 +96,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         if (token) {
             console.log("🔹 Found Token:", token);
             storeToken(token); // ✅ Save token in state
+        }
+        else{
+          return; 
         }
     };
     checkStoredToken();
@@ -212,17 +213,31 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     </TouchableOpacity>
   ); */
 
-  const renderEntry = ({ item }: { item: Entry }) => (
-    <TouchableOpacity style={styles.entryItem}>
-      <View style={styles.entryIcon}>
-        <Icon name="edit-2" size={20} color="#000" />
-      </View>
-      <View style={styles.entryContent}>
-        <Text style={styles.entryContent}>{format(new Date(item.timestamp), "EEEE, MMM d yyyy")}</Text>
-        <Text style={styles.entryContent}>{item.category || "Freeform Journal"}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderEntry = ({ item }: { item: Entry }) => {
+    // Safely format the date
+    let formattedDate = "Invalid date";
+    try {
+      // Try to use entryDate first, fall back to createdAt if needed
+      const dateString = item.entryDate || item.createdAt;
+      if (dateString) {
+        formattedDate = format(new Date(dateString), "EEEE, MMM d yyyy");
+      }
+    } catch (error) {
+      console.log("Error formatting date:", error);
+    }
+  
+    return (
+      <TouchableOpacity style={styles.entryItem}>
+        <View style={styles.entryIcon}>
+          <Icon name="edit-2" size={20} color="#000" />
+        </View>
+        <View style={styles.entryContent}>
+          <Text style={styles.entryDate}>{formattedDate}</Text>
+          <Text style={styles.entrySubtitle}>{item.entryContent || "No content"}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
   console.log("🔹 Entries state:", entries);
 
 

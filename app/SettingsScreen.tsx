@@ -2,26 +2,37 @@ import React, { useState } from "react";
 import { View, Text, Switch, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import BottomNavigation from "./BottomNavigation";
+import { useAuth } from "./auth/AuthContext"; // ✅ Correct import
+import { logoutDB } from "./services/ApiService";
+import { RootStackParamList } from "./types/types"; // Import route types
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+type SettingScreenNavigationProp = NativeStackNavigationProp<
+RootStackParamList,
+"Login", 
+"PaymentMethodSettingScreen"
+>;
 
 const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
-  const navigation = useNavigation();
+  const navigation = useNavigation<SettingScreenNavigationProp>();
+  const { logout } = useAuth(); // ✅ Get logout function from AuthContext
 
   const toggleDarkMode = () => {
     setDarkMode((prev) => !prev);
   };
 
   const handleLogout = () => {
-    // TODO: Implement logout functionality
-    console.log("User logged out");
+    logoutDB(); 
+    console.log("✅ DB logout ");
+    logout(); // ✅ Call logout from AuthContext
+    console.log("✅ User token removed out successfully");
+    navigation.navigate("Login"); 
   };
 
   return (
     <>
       <View style={styles.container}>
-        {/* <Text style={styles.title}>Settings</Text> */}
-
-        {/* Payment Settings */}
         <TouchableOpacity 
           style={styles.settingRow} 
           onPress={() => navigation.navigate("PaymentMethodSettingScreen")}
@@ -30,7 +41,6 @@ const SettingsScreen = () => {
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Notification Settings */}
         <TouchableOpacity 
           style={styles.settingRow} 
           onPress={() => navigation.navigate("NotificationSettingsScreen")}
@@ -39,13 +49,11 @@ const SettingsScreen = () => {
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Dark Mode Toggle */}
         <View style={styles.settingToggle}>
           <Text style={styles.settingText}>Dark Mode</Text>
           <Switch value={darkMode} onValueChange={toggleDarkMode} />
         </View>
 
-        {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -61,11 +69,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
   },
   settingRow: {
     flexDirection: "row",

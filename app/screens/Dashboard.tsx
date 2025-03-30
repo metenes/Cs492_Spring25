@@ -6,299 +6,330 @@ import {
   View,
   Pressable,
   Alert,
-  Modal,
   TouchableOpacity,
   Dimensions,
 } from "react-native";
-import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
-
-
-/*
-
-      <View style={styles.dateRangeContainer}>
-        <DateTimePicker 
-                      value={selectedStartDate} 
-                      mode="date" 
-                      display="default" 
-                      onChange={handleStartDateChange} 
-          />
-        <DateTimePicker 
-            value={selectedEndDate} 
-            mode="date" 
-            display="default" 
-            onChange={handleEndDateChange} 
-        />
-      </View>
-
-*/ 
-
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
-import { fetchSentimentAnalysis } from "../services/ApiService"; // Adjust path if needed
+import { fetchJournalEntriesWithDate,fetchSentimentAnalysis } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Emotions array and code→name map
+const emotions = [
+  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude",
+  "Joy", "Love", "Optimism", "Pride", "Relief", "Anger", "Annoyance",
+  "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief",
+  "Jealousy", "Sadness", "Confusion", "Curiosity", "Desire", "Neutral",
+  "Remorse", "Surprise", "Realization"
+];
+
+export const emotionMap: Record<number, string> = emotions.reduce(
+  (acc, emotion, index) => {
+    acc[index] = emotion;
+    return acc;
+  },
+  {} as Record<number, string>
+);
+
+console.log(emotionMap[3]); // "Caring"
+
+// Helper to get local date string in "YYYY-MM-DD" format
+const toLocalDateString = (date: Date) => {
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+  return localDate.toISOString().split("T")[0];
+};
 
 const SentimentAnalysisPage: React.FC = () => {
-const emotions = [
-  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude", "Joy", "Love", "Optimism", "Pride", "Relief", 
-  "Anger", "Annoyance", "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief", "Jealousy", "Sadness", "Confusion", 
-  "Curiosity", "Desire", "Neutral", "Remorse", "Surprise", "Realization"
-];
-const [selectedEmotions, setSelectedEmotions] = useState<string[]>(["Amusement"]);
+  // Default: start = today - 7, end = today.
+  const today = new Date();
+  const defaultStartDate = new Date(today);
+  defaultStartDate.setDate(today.getDate() - 7);
 
-const toggleEmotion = (emotion: string) => {
-  setSelectedEmotions((prevSelected) => {
-    if (prevSelected.includes(emotion)) {
-      return prevSelected.filter((e) => e !== emotion); // Remove if already selected
-    } else if (prevSelected.length < 4) {
-      return [...prevSelected, emotion]; // Add if not selected and under limit
-    } else {
-      Alert.alert("Limit Reached", "You can only select up to 4 emotions at a time.");
-      return prevSelected;
-    }
-  });
-};
+  // Weekly date pickers state
+  const [selectedStartDate, setSelectedStartDate] = useState(defaultStartDate);
+  const [selectedEndDate, setSelectedEndDate] = useState(today);
 
-const [sentimentData, setSentimentData] = useState([]);
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState(null);
+  // Chart date pickers state (you can set these to the same defaults or choose differently)
+  const [selectedStartDateForChart, setSelectedStartDateForChart] = useState(defaultStartDate);
+  const [selectedEndDateForChart, setSelectedEndDateForChart] = useState(today);
 
-const fetchWeeklySentimentData = async () => {
-  setLoading(true);
-  setError(null);
+  // Emotions selected for the chart
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>(["Amusement"]);
 
-  try {
-    const token = "your_jwt_token"; // Replace with actual token retrieval logic
-    const endDate = selectedEndDate.toISOString().split("T")[0]; // Convert to "YYYY-MM-DD"
-    const startDate = selectedStartDate.toISOString().split("T")[0]; 
+  // Fetched journal entries state (each entry = one card)
+  const [journalEntries, setJournalEntries] = useState<any[]>([]);
+  // Loading and error states
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const data = await fetchSentimentAnalysis(token, startDate, endDate, "daily");
+  // Toggle emotion chip
+  const toggleEmotion = (emotion: string) => {
+    setSelectedEmotions((prevSelected) => {
+      if (prevSelected.includes(emotion)) {
+        return prevSelected.filter((e) => e !== emotion);
+      } else if (prevSelected.length < 4) {
+        return [...prevSelected, emotion];
+      } else {
+        Alert.alert("Limit Reached", "You can only select up to 4 emotions at a time.");
+        return prevSelected;
+      }
+    });
+  };
 
-    if (data.error) throw new Error(data.error);
-    setSentimentData(data.emotion_analysis);
-  } catch (error) {
-    setError((error as any).message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const [sentimentEntries, setSentimentEntries] = useState([
-    { date: "Today", emotion: "Happiness", details: "Excitement, Joy, and more" },
-    { date: "Yesterday", emotion: "Joy", details: "Gratitude, Love" },
-    { date: "19.12.2024", emotion: "Anger", details: "Frustration, Disappointment" },
-    { date: "18.12.2024", emotion: "Sadness", details: "Anxiety, Loneliness" },
-    { date: "17.12.2024", emotion: "Pride", details: "Accomplishment, Satisfaction" },
-    { date: "16.12.2024", emotion: "Anxiety", details: "Anticipation, Fear" },
-  ]);
-
-  const [selectedStartDate, setSelectedStartDate] = useState(new Date());
-  const [selectedEndDate, setSelectedEndDate] = useState(new Date());
-  const [selectedStartDateForChart, setSelectedStartDateForChart] = useState(new Date());
-  const [selectedEndDateForChart, setSelectedEndDateForChart] = useState(new Date());
-
-  // Handles selecting a start date // for card part
+  // Initial fetch for default date range (today-7 to today)
   useEffect(() => {
-    fetchWeeklySentimentData();
+    const fetchInitialData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const startDateStr = toLocalDateString(selectedStartDate);
+        const endDateStr = toLocalDateString(selectedEndDate);
+        const data = await fetchJournalEntriesWithDate(startDateStr, endDateStr);
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        setJournalEntries(data.entries || []);
+        console.log("Initial entries:", data.entries);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Weekly fetch when selectedStartDate or selectedEndDate changes
+  const fetchWeeklyData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const startDateStr = toLocalDateString(selectedStartDate);
+      const endDateStr = toLocalDateString(selectedEndDate);
+      const data = await fetchJournalEntriesWithDate(startDateStr, endDateStr);
+      if (data.error) throw new Error(data.error);
+      setJournalEntries(data.entries || []);
+      console.log("Weekly entries:", data.entries);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeeklyData();
   }, [selectedStartDate, selectedEndDate]);
-  
-  const handleStartDateChange = (event: any, kind: boolean, date?: Date) => {
+
+  // Date picker handlers
+  const handleStartDateChange = (event: any, isWeekly: boolean, date?: Date) => {
     if (!date) return;
-  
-    // Get today's date without time for accurate comparison
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-  
     if (date > today) {
-      // If start date is in the future, set both start and end dates to today
-      if (kind) {
+      if (isWeekly) {
         setSelectedStartDate(today);
         setSelectedEndDate(today);
       } else {
         setSelectedStartDateForChart(today);
       }
     } else {
-      if (kind) {
+      if (isWeekly) {
         setSelectedStartDate(date);
-  
-        // Calculate new end date
         const newEndDate = new Date(date);
         newEndDate.setDate(newEndDate.getDate() + 7);
-  
-        // If the end date goes beyond today, limit it to today
         setSelectedEndDate(newEndDate > today ? today : newEndDate);
       } else {
         setSelectedStartDateForChart(date);
         if (selectedStartDateForChart > selectedEndDateForChart) {
           setSelectedEndDateForChart(date);
+        }
       }
     }
+  };
+
+  const handleEndDateChange = (event: any, isWeekly: boolean, date?: Date) => {
+    if (!date) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const newEndDate = date > today ? today : date;
+    if (isWeekly) {
+      setSelectedEndDate(newEndDate);
+      const newStartDate = new Date(newEndDate);
+      newStartDate.setDate(newStartDate.getDate() - 7);
+      setSelectedStartDate(newStartDate);
+    } else {
+      setSelectedEndDateForChart(newEndDate);
+      if (selectedEndDateForChart < selectedStartDateForChart) {
+        setSelectedStartDateForChart(newEndDate);
+      }
     }
   };
-  
-  
-  const handleEndDateChange = (event: any, kind: boolean, date?: Date) => {
-    if (!date) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today's date for accurate comparison
-
-    let newEndDate = date > today ? today : date; // Prevent future selection
-
-    if (kind) {
-        setSelectedEndDate(newEndDate);
-
-        // Ensure the start date is 7 days before the end date but does not go past today
-        let newStartDate = new Date(newEndDate);
-        newStartDate.setDate(newStartDate.getDate() - 7);
-        setSelectedStartDate(newStartDate);
+  // Compute chart interval based on the chart date range
+  const computeChartInterval = (): string => {
+    const start = new Date(toLocalDateString(selectedStartDateForChart));
+    const end = new Date(toLocalDateString(selectedEndDateForChart));
+    const diffDays = (end.getTime() - start.getTime()) / (1000 * 3600 * 24);
+    if (diffDays <= 30) {
+      return "daily";
+    } else if (diffDays > 30 && diffDays <= 120) {
+      return "weekly";
+    } else if (diffDays > 120 && diffDays <= 1095) {
+      return "monthly";
     } else {
-        setSelectedEndDateForChart(newEndDate);
-        if (selectedEndDateForChart < selectedStartDateForChart) {
-            setSelectedStartDateForChart(newEndDate);
-        }
+      return "yearly";
     }
-};
+  };
 
+  // Render horizontal list of journal entry cards
+  const renderJournalCards = () => {
+    return journalEntries.map((entry, index) => {
+      const { entryDate, journalSentiments = [] } = entry;
+      // Format the date using UTC formatting
+      const formattedDate = entryDate
+        ? new Date(entryDate).toLocaleDateString("en-US", { timeZone: "UTC" })
+        : "Unknown Date";
+
+      if (!journalSentiments || journalSentiments.length === 0) {
+        return (
+          <Pressable key={index} style={styles.entryCard}>
+            <Text style={styles.entryDate}>{formattedDate}</Text>
+            <Text style={styles.entryEmotion}>No sentiment data</Text>
+            <Text style={styles.entryDetails}></Text>
+          </Pressable>
+        );
+      }
+
+      // Sort sentiments by percentage descending
+      const sorted = [...journalSentiments].sort((a: any, b: any) => b.percentage - a.percentage);
+      const dominant = sorted[0];
+      const others = sorted.slice(1);
+
+      let subLabel = "";
+      if (others.length === 0) {
+        subLabel = "No other emotions";
+      } else if (others.length === 1) {
+        subLabel = `${emotionMap[others[0].emotion]}`;
+      } else {
+        const firstTwo = others.slice(0, 2).map((s: any) => emotionMap[s.emotion]).join(", ");
+        const remaining = others.length - 2;
+        subLabel = remaining > 0 ? `${firstTwo} and ${remaining} more` : firstTwo;
+      }
+
+      return (
+        <Pressable key={index} style={styles.entryCard}>
+          <Text style={styles.entryDate}>{formattedDate}</Text>
+          <Text style={styles.entryEmotion}>
+            {emotionMap[dominant.emotion] || dominant.emotion} 
+          </Text>
+          <Text style={styles.entryDetails}>{subLabel}</Text>
+        </Pressable>
+      );
+    });
+  };
 
   return (
     <>
-    <View style={styles.container}>
-      
-      <View style={styles.dateRangeContainer}>
-      <DateTimePicker 
-        value={selectedStartDate} 
-        mode="date" 
-        display="default" 
-        onChange={(event, date) => handleStartDateChange(event, true, date)} 
-      />
+      <View style={styles.container}>
+        {/* Weekly Date Range */}
+        <View style={styles.dateRangeContainer}>
+          <DateTimePicker
+            value={selectedStartDate}
+            mode="date"
+            display="default"
+            onChange={(event, date) => handleStartDateChange(event, true, date)}
+          />
+          <DateTimePicker
+            value={selectedEndDate}
+            mode="date"
+            display="default"
+            onChange={(event, date) => handleEndDateChange(event, true, date)}
+          />
+        </View>
 
-     <DateTimePicker 
-        value={selectedEndDate} 
-        mode="date" 
-        display="default" 
-        onChange={(event, date) => handleEndDateChange(event, true, date)} 
-     />
-      </View>
-
-      <View>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        {/* Horizontal Cards */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           style={styles.entriesScroll}
-          contentContainerStyle={{ flexGrow: 0 }} // Prevents it from expanding too much
+          contentContainerStyle={{ flexGrow: 0 }}
         >
-
-            {sentimentEntries.map((entry, index) => (
-              <Pressable key={index} style={styles.entryCard}>
-                <Text style={styles.entryDate}>{entry.date}</Text>
-                <Text style={styles.entryEmotion}>{entry.emotion}</Text>
-                <Text style={styles.entryDetails}>{entry.details}</Text>
-              </Pressable>
-            ))}
+          {renderJournalCards()}
         </ScrollView>
-      </View>
-      <View style={styles.dateRangeContainer2}>
-        <DateTimePicker 
-          value={selectedStartDateForChart} 
-          mode="date" 
-          display="default" 
-          onChange={(event, date) => handleStartDateChange(event, false, date)}  
-        />
-        <DateTimePicker 
-          value={selectedEndDateForChart} 
-          mode="date" 
-          display="default" 
-          onChange={(event, date) => handleEndDateChange(event, false, date)}  
-        />
+
+        {/* Chart Date Range */}
+        <View style={styles.dateRangeContainer2}>
+          <DateTimePicker
+            value={selectedStartDateForChart}
+            mode="date"
+            display="default"
+            onChange={(event, date) => handleStartDateChange(event, false, date)}
+          />
+          <DateTimePicker
+            value={selectedEndDateForChart}
+            mode="date"
+            display="default"
+            onChange={(event, date) => handleEndDateChange(event, false, date)}
+          />
+        </View>
+
+        {/* Emotion Chips */}
+        <View style={styles.container2}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
+            {emotions.map((emotion, index) => {
+              const isSelected = selectedEmotions.includes(emotion);
+              return (
+                <Pressable
+                  key={index}
+                  style={[styles.chip, isSelected ? styles.chipSelected : styles.chipUnselected]}
+                  onPress={() => toggleEmotion(emotion)}
+                >
+                  <Text style={[styles.chipText, !isSelected && styles.chipTextUnselected]}>
+                    {emotion}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Chart */}
+        <View style={{  alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
+          {/* Compute the chart interval based on the selected chart date range */}
+          <SentimentChart
+            selectedEmotions={selectedEmotions}
+            interval={computeChartInterval()}
+            startDate={toLocalDateString(selectedStartDateForChart)}
+            endDate={toLocalDateString(selectedEndDateForChart)}
+          />
+        </View>
       </View>
 
-  <View style={styles.container2}>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
-  {emotions.map((emotion, index) => {
-  const isSelected = selectedEmotions.includes(emotion);
-  return (
-    <Pressable
-      key={index}
-      style={[
-        styles.chip,
-        isSelected ? styles.chipSelected : styles.chipUnselected,
-      ]}
-      onPress={() => toggleEmotion(emotion)}
-    >
-      <Text style={[styles.chipText, !isSelected && styles.chipTextUnselected]}>
-        {emotion}
-      </Text>
-    </Pressable>
-  );
-})}
-      </ScrollView>
-      </View>
-      <View style={{ marginVertical: 10,alignItems: "center" ,justifyContent: "center",backgroundColor: "#000000"}}>
-  <SentimentChart selectedEmotions={selectedEmotions} />
-</View>
-
-    </View>
-    <BottomNavigation activeScreen="Dashboard" />
+      <BottomNavigation activeScreen="Dashboard" />
     </>
   );
 };
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
     padding: 16,
   },
-  dropdownContainer: {
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    marginTop: 10,  // Adds spacing from above elements
-  },
-  picker: {
-    height: 50, // Reduced height for better UI
-    width: "100%",
-    color: "#000000", // Ensures text is visible
-    flex: 1,  // Makes it expand properly inside its container
-  },
   dateRangeContainer: {
     flexDirection: "row",
-    marginBottom: 15, // Adds spacing between date pickers
+    marginBottom: 15,
   },
   dateRangeContainer2: {
     flexDirection: "row",
     marginTop: 15,
     marginBottom: 5,
   },
-  dateButton: {
-    padding: 10,
-    backgroundColor: "#000000",
-    borderRadius: 8,
-    marginHorizontal: 5,
-    flex:1,
-  },
-  dateText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 10,
-    alignItems: "center",
-  },
   entriesScroll: {
-     // Ensure it doesn't push elements below
+    // Ensure it doesn't push elements below
   },
   entryCard: {
     width: 200,
@@ -313,6 +344,7 @@ const styles = StyleSheet.create({
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
+    color: "#828282",
   },
   entryEmotion: {
     fontSize: 28,
@@ -320,7 +352,7 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   entryDetails: {
-    fontSize: 12,
+    fontSize: 18,
     color: "#828282",
   },
   container2: {
@@ -339,7 +371,7 @@ const styles = StyleSheet.create({
     backgroundColor: "black",
   },
   chipUnselected: {
-    backgroundColor: "#e0e0e0", // Lighter and more modern grey
+    backgroundColor: "#e0e0e0",
   },
   chipText: {
     fontSize: 14,
@@ -348,9 +380,6 @@ const styles = StyleSheet.create({
   },
   chipTextUnselected: {
     color: "black",
-  },
-  chipTextSelected: {
-    color: "white",
   },
 });
 
