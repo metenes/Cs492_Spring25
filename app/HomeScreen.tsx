@@ -265,7 +265,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to CheckIn...")
+                console.log("Navigating to Free Journal...")
                 navigation.navigate("FreeJournaling");
               }}
             >
@@ -279,7 +279,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 setMenuOpen(false);
                 console.log("Navigating to FreeJournaling...")
 
-                navigation.navigate("FreeJournaling");
+                navigation.navigate("PromptSelection");
               }}
             >
               <Icon name="book-open" size={20} color="black" />
