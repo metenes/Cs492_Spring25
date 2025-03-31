@@ -9,6 +9,7 @@ import {
   Image,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -17,7 +18,7 @@ import * as MediaLibrary from "expo-media-library";
 import { Audio } from "expo-av"; // 👈 For microphone permission
 import BottomNavigation from "./BottomNavigation"; // ✅ Import BottomNavigation
 
-import { saveJournalEntry } from "./services/ApiService";
+import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
@@ -34,8 +35,8 @@ const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  // New state variable for image picker warning
   const [imagePickerWarning, setImagePickerWarning] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -85,24 +86,67 @@ const FreeJournalingScreen = () => {
     setSelectedImage(null); // Close modal after deletion
   };
 
+  // Load draft when screen mounts
+  useEffect(() => {
+    const loadDraft = async () => {
+      const draft = await getDraft();
+      if (draft) {
+        setContent(draft.content);
+        setImageUris(draft.images);
+      }
+    };
+    loadDraft();
+  }, []);
+
+  // Save draft when content or images change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveDraft(content, imageUris);
+    }, 1000); // Save draft 1 second after last change
+
+    return () => clearTimeout(timeoutId);
+  }, [content, imageUris]);
+
   const handleSaveEntry = async () => {
     try {
-      // No need to get token here since ApiService handles it
+      setIsSaving(true);
       const response = await saveJournalEntry(content, imageUris);
       
       if (response.error) {
         alert("Failed to save journal entry.");
-        console.error("Error saving entry:", response.error);
         return;
       }
 
+      await clearDraft(); // Clear draft after successful save
       alert("Journal entry saved successfully!");
-      navigation.navigate("FreeJournaling"); // Update this to match your navigation type
+      navigation.navigate("Home");
     } catch (error) {
       console.error("Error in handleSaveEntry:", error);
       alert("An error occurred while saving the journal entry.");
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  if (isSaving) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: 'rgba(255,255,255,0.8)', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 999
+      }}>
+        <ActivityIndicator size="large" color="#000" />
+        <Text style={{ marginTop: 20, fontSize: 16 }}>Saving your entry...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
