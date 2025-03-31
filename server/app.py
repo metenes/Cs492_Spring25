@@ -132,12 +132,17 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
 app.config["MAIL_PORT"] = 587
 app.config["MAIL_USE_TLS"] = True
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentiooffical@gmail.com")
+app.config["MAIL_PASSWORD"] = "dpgn mvbv kias nmtx"
+# app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR714567SR33")
+
+app.config["MAIL_DEFAULT_SENDER"] = ("Sentio App", os.getenv("MAIL_USERNAME", "sentiooffical@gmail.com"))
+app.config["MAIL_MAX_EMAILS"] = 5
+app.config["MAIL_USE_SSL"] = False
+app.config["MAIL_ASCII_ATTACHMENTS"] = False
+
 # app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentioanalysis.co@gmail.com")
 # app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR71456.")
-
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentiooffical@gmail.com")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR71456.")
-
 mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)

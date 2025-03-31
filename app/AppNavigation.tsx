@@ -18,7 +18,7 @@ import ActivityScreen from "./ActivityScreen";
 import SettingsScreen from "./SettingsScreen";
 import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
-import PasswordResetScreen from "./PasswordResetScreen";
+import ForgotPasswordScreen from "./ForgotPasswordScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 import CheckInScreen from "./CheckInScreen";
@@ -107,7 +107,7 @@ const AppNavigation = () => {
           component={HomeScreen} 
           options={{ headerShown: false }} // Removes the back button from Home
         />
-        <Stack.Screen name="ForgotPassword" component={PasswordResetScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Activity" component={ActivityScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />

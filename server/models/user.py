@@ -5,7 +5,8 @@ class User(Document):
     name = StringField(min_length=1, max_length=50, trim=True)
     email = EmailField(required=True, unique=True)
     password = StringField(required=True, min_length=6, trim=True)
-    created_at = DateField(default=datetime.utcnow)
+    created_at = DateField(default=datetime.now)
+    
     
     def to_json(self):
         return {

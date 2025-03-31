@@ -6,40 +6,62 @@ import {
   StyleSheet, 
   Alert, 
   Text, 
-  Dimensions 
+  Dimensions, 
+  ActivityIndicator 
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { resetPassword } from "./services/ApiService";
+import { requestPasswordReset } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-// Get screen width & height dynamically
 const { width, height } = Dimensions.get("window");
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "ForgotPassword">;
 
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
 
-  const handleResetPassword = async () => {
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert("Error", "Please enter a valid email address.");
+      return;
+    }
+  
+    setLoading(true);
+  
     try {
-      await resetPassword(email);
-      Alert.alert("Success", "A password reset link has been sent to your email.");
-      navigation.navigate("Login");
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        Alert.alert("Error", error.message);
+      const response = await requestPasswordReset(email);
+      if (response.token) {
+        Alert.alert("Success", "A password reset link has been sent to your email.");
+        navigation.navigate("ResetPasswordScreen", { token: response.token }); // ✅ Fixed navigation
       } else {
-        Alert.alert("Error", "An unknown error occurred");
+        Alert.alert("Error", "Something went wrong. Please try again.");
       }
+    } catch (error: unknown) {
+      let errorMessage = "An unknown error occurred";
+      if (error instanceof Error) {
+        if (error.message.includes("404")) {
+          errorMessage = "Email not registered.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
+  
 
   return (
     <View style={styles.container}>
       <Text style={styles.appTitle}>Sentio</Text>
-      <Text style={styles.subtitle}>Reset Your Password</Text>
+      <Text style={styles.subtitle}>Forgot Your Password?</Text>
+      <Text style={styles.instructions}>
+        Enter your email, and we will send you a link to reset your password.
+      </Text>
 
       <TextInput
         style={styles.input}
@@ -48,13 +70,19 @@ const ForgotPasswordScreen = () => {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        testID="email-input"
       />
 
-      <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
-        <Text style={styles.resetButtonText}>Send Reset Link</Text>
+      <TouchableOpacity 
+        style={[styles.resetButton, loading && styles.disabledButton]} 
+        onPress={handleForgotPassword}
+        disabled={loading}
+        testID="forgot-password-button"
+      >
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Send Reset Link</Text>}
       </TouchableOpacity>
 
-      <Text style={styles.backToLoginText} onPress={() => navigation.navigate("Login")}>
+      <Text style={styles.backToLoginText} onPress={() => navigation.navigate("Login")} testID="back-to-login">
         Back to Login
       </Text>
     </View>
@@ -82,7 +110,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: width * 0.045,
     color: "#666",
-    marginBottom: height * 0.04,
+    marginBottom: height * 0.02,
+  },
+  instructions: {
+    fontSize: width * 0.04,
+    color: "#888",
+    textAlign: "center",
+    marginBottom: height * 0.03,
+    width: "90%",
   },
   input: {
     width: "90%",
@@ -106,6 +141,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: width * 0.045,
     fontWeight: "bold",
+  },
+  disabledButton: {
+    backgroundColor: "#555",
   },
 });
 
