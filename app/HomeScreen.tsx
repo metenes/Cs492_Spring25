@@ -68,26 +68,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     const token = await AsyncStorage.getItem("userToken");
     console.log("🔹 Token in AsyncStorage:", token);
   };
-  
   checkStoredToken();
-/*
-  const testLogin = async () => {
-    const email = "irem.akel@ug.bilkent.edu.tr"; // Your test email
-    const password = "password123"; // Your test password
-  
-    try {
-      const response = await loginUser(email, password);
-      console.log("✅ Received login response:", response);
-  
-      const storedToken = await AsyncStorage.getItem("userToken");
-      console.log("🔹 Token in AsyncStorage after login:", storedToken);
-    } catch (error) {
-      console.error("❌ Login test failed:", error);
-    }
-  };
-*/
-  //testLogin();
-  
+
   console.log("STARTING FROM HERE")
 
   useEffect(() => {
@@ -102,6 +84,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         }
     };
     checkStoredToken();
+    
     const loadEntries = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
@@ -126,26 +109,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     loadEntries();
   }, []);
   
-  /* useEffect(() => {
-    const loadEntries = async () => {
-      try {
-        const token = await AsyncStorage.getItem("userToken");
-        if (token) {
-          const response = await fetchJournalEntries(token);
-          if (!response.error) {
-            setEntries(response.entries);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading journal entries:", error);
-      }
-    };
-
-    loadEntries();
-  }, []); */
-
-
-
   const toggleMenu = () => {
     if (isMenuOpen) {
       // Close animation

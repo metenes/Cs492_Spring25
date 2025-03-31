@@ -43,6 +43,7 @@ from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
+from controller.check_in_controller import check_bp; 
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
@@ -53,64 +54,6 @@ from bson import ObjectId
 from botocore.exceptions import ClientError
 # Chat API from chat.py
 from chat import *
-
-# Models
-class User(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class UserInDB(User):
-    hashed_password: str
-    user_id: str
-    created_at: str
-    model_path: Optional[str] = None
-    model_version: int = 0
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-
-class TokenData(BaseModel):
-    user_id: Optional[str] = None
-
-class ChatMessage(BaseModel):
-    role: str = "user"
-    content: str
-
-class ChatHistory(BaseModel):
-    messages: List[ChatMessage] = []
-
-class ChatRequest(BaseModel):
-    message: str
-    update_model: bool = False  # Whether to update the model based on this interaction
-    context: Optional[Dict[str, Any]] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    conversation_id: str
-    model_version: int
-    model_updated: bool = False
-    inference_time: float = 0.0
-
-class ModelTrainingRequest(BaseModel):
-    training_data: List[Dict[str, str]]
-    hyperparameters: Optional[Dict[str, Any]] = None
-
-class ModelTrainingResponse(BaseModel):
-    job_id: str
-    status: str
-    estimated_completion_time: Optional[str] = None
-
-class ModelStatus(BaseModel):
-    user_id: str
-    model_path: str
-    model_version: int
-    last_updated: str
-    training_jobs: List[Dict[str, Any]] = []
-    performance_metrics: Optional[Dict[str, float]] = None
-
 
 app = Flask(__name__)
 CORS(app)
@@ -299,7 +242,7 @@ app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
 app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
-
+app.register_blueprint(check_bp, url_prefix="/check-in")
 
 # ---------------------------------------
 #  **Protected Route**

@@ -4,14 +4,9 @@ import { Calendar } from 'react-native-calendars';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import BottomNavigation from './BottomNavigation';
-
-// Define navigation types
-type RootStackParamList = {
-  Home: undefined;
-  FreeJournaling: { selectedDate: string };
-};
+import { RootStackParamList } from "./types/types";
+import { StackNavigationProp } from "@react-navigation/stack";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
 

@@ -10,7 +10,7 @@ export type RootStackParamList = {
     Chatbot: undefined;
     DiaryMain: undefined;
     Dashboard: undefined;
-    FreeJournaling: undefined;
+    FreeJournaling: { selectedDate: string };
     Journal: undefined;
     ActivityLog: undefined;
     PaymentMethodHistoryScreen: undefined;
