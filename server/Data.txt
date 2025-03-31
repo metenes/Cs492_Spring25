@@ -2,9 +2,10 @@ Username: sentioanalysisco
 Password: 9o2Y9o20jmgNziQi
 mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/
 
-
-
-
+Google smtp properties : 
+Name : Sentio App 
+16-Digit Password : dpgn mvbv kias nmtx
+This is not same with google mail's sentiooffical@gmail.com, account info : 1234SR714567SR33
 
 AWS Sentio Credential - aws configure 
 Access Key : AKIAXGZAMH3HUVQSPNED

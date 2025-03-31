@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
- //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
+//const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 const API_URL = "http://192.168.1.104:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://172.20.10.2:5000"; // Melisa's API - LAN
@@ -256,32 +256,207 @@ export const registerUser = async (email: string, password: string, dob: string)
   }
 };
 
-
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
-  const response = await fetch(`${API_URL}/user/profile`, {
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`, 
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if(userId == -1){
+    throw new Error(`Failed to userId -1`);
+  }
+
+  // Then fetch the detailed profile with the user ID
+  const profileResponse = await fetch(`${API_URL}/user/${userId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!profileResponse.ok) {
+    throw new Error(`Failed to fetch profile: ${profileResponse.statusText}`);
+  }
+
+  const profileData = await profileResponse.json();
+
+  // Return formatted profile data structure
+  return {
+    userId: profileData._id,
+    email: profileData.email,
+    name: profileData.name || '',
+    bio: profileData.bio || '',
+    phone: profileData.phone || '',
+    location: profileData.location || '',
+    profileImageUrl: profileData.profileImageUrl || null,
+    
+    // Including the previously existing fields for backward compatibility
+    profile_picture: profileData.profileImageUrl || null,
+    preferences: profileData.preferences || {},
+    last_login: profileData.last_login || null,
+    role: profileData.role || 'user',
+    account_status: profileData.account_status || 'active',
+  };
+};
+
+// Update user profile information
+export const updateProfile = async (token: string, profileData: any) => {
+
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if(userId == -1){
+    throw new Error(`Failed to userId -1`);
+  }
+
+
+  const response = await fetch(`${API_URL}/user/${userId}/update-user`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profileData),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update profile: ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+
+// Upload profile image
+export const uploadProfileImage = async (token: string, imageFile: File) => {
+
+    // First get the user ID from the token (if not stored separately)
+    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+    }
+  
+    const userData = await userResponse.json();
+    const userId = userData._id;
+  
+    if(userId == -1){
+      throw new Error(`Failed to userId -1`);
+    }
+
+    
+  const formData = new FormData();
+  formData.append('profileImage', imageFile);
+
+  const response = await fetch(`${API_URL}/user/${userId}/profile-image`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upload profile image: ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+
+
+export const fetchActivities = async (token: string) => {
+  const response = await fetch(`${API_URL}/activity`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  return response.json();
+};
+
+
+export const logActivity = async (token: string, activity: string) => {
+  const response = await fetch(`${API_URL}/activity`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ activity }),
+  });
+  return response.json();
+};
+
+
+// **********************************************
+// **Delete API**
+// **********************************************
+
+// Delete user account
+export const deleteAccount = async (token: string) => {
+
+    // First get the user ID from the token (if not stored separately)
+    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+    }
+  
+    const userData = await userResponse.json();
+    const userId = userData._id;
+  
+    if(userId == -1){
+      throw new Error(`Failed to userId -1`);
+    }
+
+  const response = await fetch(`${API_URL}/user/${userId}/delete-user`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch profile: ${response.statusText}`);
+    throw new Error(`Failed to delete account: ${response.statusText}`);
   }
 
-  const responseData = await response.json();
-
-  // Make sure the profile data includes the new context information
-  return {
-    email: responseData.email,
-    profile_picture: responseData.profile_picture,
-    preferences: responseData.preferences,
-    last_login: responseData.last_login,
-    role: responseData.role,
-    account_status: responseData.account_status,
-  };
+  return await response.json();
 };
+
+
+// **********************************************
+// ****** Password Reset API
+// **********************************************
 
 // Update the user's password
 export const updatePassword = async (token: string, newPassword: string) => {
@@ -301,27 +476,8 @@ export const updatePassword = async (token: string, newPassword: string) => {
   return await response.json(); // Return success message
 };
 
-export const logActivity = async (token: string, activity: string) => {
-  const response = await fetch(`${API_URL}/activity`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ activity }),
-  });
-  return response.json();
-};
 
-export const fetchActivities = async (token: string) => {
-  const response = await fetch(`${API_URL}/activity`, {
-    method: "GET",
-    headers: { "Authorization": `Bearer ${token}` },
-  });
-  return response.json();
-};
-
-export const resetPassword = async (email: string) => {
+export const requestPasswordReset = async (email: string) => {
   const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
     headers: {
@@ -334,8 +490,28 @@ export const resetPassword = async (email: string) => {
     throw new Error(`Failed to send reset link: ${response.statusText}`);
   }
 
-  return await response.json(); // Return success message
+  return await response.json(); // Expecting { token: "some-reset-token" }
 };
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  const response = await fetch(`${API_URL}/user/reset-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token, newPassword }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to reset password: ${response.statusText}`);
+  }
+
+  return await response.json(); // Expecting success message
+};
+
+// **********************************************
+// ****** Journal API
+// **********************************************
 
 export const saveJournalEntry = async (content: string, images?: string[], category?: string) => {
   try {
@@ -410,7 +586,6 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
   }
 };
 
-
 export const fetchJournalEntries = async (token: string) => {
   try {
     const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
@@ -445,7 +620,11 @@ export const fetchJournalEntries = async (token: string) => {
   }
 };
 
+// **********************************************
+// ****** User Setting Preferences API
+// **********************************************
 
+// Modify app preferences (dark mode, etc.)
 export const updatePreferences = async (token: string, preferences: object) => {
   const response = await fetch(`${API_URL}/update-preferences`, {
     method: "POST",
@@ -462,3 +641,28 @@ export const updatePreferences = async (token: string, preferences: object) => {
 
   return await response.json(); // Return updated preferences
 };
+
+
+// Save app preferences (dark mode, etc.)
+export const saveAppPreferences = async (preferences: any) => {
+  try {
+    // Store locally in AsyncStorage
+    await AsyncStorage.setItem('appPreferences', JSON.stringify(preferences));
+    return true;
+  } catch (error) {
+    console.error('Error saving preferences:', error);
+    throw new Error('Failed to save preferences');
+  }
+};
+
+// Load app preferences
+export const loadAppPreferences = async () => {
+  try {
+    const storedPrefs = await AsyncStorage.getItem('appPreferences');
+    return storedPrefs ? JSON.parse(storedPrefs) : null;
+  } catch (error) {
+    console.error('Error loading preferences:', error);
+    return null;
+  }
+};
+
