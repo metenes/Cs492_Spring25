@@ -19,6 +19,8 @@ export type RootStackParamList = {
     FaceEmotion : undefined;
     CheckIn: undefined;
     NotificationSettingsScreen: undefined; 
-    ResetPasswordScreen: { token: string }; 
+    ResetPassword: { token: string }; 
+    GuidedJournaling : { prompt: string };
+    PromptSelection : undefined;
   };
   

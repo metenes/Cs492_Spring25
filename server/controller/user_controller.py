@@ -381,7 +381,16 @@ def forgot_password():
             return jsonify({"error": "User not found"}), 404
 
         reset_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))
-        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+
+        # MODIFY HERE SIMIAR TI API FOR NOW, WE WILL SORT THIS OUT SMHW - TODO
+        
+        # const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+        # const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
+        # const API_URL = "http://192.168.1.104:5000";
+        # const API_URL = "http://10.203.122.69:5000";
+        # const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+
+        reset_link = f"http://http://192.168.1.104:5000/reset-password?token={reset_token}"
 
         print(f"✅ Reset link: {reset_link}")
 
@@ -456,8 +465,8 @@ def reset_password():
             return jsonify({"error": "Invalid token content"}), 400
 
         # Password validation
-        if len(new_password) < 8:
-            return jsonify({"error": "Password must be at least 8 characters long"}), 400
+        if len(new_password) < 6:
+            return jsonify({"error": "Password must be at least 6 characters long"}), 400
 
         hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
         result = users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": hashed_password}})

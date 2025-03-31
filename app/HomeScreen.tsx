@@ -7,7 +7,6 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import {storeToken} from './auth/AuthContext'
 import BottomNavigation from './BottomNavigation';
 import { ScrollView } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
@@ -16,12 +15,6 @@ import { fetchJournalEntries } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
-/* type Entry = {
-  id: string;
-  date: string;
-  type: "freeform journal" | "checkin" | "guided journal";
-  subtitle: string;
-}; */
 type Entry = {
   _id: string;
   entryContent: string;
@@ -29,8 +22,9 @@ type Entry = {
   createdAt?: string;
   images?: string[];
   journalSentiments?: any[];
+  category :string,
+  prompt: string; 
 };
-
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -84,7 +78,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         }
     };
     checkStoredToken();
-    
+
     const loadEntries = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
@@ -266,7 +260,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               onPress={() => {
                 setMenuOpen(false);
                 console.log("Navigating to Free Journal...")
-                navigation.navigate("FreeJournaling");
+                navigation.navigate("FreeJournaling", {selectedDate : "TODO"});
               }}
             >
               <Icon name="edit-2" size={20} color="black" />

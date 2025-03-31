@@ -532,10 +532,10 @@ export const resetPassword = async (token: string, newPassword: string) => {
 };
 
 // **********************************************
-// ** Homepage API ** - FreeJournal 
+// ** Homepage API ** - FreeJournal & Guided Journal
 // **********************************************
 
-export const saveJournalEntry = async (content: string, images?: string[], category?: string) => {
+export const saveJournalEntry = async (content: string, images?: string[], category?: string, promt?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -580,7 +580,9 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
         fileName: `uploads/${image}`,
         signedUrl: image
       })) || [],
-      journalSentiments: mappedSentiments
+      journalSentiments: mappedSentiments,
+      category: category,
+      prompt: promt
     };
 
     console.log("Final data being sent:", JSON.stringify(entryData, null, 2));

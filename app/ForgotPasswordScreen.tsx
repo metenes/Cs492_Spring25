@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 const { width, height } = Dimensions.get("window");
 
-type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "ForgotPassword">;
+type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "ResetPassword">;
 
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState("");
@@ -33,9 +33,9 @@ const ForgotPasswordScreen = () => {
   
     try {
       const response = await requestPasswordReset(email);
-      if (response.token) {
+      if (response.message) {
         Alert.alert("Success", "A password reset link has been sent to your email.");
-        navigation.navigate("ResetPasswordScreen", { token: response.token }); // ✅ Fixed navigation
+        navigation.navigate("ResetPassword", { token: response.token }); // ✅ Fixed navigation
       } else {
         Alert.alert("Error", "Something went wrong. Please try again.");
       }
