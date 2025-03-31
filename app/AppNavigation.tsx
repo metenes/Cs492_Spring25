@@ -24,6 +24,8 @@ import DiaryMainScreen from "./DiaryMainScreen";
 import CheckInScreen from "./CheckInScreen";
 import FaceEmotionScreen from "./FaceEmotionScreen";
 import FreeJournalingScreen from "./FreeJournalingScreen";
+import PromptSelectionScreen from "./PromptSelectionScreen";
+import GuidedJournalingScreen from "./GuidedJournalingScreen";
 import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
 import ActivityLogScreen from "./ActivityLogScreen";
@@ -123,6 +125,8 @@ const AppNavigation = () => {
         
         <Stack.Screen name="Dashboard" component={Dashboard} />
         <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
+        <Stack.Screen name="PromptSelection" component={PromptSelectionScreen} />
+        <Stack.Screen name="GuidedJournaling" component={GuidedJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
        
