@@ -11,7 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 
-import { fetchJournalEntries } from "./services/ApiService";
+import { fetchJournalEntries , getCheckInHistory } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -37,6 +37,32 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const rotation = useState(new Animated.Value(0))[0];
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
+  // Filtering state
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
+
+      // Map UI filter names to your backend category values
+      const filterMap: { [key: string]: string } = {
+        "checkin": "checkin",
+        "freeform": "freeform",
+        "guided": "guided"
+      };
+      
+  // Apply filter function
+  const applyFilter = (filter: string) => {
+    setActiveFilter(filter);
+    
+    if (filter === "all") {
+      setFilteredEntries(entries);
+      return;
+    }
+    
+    
+    const filtered = entries.filter(entry => entry.category === filterMap[filter]);
+    setFilteredEntries(filtered);
+  };
+
   useFocusEffect(
     useCallback(() => {
       // Reset everything as soon as the screen is focused
@@ -45,18 +71,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       rotation.setValue(0);
     }, [])
   );  
-
-  /* const entries: Entry[] = [
-    { id: "1", date: "December 18", type: "freeform journal", subtitle: "Freeform Journal Entry" },
-    { id: "2", date: "December 18", type: "checkin", subtitle: "Check-in" },
-    { id: "3", date: "December 14", type: "freeform journal", subtitle: "Freeform Journal Entry" },
-    { id: "4", date: "December 2", type: "guided journal", subtitle: "Guided Journal Entry" },
-    { id: "5", date: "November 30", type: "guided journal", subtitle: "Guided Journal Entry" },
-    { id: "6", date: "November 27", type: "checkin", subtitle: "Check-in" },
-    { id: "7", date: "November 25", type: "freeform journal", subtitle: "Freeform Journal Entry" },
-  ]; */
-
-  const [entries, setEntries] = useState<Entry[]>([]);
 
   const checkStoredToken = async () => {
     const token = await AsyncStorage.getItem("userToken");
@@ -82,23 +96,54 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     const loadEntries = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
-        if (token) {
-          console.log("🔹 Using token to fetch journal entries:", token);
-          const fetchedEntries = await fetchJournalEntries(token);
-      
-          console.log("Fetched entries:", fetchedEntries);
-            
-          if (fetchedEntries.length === 0) {
-            console.warn("⚠️ No journal entries found for user.");
-          }
-        
-          setEntries(fetchedEntries);
-          // print(entries)
+        if (!token) return;
+    
+        console.log("🔹 Fetching journal entries and check-ins using token:", token);
+    
+        // Fetch journal entries
+        const fetchedEntries = await fetchJournalEntries(token);
+        console.log("📖 Journal entries:", fetchedEntries);
+    
+        // Fetch check-ins
+        const checkInResponse = await getCheckInHistory(token);
+    
+        if (!checkInResponse.history) {
+          console.warn("⚠️ No check-ins found.");
+          return;
         }
+    
+        const fetchedCheckIns = checkInResponse.history;
+        console.log("✅ Check-in entries:", fetchedCheckIns);
+    
+        // Convert check-ins to match journal entry structure
+        const formattedCheckIns = fetchedCheckIns.map((checkIn: { entry_id: any; comments: string | any[]; created_at: any; sentiments: any; }) => ({
+          _id: checkIn.entry_id, // Match ID structure
+          entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments", // Use first comment as content
+          entryDate: checkIn.created_at || new Date().toISOString(), // Ensure valid date
+          createdAt: checkIn.created_at,
+          category: "checkin", // Mark as check-in
+          images: [], // Check-ins likely have no images
+          journalSentiments: checkIn.sentiments || [], // Keep sentiments
+          prompt: "", // No prompt for check-ins
+        }));
+    
+        // Merge journals and check-ins
+        let allEntries = [...fetchedEntries, ...formattedCheckIns];
+    
+        // Sort all entries by date (newest first)
+        allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+        // Limit to last 30 entries
+        allEntries = allEntries.slice(0, 30);
+
+        console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
+    
+        setEntries(allEntries);
+        setFilteredEntries(allEntries); // Initially show all entries
       } catch (error) {
-        console.error("❌ Error loading journal entries:", error);
+        console.error("❌ Error loading journal entries and check-ins:", error);
       }
     };
+    
   
     loadEntries();
   }, []);
@@ -148,33 +193,17 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     outputRange: ["0deg", "45deg"], // Smooth 45° rotation (plus → cross)
   });
 
-  const renderTab = (title: string, isActive: boolean) => (
-    <TouchableOpacity style={[styles.tab, isActive && styles.activeTab]}>
+  const renderTab = (title: string, filterValue: string, isActive: boolean) => (
+    <TouchableOpacity style={[styles.tab, isActive && styles.activeTab ]}
+    onPress={() => applyFilter(filterValue)}>
       <Text style={[styles.tabText, isActive && styles.activeTabText]}>{title}</Text>
     </TouchableOpacity>
   );
-
-  /* const renderEntry = ({ item }: { item: Entry }) => (
-    <TouchableOpacity style={styles.entryItem}>
-      <View style={styles.entryIcon}>
-        {item.type === "checkin" ? (
-          <Icon name="smile" size={20} color="#000" />
-        ) : (
-          <Icon name="edit-2" size={20} color="#000" />
-        )}
-      </View>
-      <View style={styles.entryContent}>
-        <Text style={styles.entryDate}>{item.date}</Text>
-        <Text style={styles.entrySubtitle}>{item.subtitle}</Text>
-      </View>
-    </TouchableOpacity>
-  ); */
 
   const renderEntry = ({ item }: { item: Entry }) => {
     // Safely format the date
     let formattedDate = "Invalid date";
     try {
-      // Try to use entryDate first, fall back to createdAt if needed
       const dateString = item.entryDate || item.createdAt;
       if (dateString) {
         formattedDate = format(new Date(dateString), "EEEE, MMM d yyyy");
@@ -183,14 +212,27 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       console.log("Error formatting date:", error);
     }
   
+    // Choose icon based on entry category
+    let iconName = "edit-2";
+    if (item.category === "checkin") {
+      iconName = "smile";
+    } else if (item.category === "guided") {
+      iconName = "book-open";
+    }
+  
     return (
-      <TouchableOpacity style={styles.entryItem}>
+      <TouchableOpacity 
+        style={styles.entryItem}
+        onPress={() => navigation.navigate("EntryDetail", { entry: item })}
+      >
         <View style={styles.entryIcon}>
-          <Icon name="edit-2" size={20} color="#000" />
+          <Icon name={iconName} size={20} color="#000" />
         </View>
         <View style={styles.entryContent}>
           <Text style={styles.entryDate}>{formattedDate}</Text>
-          <Text style={styles.entrySubtitle}>{item.entryContent || "No content"}</Text>
+          <Text style={styles.entrySubtitle} numberOfLines={2}>
+            {item.entryContent || "No content"}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -215,14 +257,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       showsHorizontalScrollIndicator={false} 
       contentContainerStyle={styles.tabContainer}
       >
-        {renderTab("All Entries", true)}
-        {renderTab("Check-ins", false)}
-        {renderTab("Freeform Journals", false)}
-        {renderTab("Guided Journals", false)}
+      {renderTab("All Entries", "all", activeFilter === "all")}
+      {renderTab("Check-ins", "checkin", activeFilter === "checkin")}
+      {renderTab("Freeform Journals", "freeform", activeFilter === "freeform")}
+      {renderTab("Guided Journals", "guided", activeFilter === "guided")}
+
       </ScrollView>
       </View>
 
-      <FlatList data={entries} renderItem={renderEntry} keyExtractor={(item) => item._id} style={styles.list} 
+      <FlatList data={filteredEntries} renderItem={renderEntry} keyExtractor={(item) => item._id || Math.random().toString()} style={styles.list} 
         ListEmptyComponent={<Text>No journal entries found.</Text>}
       />
 

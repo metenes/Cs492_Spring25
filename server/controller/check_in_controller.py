@@ -48,7 +48,7 @@ def create_check_in():
         return jsonify({"error": str(e)}), 500
 
 
-# Route to get check-in history for a user
+
 @check_bp.route('/history/<user_id>', methods=['GET'])
 def get_check_in_history(user_id):
     try:
@@ -56,25 +56,30 @@ def get_check_in_history(user_id):
         if not user:
             return jsonify({"error": "User not found"}), 404
         
-        entries = check_in_collection.find({"user_id": ObjectId(user_id)})
+        # Convert cursor to a list before checking length
+        entries = list(check_in_collection.find({"user_id": ObjectId(user_id)}))
+
+        if not entries:  # Corrected check
+            print("here")
+            return jsonify({"error": "No check-in entries found"}), 404
 
         # Convert entries to JSON format
-        history = []
-        for entry in entries:
-            history.append({
-                "entry_id": entry["entry_id"],
+        history = [
+            {
+                "entry_id": str(entry["_id"]),
                 "user_id": str(entry["user_id"]),
-                "sentiments": entry["sentiments"],  # No need to convert objects
+                "sentiments": entry["sentiments"],  
                 "causes": entry["causes"],
                 "comments": entry.get("comments", []),
                 "created_at": entry.get("created_at").isoformat() if entry.get("created_at") else None
-            })
+            }
+            for entry in entries
+        ]
 
         return jsonify({"history": history}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # Route to get a specific check-in entry
 @check_bp.route('/<int:entry_id>', methods=['GET'])

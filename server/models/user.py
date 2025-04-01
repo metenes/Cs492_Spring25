@@ -30,8 +30,6 @@ from datetime import datetime
 }
 """
 
-
-
 class User(Document):
     name = StringField(min_length=1, max_length=50, trim=True)
     email = EmailField(required=True, unique=True)

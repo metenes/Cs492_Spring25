@@ -76,7 +76,7 @@ export const logoutDB = async () => {
 };
 
 // **********************************************
-// **Sentiment API** - REDO TODO
+// **Sentiment API** - 
 // **********************************************
 
 export const fetchSentimentAnalysis = async (
@@ -160,25 +160,36 @@ export const fetchJournalEntriesWithDate = async (
   }
 };
 
+// **********************************************
+// ** Chat API** - Send message
+// **********************************************
 export const sendMessage = async (message: string) => {
   try {
-    const response = await fetch(`${API_URL}/chat`, {
+    const response = await fetch(`${API_URL}/chat/test`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ message }),
     });
+
     if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
+      throw new Error(`Server error: ${response.statusText}`);
     }
+
     const data = await response.json();
-    return data.reply; 
+    console.log("Data recived from test : " , data)
+    if (!data.reply) {
+      throw new Error("Invalid response format");
+    }
+
+    return data.reply; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
   }
 };
+
 
 // **********************************************
 // **Login&Register API** - Login
@@ -435,10 +446,6 @@ export const logActivity = async (token: string, activity: string) => {
   return response.json();
 };
 
-// **********************************************
-// **Profile API** - Delete 
-// **********************************************
-
 // Delete user account
 export const deleteAccount = async (token: string) => {
 
@@ -572,7 +579,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
     }));
 
     console.log("Final mapped sentiments:", mappedSentiments);
-
+    console.log("CATEGORY : " , category)
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
@@ -646,15 +653,38 @@ export const fetchJournalEntries = async (token: string) => {
 
 
 // **********************************************
-// ** Homepage API ** - Guided Journal 
+// ** Homepage API ** - Entry Details 
 // **********************************************
 
+export const deleteEntry = async (entry : any) => {
+  try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) throw new Error("No token found");
+      // Fetch from the database
+      const response = await fetch(`${API_URL}/journal/delete-journal`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        }
+      });
 
+      if (response.ok) {
+        console.error("Success", "Journal entry deleted successfully");
+        return await response.json(); 
+
+      } else {
+        throw new Error("Failed to fetch journal entries");
+      }
+  } catch (error) {
+    console.error("Error deleting entry:", error);
+    throw new Error("Something went wrong while deleting the entry");
+  }
+};
 
 // **********************************************
 // ** Homepage API ** - Entry 
 // **********************************************
-
 
 export const fetchAllEntries = async (token: string) => {
   try {
@@ -678,9 +708,6 @@ export const fetchAllEntries = async (token: string) => {
     return [];
   }
 };
-
-
-
 
 
 // **********************************************
@@ -861,7 +888,7 @@ export const getCheckInHistory = async (token: string) => {
     });
 
     const data = await response.json();
-    
+    console.log("here" , data)
     if (!response.ok) {
       throw new Error(data.message || 'Failed to fetch check-in history');
     }

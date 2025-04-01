@@ -110,6 +110,7 @@ const FreeJournalingScreen = () => {
   const handleSaveEntry = async () => {
     try {
       setIsSaving(true);
+      
       const response = await saveJournalEntry(content, imageUris, "freeform" ); // saveJournalEntry(content, imageUris ); is same too
       
       if (response.error) {

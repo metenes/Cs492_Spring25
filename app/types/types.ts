@@ -22,5 +22,6 @@ export type RootStackParamList = {
     ResetPassword: { token: string }; 
     GuidedJournaling : { prompt: string };
     PromptSelection : undefined;
+    EntryDetail: { entry: any };
   };
   
