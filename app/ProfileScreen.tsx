@@ -16,8 +16,6 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { MediaType } from 'expo-image-picker';
-
 import { Ionicons } from "@expo/vector-icons";
 import BottomNavigation from './BottomNavigation';
 import axios from 'axios';
@@ -127,36 +125,52 @@ const ProfileScreen = () => {
 
   // Pick an image from the gallery (only one image)
   const pickImage = async () => {
+    console.log("🟡 Opening gallery...");
     setModalVisible(false);
-
-    // Option 1: Using the enum without array
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      await uploadImage(result.assets[0].uri);
+  
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+  
+      if (!result.canceled && result.assets.length > 0) {
+        const selectedUri = result.assets[0].uri;
+        console.log("✅ Image picked:", selectedUri);
+        Alert.alert("Image Picked", selectedUri); // <-- force feedback
+        setProfileImage(selectedUri); // You can comment this too to isolate
+      } else {
+        console.log("❌ No image selected");
+      }
+    } catch (err) {
+      console.error("❌ Picker crashed:", err);
+      Alert.alert("Error", "Picker crashed: " + err.message);
     }
   };
-
+  
+  
+  
+  
   // Take a photo using the camera
   const takePhoto = async () => {
     setModalVisible(false);
-
+  
     let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: "images",
+      mediaTypes: ImagePicker.MediaType.Image, // ✅ also fix this here
       allowsEditing: true,
-      aspect: [1, 1], // Crop to square
-      quality: 0.8,
+      aspect: [1, 1],
+      quality: 1,
     });
-
-    if (!result.canceled) {
-      await uploadImage(result.assets[0].uri);
+  
+    if (!result.canceled && result.assets.length > 0) {
+      const photoUri = result.assets[0].uri;
+      setProfileImage(photoUri);
+      await uploadImage(photoUri);
     }
   };
+  
 
   // Upload image to server (S3 via backend)
   const uploadImage = async (imageUri : any) => {
@@ -264,14 +278,22 @@ const ProfileScreen = () => {
       <View style={[styles.profileContainer, { backgroundColor: theme.cardBackground }]}>
         <TouchableOpacity onPress={() => setModalVisible(true)}>
           <View style={styles.avatarWrapper}>
-            <Image
-              source={
-                profileImage
-                  ? { uri: profileImage }
-                  : require("../assets/default-avatar.jpeg")
-              }
-              style={styles.avatar}
-            />
+          {profileImage && profileImage.trim() !== "" ? (
+          <Image
+            source={{ uri: profileImage }}
+            style={styles.avatar}
+            onError={() => {
+              console.warn("⚠️ Failed to load image, reverting to default.");
+              setProfileImage(null); // fallback in case image fails
+            }}
+          />
+        ) : (
+          <Image
+            source={require("../assets/default-avatar.jpeg")}
+            style={styles.avatar}
+          />
+        )}
+
             <View style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}>
               <Ionicons name="camera-outline" size={18} color={theme.text} />
             </View>
