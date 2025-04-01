@@ -147,24 +147,6 @@ mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-# bcrypt.init_app(app) 
-# MongoDB Connection (Using `retryWrites=true&w=majority` for SSL fix)
-# MONGO_URI = "mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/mydb?retryWrites=true&w=majority&tls=true&tlsCAFile=<path_to_ca_file>"
-MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
-
-try:
-    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
-    db = client["mydb"]
-    print("✅ Connected to MongoDB successfully!")
-    print("✅ Available collections:", db.list_collection_names())
-    users_collection = db["users"]
-    sentiments_collection = db["sentiments"]  # db sentiments 
-    activities_collection = db["activities"]
-    #print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
-except Exception as e:
-    print(f"❌ Error connecting to MongoDB: {e}")
-    exit(1)
-
 # ---------------------------------------
 #  User Token check 
 # ---------------------------------------
@@ -191,18 +173,6 @@ def token_required(f):
 
     return decorator
 
-
-# ---------------------------------------
-#  Time classification 
-# ---------------------------------------
-def get_period_of_day(timestamp):
-    hour = timestamp.hour
-    if hour < 12:
-        return 'Morning'
-    elif hour < 17:
-        return 'Afternoon'
-    return 'Evening'
-
 # ---------------------------------------
 # Function to create a JWT token
 # ---------------------------------------
@@ -216,84 +186,6 @@ def get_period_of_day(timestamp):
 #    return token
 
 
-# 1. First define the route
-@journal_bp.route("/save-journal-entry", methods=["POST"])
-@jwt_required()
-def save_journal_entry():
-    try:
-        print("🔵 Starting save_journal_entry function")
-        user_id = get_jwt_identity()
-        print(f"🔹 User ID: {user_id}")
-        
-        # Validate user_id format
-        try:
-            user_object_id = ObjectId(user_id)
-        except:
-            print("❌ Invalid user ID format")
-            return jsonify({"error": "Invalid user ID format"}), 400
-        
-        data = request.get_json()
-        print(f"🔹 Received data: {data}")
-        
-        # Extract data from request
-        entry_content = data.get('entryContent')
-        entry_date = data.get('entryDate')
-        images = data.get('images', [])
-        journal_sentiments = data.get('journalSentiments', [])
-        
-        # Validate required fields
-        if not entry_content:
-            print("❌ No entry content provided")
-            return jsonify({"error": "Entry content is required"}), 400
-        
-        # Create new journal entry with its own ObjectId
-        new_entry = {
-            "_id": ObjectId(),  # Give each entry its own ID
-            "entryContent": entry_content,
-            "entryDate": entry_date,
-            "images": images,
-            "journalSentiments": journal_sentiments,
-            "createdAt": datetime.now()
-        }
-        
-        # Update the document using $push to add to the journalEntries array
-        print(f"🔹 Attempting to save to MongoDB for user {user_id}")
-
-        # First check if document exists
-        existing_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        print(f"🔹 Existing document: {existing_doc}")
-
-        if existing_doc:
-            # Update existing document
-            result = journal_entries_collection.update_one(
-                {"_id": ObjectId(user_id)},
-                {
-                    "$push": {
-                        "journalEntries": new_entry
-                    }
-                }
-            )
-        else:
-            # Create new document with proper structure
-            result = journal_entries_collection.insert_one({
-                "_id": ObjectId(user_id),
-                "journalEntries": [new_entry]
-            })
-        
-        print(f"✅ MongoDB operation successful")
-        
-        return jsonify({
-            "message": "Journal entry saved successfully",
-            "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
-        }), 201
-        
-    except Exception as e:
-        print(f"❌ Error saving journal entry: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-# 2. THEN register all blueprints
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
