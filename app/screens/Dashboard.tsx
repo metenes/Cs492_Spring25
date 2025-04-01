@@ -17,11 +17,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Emotions array and code→name map
 const emotions = [
-  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude",
-  "Joy", "Love", "Optimism", "Pride", "Relief", "Anger", "Annoyance",
-  "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief",
-  "Jealousy", "Sadness", "Confusion", "Curiosity", "Desire", "Neutral",
-  "Remorse", "Surprise", "Realization"
+  "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+  "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+  "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+  "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+  "sadness", "surprise", "neutral"
 ];
 
 export const emotionMap: Record<number, string> = emotions.reduce(
