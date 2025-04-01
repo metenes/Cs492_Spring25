@@ -94,24 +94,6 @@ mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-# bcrypt.init_app(app) 
-# MongoDB Connection (Using `retryWrites=true&w=majority` for SSL fix)
-# MONGO_URI = "mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/mydb?retryWrites=true&w=majority&tls=true&tlsCAFile=<path_to_ca_file>"
-MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
-
-try:
-    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
-    db = client["mydb"]
-    print("✅ Connected to MongoDB successfully!")
-    print("✅ Available collections:", db.list_collection_names())
-    users_collection = db["users"]
-    sentiments_collection = db["sentiments"]  # db sentiments 
-    activities_collection = db["activities"]
-    #print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
-except Exception as e:
-    print(f"❌ Error connecting to MongoDB: {e}")
-    exit(1)
-
 # ---------------------------------------
 #  User Token check 
 # ---------------------------------------
@@ -137,18 +119,6 @@ def token_required(f):
         return f(*args, **kwargs)
 
     return decorator
-
-
-# ---------------------------------------
-#  Time classification 
-# ---------------------------------------
-def get_period_of_day(timestamp):
-    hour = timestamp.hour
-    if hour < 12:
-        return 'Morning'
-    elif hour < 17:
-        return 'Afternoon'
-    return 'Evening'
 
 # ---------------------------------------
 # Function to create a JWT token

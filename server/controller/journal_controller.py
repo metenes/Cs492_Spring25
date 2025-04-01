@@ -390,3 +390,79 @@ def delete_journal_entry(entry_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@journal_bp.route("/save-journal-entry", methods=["POST"])
+@jwt_required()
+def save_journal_entry():
+    try:
+        print("🔵 Starting save_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}")
+        
+        # Validate user_id format
+        try:
+            user_object_id = ObjectId(user_id)
+        except:
+            print("❌ Invalid user ID format")
+            return jsonify({"error": "Invalid user ID format"}), 400
+        
+        data = request.get_json()
+        print(f"🔹 Received data: {data}")
+        
+        # Extract data from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images', [])
+        journal_sentiments = data.get('journalSentiments', [])
+        
+        # Validate required fields
+        if not entry_content:
+            print("❌ No entry content provided")
+            return jsonify({"error": "Entry content is required"}), 400
+        
+        # Create new journal entry with its own ObjectId
+        new_entry = {
+            "_id": ObjectId(),  # Give each entry its own ID
+            "entryContent": entry_content,
+            "entryDate": entry_date,
+            "images": images,
+            "journalSentiments": journal_sentiments,
+            "createdAt": datetime.now()
+        }
+        
+        # Update the document using $push to add to the journalEntries array
+        print(f"🔹 Attempting to save to MongoDB for user {user_id}")
+
+        # First check if document exists
+        existing_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        print(f"🔹 Existing document: {existing_doc}")
+
+        if existing_doc:
+            # Update existing document
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$push": {
+                        "journalEntries": new_entry
+                    }
+                }
+            )
+        else:
+            # Create new document with proper structure
+            result = journal_entries_collection.insert_one({
+                "_id": ObjectId(user_id),
+                "journalEntries": [new_entry]
+            })
+        
+        print(f"✅ MongoDB operation successful")
+        
+        return jsonify({
+            "message": "Journal entry saved successfully",
+            "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
+        }), 201
+        
+    except Exception as e:
+        print(f"❌ Error saving journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
