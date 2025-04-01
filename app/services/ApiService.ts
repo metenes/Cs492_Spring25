@@ -4,7 +4,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 //const API_URL = "http://192.168.1.104:5000";
 // const API_URL = "http://10.203.122.69:5000";
-const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+//const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+// const API_URL = "http://10.203.122.69:5000";
+//const API_URL= "http://10.22.247.80:5000"; //B2 STAR
+const API_URL= "http://172.20.10.6:5000"; //Doga Hotspot
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
