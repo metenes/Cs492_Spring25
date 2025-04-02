@@ -32,7 +32,7 @@ const GuidedJournalingScreen = () => {
       return;
     }
 
-    const response = await saveJournalEntry(token, content, imageUris, prompt);
+    const response = await saveJournalEntry(content, imageUris ,"guided", prompt); // need to save the prompt for guided category
 
     if (response.error) {
       alert("Failed to save journal entry.");

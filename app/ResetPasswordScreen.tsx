@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   View, 
   TextInput, 
@@ -9,23 +9,47 @@ import {
   Dimensions, 
   ActivityIndicator 
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { resetPassword } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 const { width, height } = Dimensions.get("window");
 
-type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "ResetPasswordScreen">;
+type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "ResetPassword">;
+type ResetPasswordRouteProp = RouteProp<RootStackParamList, "ResetPassword">;
 
-const ResetPasswordScreen = ({ route }: { route: any }) => {
-  const { token } = route.params;
+const ResetPasswordScreen = () => {
+  const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
+  const route = useRoute<ResetPasswordRouteProp>();
+
+  useEffect(() => {
+    // Extract token from route params
+    if (route.params && route.params.token) {
+      // Ensure we're setting a string
+      const tokenValue = String(route.params.token);
+      setToken(tokenValue);
+      console.log("Token retrieved from route params:", tokenValue);
+    } else {
+      // Handle case where token is not provided
+      Alert.alert(
+        "Error", 
+        "Invalid reset link. Please request a new password reset.",
+        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+      );
+    }
+  }, []);
 
   const handleResetPassword = async () => {
+    if (!token) {
+      Alert.alert("Error", "Invalid reset token. Please request a new password reset.");
+      return;
+    }
+
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
@@ -45,13 +69,16 @@ const ResetPasswordScreen = ({ route }: { route: any }) => {
 
     try {
       await resetPassword(token, newPassword);
-      Alert.alert("Success", "Your password has been reset successfully!");
-      navigation.navigate("Login");
+      Alert.alert(
+        "Success", 
+        "Your password has been reset successfully!",
+        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+      );
     } catch (error: unknown) {
       let errorMessage = "An unknown error occurred.";
       if (error instanceof Error) {
-        errorMessage = error.message.includes("400")
-          ? "Invalid or expired reset token."
+        errorMessage = error.message.includes("400") || error.message.includes("401")
+          ? "Invalid or expired reset token. Please request a new password reset."
           : error.message;
       }
       Alert.alert("Error", errorMessage);
@@ -84,9 +111,9 @@ const ResetPasswordScreen = ({ route }: { route: any }) => {
       />
 
       <TouchableOpacity 
-        style={[styles.resetButton, loading && styles.disabledButton]} 
+        style={[styles.resetButton, (loading || !token) && styles.disabledButton]} 
         onPress={handleResetPassword}
-        disabled={loading}
+        disabled={loading || !token}
         testID="submit-reset-button"
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Reset Password</Text>}

@@ -1,6 +1,7 @@
 import pymongo
 import certifi
 import os
+
 import mongoengine
 # MongoDB Connection URI
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
@@ -26,3 +27,5 @@ sentiments_collection = db["sentiments"]
 activities_collection = db["activities"]
 journal_entries_collection = db["journal_entries"]
 chat_collection = db["chats"]
+check_in_collection = db["check_in"]
+prompt_collection = db["prompt"]

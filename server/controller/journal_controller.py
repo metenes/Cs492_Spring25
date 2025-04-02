@@ -7,6 +7,86 @@ from bson import ObjectId
 
 journal_bp = Blueprint("journal_bp", __name__)
 
+@journal_bp.route("/save-journal-entry", methods=["POST"])
+@jwt_required()
+def save_journal_entry():
+    try:
+        print("🔵 Starting save_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}")
+        
+        # Validate user_id format
+        try:
+            user_object_id = ObjectId(user_id)
+        except:
+            print("❌ Invalid user ID format")
+            return jsonify({"error": "Invalid user ID format"}), 400
+        
+        data = request.get_json()
+        print(f"🔹 Received data: {data}")
+        
+        # Extract data from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images', [])
+        journal_sentiments = data.get('journalSentiments', [])
+        category = data.get('category')
+        prompt = data.get('prompt') 
+
+        # Validate required fields
+        if not entry_content:
+            print("❌ No entry content provided")
+            return jsonify({"error": "Entry content is required"}), 400
+        
+        # Create new journal entry with its own ObjectId
+        new_entry = {
+            "_id": ObjectId(),  # Give each entry its own ID
+            "entryContent": entry_content,
+            "entryDate": entry_date,
+            "images": images,
+            "journalSentiments": journal_sentiments,
+            "createdAt": datetime.now(),
+            "category" : category,
+            "prompt" : prompt
+        }
+        
+        # Update the document using $push to add to the journalEntries array
+        print(f"🔹 Attempting to save to MongoDB for user {user_id}")
+
+        # First check if document exists
+        existing_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        print(f"🔹 Existing document: {existing_doc}")
+
+        if existing_doc:
+            # Update existing document
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$push": {
+                        "journalEntries": new_entry
+                    }
+                }
+            )
+        else:
+            # Create new document with proper structure
+            result = journal_entries_collection.insert_one({
+                "_id": ObjectId(user_id),
+                "journalEntries": [new_entry]
+            })
+        
+        print(f"✅ MongoDB operation successful")
+        
+        return jsonify({
+            "message": "Journal entry saved successfully",
+            "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
+        }), 201
+        
+    except Exception as e:
+        print(f"❌ Error saving journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 @journal_bp.route("/get-journal-entries", methods=["GET"])
 @jwt_required()
 def get_journal_entries():
@@ -21,51 +101,63 @@ def get_journal_entries():
             print(f"❌ Invalid user ID format: {user_id}")
             return jsonify({"error": "Invalid user ID format"}), 400
         
-        # Print the exact query we're running
-        print(f"🔍 Running query: db.collection.findOne({{_id: ObjectId('{user_id}')}}")
+        # IMPORTANT FIX: The user_id from JWT is used to query the journal entries
+        # But we need to make sure we're querying the correct collection
+        print(f"🔍 Running query: journal_entries_collection.findOne({{_id: ObjectId('{user_id}')}}")
         
         # Retrieve user's journal entries from MongoDB
-        user_data = journal_entries_collection.find_one({"_id": user_object_id})
-        print(f"🔍 Raw user data: {user_data}")
+        # This should be from journal_entries_collection, not the users collection
+        journal_data = journal_entries_collection.find_one({"_id": user_object_id})
+        print(f"🔍 Raw journal data: {journal_data}")
         
-        if not user_data:
-            print("⚠️ No document found for this user at all.")
-            return jsonify({"entries": []}), 200
-            
-        if "journalEntries" not in user_data:
-            print("⚠️ Document exists but has no journalEntries field.")
-            print(f"⚠️ Document keys: {user_data.keys()}")
-            return jsonify({"entries": []}), 200
-            
-        if not user_data["journalEntries"]:
-            print("⚠️ journalEntries array exists but is empty.")
-            return jsonify({"entries": []}), 200
-        
-        # Convert entries to a list and serialize ObjectIds
-        entries_list = user_data["journalEntries"]
-        print(f"🔍 Found {len(entries_list)} raw entries")
-        
+        # Initialize empty entries list as default
         serialized_entries = []
-        for entry in entries_list:
-            serialized_entry = {k: v for k, v in entry.items()}
-            if "_id" in serialized_entry:
-                serialized_entry["_id"] = str(serialized_entry["_id"])
-            serialized_entries.append(serialized_entry)
         
-        # Sort entries by date (latest first)
-        sorted_entries = sorted(serialized_entries, 
-                              key=lambda x: x.get("entryDate", ""), 
-                              reverse=True)
+        # Check if we have journal data
+        if journal_data and "journalEntries" in journal_data and journal_data["journalEntries"]:
+            # Convert entries to a list and serialize ObjectIds
+            entries_list = journal_data["journalEntries"]
+            print(f"🔍 Found {len(entries_list)} raw entries")
+            
+            for entry in entries_list:
+                serialized_entry = {k: v for k, v in entry.items()}
+                if "_id" in serialized_entry:
+                    serialized_entry["_id"] = str(serialized_entry["_id"])
+                # Convert any other ObjectId fields if present
+                for field in serialized_entry:
+                    if isinstance(serialized_entry[field], ObjectId):
+                        serialized_entry[field] = str(serialized_entry[field])
+                # Convert datetime objects to ISO format strings
+                for field in serialized_entry:
+                    if isinstance(serialized_entry[field], datetime):
+                        serialized_entry[field] = serialized_entry[field].isoformat()
+                        
+                serialized_entries.append(serialized_entry)
+            
+            # Sort entries by date (latest first)
+            serialized_entries = sorted(serialized_entries, 
+                                  key=lambda x: x.get("entryDate", ""), 
+                                  reverse=True)
+        else:
+            if not journal_data:
+                print("⚠️ No journal data found for this user at all.")
+                # This might be because the user hasn't created any journal entries yet
+                print("⚠️ Creating empty journal entries document for user")
+                # Optionally, you could initialize an empty document here
+            elif "journalEntries" not in journal_data:
+                print("⚠️ Document exists but has no journalEntries field.")
+                print(f"⚠️ Document keys: {journal_data.keys()}")
+            elif not journal_data["journalEntries"]:
+                print("⚠️ journalEntries array exists but is empty.")
         
-        print(f"✅ Fetched and processed {len(sorted_entries)} journal entries")
-        return jsonify({"entries": sorted_entries}), 200
+        print(f"✅ Fetched and processed {len(serialized_entries)} journal entries")
+        return jsonify({"entries": serialized_entries}), 200
         
     except Exception as e:
         print(f"❌ Error fetching journal entries: {str(e)}")
         import traceback
         traceback.print_exc()  # Print the full stack trace
         return jsonify({"error": str(e)}), 500
-    
 
 @journal_bp.route("/api/journal-entries", methods=["GET"])
 @jwt_required()
@@ -297,3 +389,4 @@ def delete_journal_entry(entry_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+

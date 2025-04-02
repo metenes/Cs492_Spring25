@@ -174,6 +174,7 @@ const ProfileScreen = () => {
         type,
       } as any);
 
+      // TODO DOGA PROFILE PICTURE
       // Send to server
       const response = await axios.post(`/api/users/${userId}/profile-image`, formData, {
         headers: {
@@ -181,6 +182,8 @@ const ProfileScreen = () => {
           Authorization: `Bearer ${token}`
         }
       });
+
+      
 
       if (response.data && response.data.profileImageUrl) {
         setProfileImage(response.data.profileImageUrl);

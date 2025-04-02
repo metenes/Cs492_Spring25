@@ -10,7 +10,7 @@ export type RootStackParamList = {
     Chatbot: undefined;
     DiaryMain: undefined;
     Dashboard: undefined;
-    FreeJournaling: undefined;
+    FreeJournaling: { selectedDate: string };
     Journal: undefined;
     ActivityLog: undefined;
     PaymentMethodHistoryScreen: undefined;
@@ -19,6 +19,9 @@ export type RootStackParamList = {
     FaceEmotion : undefined;
     CheckIn: undefined;
     NotificationSettingsScreen: undefined; 
-    ResetPasswordScreen: { token: string }; 
+    ResetPassword: { token: string }; 
+    GuidedJournaling : { prompt: string };
+    PromptSelection : undefined;
+    EntryDetail: { entry: any };
   };
   

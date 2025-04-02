@@ -8,6 +8,10 @@ import {
   StyleSheet,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { RootStackParamList } from "./types/types";
+import { StackNavigationProp } from "@react-navigation/stack";
+
+type PromptSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, "GuidedJournaling">;
 
 const promptList = [
   { id: 1, text: "What's something you’re anxious about today?", category: "Anxiety" },
@@ -21,7 +25,7 @@ const promptList = [
 const categories = ["All", "Anxiety", "Gratitude", "Productivity", "Personal Growth", "Reflection", "Stress Relief"];
 
 const PromptSelectionScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<PromptSelectionScreenNavigationProp>();
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const filteredPrompts =

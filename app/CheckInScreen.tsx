@@ -1,8 +1,24 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  FlatList, 
+  ActivityIndicator,
+  Alert, 
+  TextInput
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Feather";
 import { ScrollView } from "react-native";
+// import {setToken } from "./auth/AuthContext"
+import { RootStackParamList } from "./types/types";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { submitCheckIn } from "./services/ApiService"; // Import the API function
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+type CheckInNavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
 
 const emotions = [
   { name: "Admiration", icon: "star" }, { name: "Amusement", icon: "smile" }, { name: "Anger", icon: "frown" },
@@ -25,20 +41,25 @@ const reasons = [
 ];
 
 const CheckInScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<CheckInNavigationProp>();
   const [step, setStep] = useState(1);
   const [selectedEmotions, setSelectedEmotions] = useState([]);
   const [selectedReasons, setSelectedReasons] = useState([]);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const toggleSelection = (item, state, setState) => {
-    setState((prev) =>
+  const [userId, setUserId] = useState(""); 
+  const [token, setToken] = useState("");
+
+  const toggleSelection = (item : any, state: any, setState: any) => {
+    setState((prev : any) =>
       prev.includes(item)
-        ? prev.filter((i) => i !== item)
+        ? prev.filter((i : any) => i !== item)
         : [...prev, item]
     );
   };
 
-  const renderItem = ({ item }, state, setState) => (
+  const renderItem = ({ item } : any, state : any, setState : any) => (
     <TouchableOpacity
       style={[
         styles.option,
@@ -50,6 +71,45 @@ const CheckInScreen = () => {
       <Text>{item.name}</Text>
     </TouchableOpacity>
   );
+
+  // Function to handle the check-in submission
+  const handleSubmitCheckIn = async () => {
+    const token = await AsyncStorage.getItem('userToken');
+    console.log("🔹 retrive token to fetch profile:", token);
+      if (token ) {
+        console.log("🔹 Using token to fetch profile:", token);
+        setToken(token);
+          
+        if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
+          Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
+          return;
+        }
+
+        setIsSubmitting(true);
+        try {
+          // Prepare comments array if comment is provided
+          const comments = comment.trim() ? [comment] : [];
+          
+          // Call the API to submit the check-in
+          const result = await submitCheckIn(token, selectedEmotions, selectedReasons, comments);
+          
+          // Show success message
+          Alert.alert(
+            "Check-in Submitted", 
+            "Your check-in has been successfully recorded.",
+            [{ text: "OK", onPress: () => navigation.navigate("Home") }]
+          );
+        } catch (error) {
+          console.error("Failed to submit check-in:", error);
+          Alert.alert(
+            "Submission Failed", 
+            "There was a problem submitting your check-in. Please try again."
+          );
+        } finally {
+          setIsSubmitting(false);
+        }
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -63,7 +123,11 @@ const CheckInScreen = () => {
             keyExtractor={(item) => item.name}
             numColumns={3}
           />
-          <TouchableOpacity style={styles.nextButton} onPress={() => setStep(2)}>
+          <TouchableOpacity 
+            style={[styles.nextButton, selectedEmotions.length === 0 && styles.disabledButton]}
+            onPress={() => setStep(2)}
+            disabled={selectedEmotions.length === 0}
+          >
             <Text style={styles.buttonText}>Next</Text>
           </TouchableOpacity>
         </>
@@ -84,7 +148,11 @@ const CheckInScreen = () => {
             keyExtractor={(item) => item.name}
             numColumns={3}
           />
-          <TouchableOpacity style={styles.nextButton} onPress={() => setStep(3)}>
+          <TouchableOpacity 
+            style={[styles.nextButton, selectedReasons.length === 0 && styles.disabledButton]}
+            onPress={() => setStep(3)}
+            disabled={selectedReasons.length === 0}
+          >
             <Text style={styles.buttonText}>Next</Text>
           </TouchableOpacity>
         </>
@@ -100,7 +168,7 @@ const CheckInScreen = () => {
 
           {/* Summary Container */}
           <View style={styles.summaryContainer}>
-            <ScrollView>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
               <Text style={styles.summaryTitle}>Check-in Summary</Text>
 
               {/* Emotions Section */}
@@ -114,6 +182,7 @@ const CheckInScreen = () => {
                   ))}
                 </View>
               </View>
+              
               {/* Reasons Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Reasons</Text>
@@ -126,9 +195,30 @@ const CheckInScreen = () => {
                 </View>
               </View>
 
+              {/* Optional Comment */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Additional Thoughts (Optional)</Text>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Add any additional thoughts here..."
+                  multiline={true}
+                  numberOfLines={4}
+                  value={comment}
+                  onChangeText={setComment}
+                />
+              </View>
+
               {/* Complete Check-in Button */}
-              <TouchableOpacity style={styles.completeButton} onPress={() => navigation.navigate("Home")}>
-                <Text style={styles.completeButtonText}>Complete Check-in</Text>
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={handleSubmitCheckIn}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.completeButtonText}>Complete Check-in</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -144,14 +234,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 5,
-    backgroundColor: "#fff", //rgba(255, 252, 244, 1)
+    backgroundColor: "#fff",
   },
   title: {
     fontFamily: "Poppins",
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 20,
-    
   },
   option: {
     padding: 5,
@@ -170,6 +259,11 @@ const styles = StyleSheet.create({
     padding: 15,
     backgroundColor: "black",
     borderRadius: 10,
+    width: "50%",
+    alignSelf: "center",
+  },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
   },
   buttonText: {
     color: "white",
@@ -180,24 +274,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 20,
     left: 20,
-    //padding: 10,
-    zIndex: 10, // Ensures it's above other elements
-    backgroundColor: "rgba(255, 255, 255, 0.8)", // Optional subtle background
+    zIndex: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
     borderRadius: 20,
     padding: 8,
   },
-  
   summaryContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f8f8", // Soft tint to break the full-white monotony
     width: "100%",
     paddingVertical: 40,
     paddingHorizontal: 20,
     borderRadius: 20,
+    backgroundColor: "#f8f8f8",
   },
-  
+  scrollContent: {
+    alignItems: "center",
+    paddingBottom: 20,
+  },
   summaryTitle: {
     fontSize: 26,
     fontWeight: "bold",
@@ -206,48 +299,52 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Poppins",
   },
-  
   section: {
     width: "100%",
     alignItems: "center",
     marginBottom: 20,
   },
-  
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
     color: "#333",
   },
-  
   tagsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
   },
-  
   tag: {
     backgroundColor: "lavender",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  
   tagText: {
     fontSize: 16,
     fontWeight: "500",
     color: "black",
   },
-  
+  commentInput: {
+    width: "100%",
+    height: 100,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    textAlignVertical: "top",
+    backgroundColor: "white",
+  },
   completeButton: {
     marginTop: 30,
     paddingVertical: 15,
     paddingHorizontal: 40,
     backgroundColor: "black",
     borderRadius: 30,
+    width: "80%",
   },
-  
   completeButtonText: {
     color: "white",
     fontSize: 18,
@@ -255,7 +352,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Poppins",
   },
-  
 });
 
 export default CheckInScreen;

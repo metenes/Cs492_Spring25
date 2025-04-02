@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 const API_URL = "http://192.168.1.29:5000";
 // const API_URL = "http://10.203.122.69:5000";
-//const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+// const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -74,6 +74,10 @@ export const logoutDB = async () => {
     console.error("❌ Logout failed:", error);
   }
 };
+
+// **********************************************
+// **Sentiment API** - 
+// **********************************************
 
 export const fetchSentimentAnalysis = async (
   start_date: string,   // Format: "YYYY-MM-DD"
@@ -156,25 +160,40 @@ export const fetchJournalEntriesWithDate = async (
   }
 };
 
+// **********************************************
+// ** Chat API** - Send message
+// **********************************************
 export const sendMessage = async (message: string) => {
   try {
-    const response = await fetch(`${API_URL}/chat`, {
+    const response = await fetch(`${API_URL}/chat/test`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ message }),
     });
+
     if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
+      throw new Error(`Server error: ${response.statusText}`);
     }
+
     const data = await response.json();
-    return data.reply; 
+    console.log("Data recived from test : " , data)
+    if (!data.reply) {
+      throw new Error("Invalid response format");
+    }
+
+    return data.reply; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
   }
 };
+
+
+// **********************************************
+// **Login&Register API** - Login
+// **********************************************
 
 export const loginUser = async (email: string, password: string) => {
   try {
@@ -211,6 +230,10 @@ export const loginUser = async (email: string, password: string) => {
     throw error; 
   }
 };
+
+// **********************************************
+// **Login&Register API** - Register
+// **********************************************
 
 export const registerUser = async (email: string, password: string, dob: string) => {
   console.log("registerUser() email, password, dob:", email, password, dob);
@@ -260,6 +283,10 @@ export const registerUser = async (email: string, password: string, dob: string)
     throw error;
   }
 };
+
+// **********************************************
+// **Profile API** - Profile Operations
+// **********************************************
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
@@ -395,6 +422,9 @@ export const uploadProfileImage = async (token: string, imageFile: File) => {
   return await response.json();
 };
 
+// **********************************************
+// **Profile API** - Activity - TODO 
+// **********************************************
 
 export const fetchActivities = async (token: string) => {
   const response = await fetch(`${API_URL}/activity`, {
@@ -403,7 +433,6 @@ export const fetchActivities = async (token: string) => {
   });
   return response.json();
 };
-
 
 export const logActivity = async (token: string, activity: string) => {
   const response = await fetch(`${API_URL}/activity`, {
@@ -416,11 +445,6 @@ export const logActivity = async (token: string, activity: string) => {
   });
   return response.json();
 };
-
-
-// **********************************************
-// **Delete API**
-// **********************************************
 
 // Delete user account
 export const deleteAccount = async (token: string) => {
@@ -460,7 +484,7 @@ export const deleteAccount = async (token: string) => {
 
 
 // **********************************************
-// ****** Password Reset API
+// ** Password Reset API ** 
 // **********************************************
 
 // Update the user's password
@@ -515,10 +539,10 @@ export const resetPassword = async (token: string, newPassword: string) => {
 };
 
 // **********************************************
-// ****** Journal API
+// ** Homepage API ** - FreeJournal & Guided Journal
 // **********************************************
 
-export const saveJournalEntry = async (content: string, images?: string[], category?: string) => {
+export const saveJournalEntry = async (content: string, images?: string[], category?: string, promt?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -555,7 +579,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
     }));
 
     console.log("Final mapped sentiments:", mappedSentiments);
-
+    console.log("CATEGORY : " , category)
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
@@ -563,7 +587,9 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
         fileName: `uploads/${image}`,
         signedUrl: image
       })) || [],
-      journalSentiments: mappedSentiments
+      journalSentiments: mappedSentiments,
+      category: category,
+      prompt: promt
     };
 
     console.log("Final data being sent:", JSON.stringify(entryData, null, 2));
@@ -677,7 +703,65 @@ export const calculateStreak = (dates: string[]): number => {
 
 
 // **********************************************
-// ****** User Setting Preferences API
+// ** Homepage API ** - Entry Details 
+// **********************************************
+
+export const deleteEntry = async (entry : any) => {
+  try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) throw new Error("No token found");
+      // Fetch from the database
+      const response = await fetch(`${API_URL}/journal/delete-journal`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        }
+      });
+
+      if (response.ok) {
+        console.error("Success", "Journal entry deleted successfully");
+        return await response.json(); 
+
+      } else {
+        throw new Error("Failed to fetch journal entries");
+      }
+  } catch (error) {
+    console.error("Error deleting entry:", error);
+    throw new Error("Something went wrong while deleting the entry");
+  }
+};
+
+// **********************************************
+// ** Homepage API ** - Entry 
+// **********************************************
+
+export const fetchAllEntries = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/journal/all`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch journal entries");
+    }
+
+    const data = await response.json();
+    console.log("✅ All journal entries fetched:", data);
+    return data.entries;
+  } catch (error) {
+    console.error("❌ Error fetching journal entries:", error);
+    return [];
+  }
+};
+
+
+// **********************************************
+// ** User Setting Preferences API **
 // **********************************************
 
 // Modify app preferences (dark mode, etc.)
@@ -748,3 +832,177 @@ export const clearDraft = async () => {
     console.error('Error clearing draft:', error);
   }
 };
+
+
+// **********************************************
+// ** User CheckIn API **
+// **********************************************
+
+// Function to submit a check-in entry
+export const submitCheckIn = async (token: string, sentiments: string[], causes: string[], comments: string[] = []) => {
+  try {
+    console.log("Submitting check-in:", { token, sentiments, causes, comments });
+
+    // First get the user ID from the token (if not stored separately)
+    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+    }
+
+    const userData = await userResponse.json();
+    const userId = userData._id;
+
+    if(userId == -1){
+      throw new Error(`Failed to userId -1`);
+    }
+
+    const requestBody = {
+      user_id: userId,
+      sentiments: sentiments,
+      causes: causes,
+      comments: comments,
+    }
+    console.log("Request body:", JSON.stringify(requestBody));
+
+    const response = await fetch(`${API_URL}/check-in/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("Response status:", response.status);
+    
+    // Read response as text first to handle cases where it's not JSON
+    const rawText = await response.text();
+    console.log("Raw response:", rawText);
+
+    // Try parsing JSON, but handle errors if response is not JSON
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (jsonError) {
+      console.error("JSON Parse Error:", jsonError);
+      throw new Error(`Unexpected server response: ${rawText}`);
+    }
+
+    // Handle non-OK responses
+    if (!response.ok) {
+      throw new Error(data.message || `Failed to submit check-in (HTTP ${response.status})`);
+    }
+
+    console.log("Parsed response data:", data);
+    return data;
+
+  } catch (error) {
+    console.error("Error submitting check-in:", error);
+    throw error;
+  }
+};
+
+// Function to get user's check-in history
+export const getCheckInHistory = async (token: string) => {
+  try {
+    // First get the user ID from the token (if not stored separately)
+    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+    }
+
+    const userData = await userResponse.json();
+    const userId = userData._id;
+
+    if(userId == -1){
+      throw new Error(`Failed to userId -1`);
+    }
+
+    const response = await fetch(`${API_URL}/check-in/history/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    console.log("here" , data)
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch check-in history');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching check-in history:', error);
+    throw error;
+  }
+};
+
+// Function to get a specific check-in entry
+export const getCheckInEntry = async (token: string, entryId: number) => {
+  try {
+    const response = await fetch(`${API_URL}/check-in/${entryId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch check-in entry');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching check-in entry:', error);
+    throw error;
+  }
+};
+
+
+// Function to delete a specific check-in
+export const deleteCheckIn = async (checkInId: string) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+    
+    const response = await fetch(`${API_URL}/checkin/${checkInId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to delete check-in');
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error('Check-in deletion error:', error);
+    throw error;
+  }
+};
+
+// **********************************************
+// ** CheckIn  API **
+// **********************************************

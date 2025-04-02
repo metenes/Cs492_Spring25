@@ -1,3 +1,4 @@
+from functools import wraps
 import os
 import pymongo
 import certifi
@@ -43,80 +44,25 @@ from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
+from controller.check_in_controller import check_bp; 
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
 from utils.load_model import model
-from utils.jwt_config import jwt_manager, SECRET_KEY
+from utils.jwt_config import jwt_manager
 from datetime import datetime
 from bson import ObjectId
 from botocore.exceptions import ClientError
 # Chat API from chat.py
-from chat import *
-
-# Models
-class User(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class UserInDB(User):
-    hashed_password: str
-    user_id: str
-    created_at: str
-    model_path: Optional[str] = None
-    model_version: int = 0
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-
-class TokenData(BaseModel):
-    user_id: Optional[str] = None
-
-class ChatMessage(BaseModel):
-    role: str = "user"
-    content: str
-
-class ChatHistory(BaseModel):
-    messages: List[ChatMessage] = []
-
-class ChatRequest(BaseModel):
-    message: str
-    update_model: bool = False  # Whether to update the model based on this interaction
-    context: Optional[Dict[str, Any]] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    conversation_id: str
-    model_version: int
-    model_updated: bool = False
-    inference_time: float = 0.0
-
-class ModelTrainingRequest(BaseModel):
-    training_data: List[Dict[str, str]]
-    hyperparameters: Optional[Dict[str, Any]] = None
-
-class ModelTrainingResponse(BaseModel):
-    job_id: str
-    status: str
-    estimated_completion_time: Optional[str] = None
-
-class ModelStatus(BaseModel):
-    user_id: str
-    model_path: str
-    model_version: int
-    last_updated: str
-    training_jobs: List[Dict[str, Any]] = []
-    performance_metrics: Optional[Dict[str, float]] = None
-
+# from chat import Chat
 
 app = Flask(__name__)
 CORS(app)
 
 JWT_SECRET = os.getenv("JWT_SECRET", "sentioSecretKey")
 JWT_ALGORITHM = "HS256"
+app.config['JWT_SECRET_KEY'] = 'sentioSecretKey'  # Replace with a strong random key
+app.config['SECRET_KEY'] = 'sentioSecretKey'    # If you want to use the same key for both Flask and JWT
 JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 # Load ML Model
 
@@ -124,7 +70,8 @@ model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
+
+app.config["JWT_SECRET"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 # datetime.timedelta(days=1)
 
@@ -147,24 +94,6 @@ mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-# bcrypt.init_app(app) 
-# MongoDB Connection (Using `retryWrites=true&w=majority` for SSL fix)
-# MONGO_URI = "mongodb+srv://sentioanalysisco:9o2Y9o20jmgNziQi@cluster0.dx4f7.mongodb.net/mydb?retryWrites=true&w=majority&tls=true&tlsCAFile=<path_to_ca_file>"
-MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
-
-try:
-    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000,tlsCAFile=certifi.where())   
-    db = client["mydb"]
-    print("✅ Connected to MongoDB successfully!")
-    print("✅ Available collections:", db.list_collection_names())
-    users_collection = db["users"]
-    sentiments_collection = db["sentiments"]  # db sentiments 
-    activities_collection = db["activities"]
-    #print("✅ users_collection, sentiments_collection, activities_collection lists extracted from MongoDB successfully!")
-except Exception as e:
-    print(f"❌ Error connecting to MongoDB: {e}")
-    exit(1)
-
 # ---------------------------------------
 #  User Token check 
 # ---------------------------------------
@@ -178,7 +107,7 @@ def token_required(f):
             return jsonify({"error": "Token is missing"}), 403
 
         try:
-            # Decode the token using the SECRET_KEY
+            # Decode the token using the JWT_SECRET
             token = token.split(" ")[1]  # Extract token from "Bearer token" format
             decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             request.user = decoded  # Store decoded data in request for access in route
@@ -247,86 +176,12 @@ def get_journal_dates():
 #        'user_id': user_id,
 #        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time (1 hour)
 #    }
-#    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+#    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 #    return token
 
 
 # 1. First define the route
-@journal_bp.route("/save-journal-entry", methods=["POST"])
-@jwt_required()
-def save_journal_entry():
-    try:
-        print("🔵 Starting save_journal_entry function")
-        user_id = get_jwt_identity()
-        print(f"🔹 User ID: {user_id}")
-        
-        # Validate user_id format
-        try:
-            user_object_id = ObjectId(user_id)
-        except:
-            print("❌ Invalid user ID format")
-            return jsonify({"error": "Invalid user ID format"}), 400
-        
-        data = request.get_json()
-        print(f"🔹 Received data: {data}")
-        
-        # Extract data from request
-        entry_content = data.get('entryContent')
-        entry_date = data.get('entryDate')
-        images = data.get('images', [])
-        journal_sentiments = data.get('journalSentiments', [])
-        
-        # Validate required fields
-        if not entry_content:
-            print("❌ No entry content provided")
-            return jsonify({"error": "Entry content is required"}), 400
-        
-        # Create new journal entry with its own ObjectId
-        new_entry = {
-            "_id": ObjectId(),  # Give each entry its own ID
-            "entryContent": entry_content,
-            "entryDate": entry_date,
-            "images": images,
-            "journalSentiments": journal_sentiments,
-            "createdAt": datetime.now()
-        }
-        
-        # Update the document using $push to add to the journalEntries array
-        print(f"🔹 Attempting to save to MongoDB for user {user_id}")
 
-        # First check if document exists
-        existing_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        print(f"🔹 Existing document: {existing_doc}")
-
-        if existing_doc:
-            # Update existing document
-            result = journal_entries_collection.update_one(
-                {"_id": ObjectId(user_id)},
-                {
-                    "$push": {
-                        "journalEntries": new_entry
-                    }
-                }
-            )
-        else:
-            # Create new document with proper structure
-            result = journal_entries_collection.insert_one({
-                "_id": ObjectId(user_id),
-                "journalEntries": [new_entry]
-            })
-        
-        print(f"✅ MongoDB operation successful")
-        
-        return jsonify({
-            "message": "Journal entry saved successfully",
-            "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
-        }), 201
-        
-    except Exception as e:
-        print(f"❌ Error saving journal entry: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 # 2. THEN register all blueprints
 app.register_blueprint(user_bp, url_prefix="/user")
@@ -334,7 +189,7 @@ app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
 app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
-
+app.register_blueprint(check_bp, url_prefix="/check-in")
 
 # ---------------------------------------
 #  **Protected Route**
@@ -376,13 +231,13 @@ s3 = boto3.client('s3')
 # s3 = boto3.client(
 #   's3',
 #    aws_access_key_id="YOUR_ACCESS_KEY",
-#    aws_secret_access_key="YOUR_SECRET_KEY",
+#    aws_secret_access_key="YOUR_JWT_SECRET",
 #    region_name="YOUR_REGION"
 # )
 
 # Add to upper part if necessary
 # aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-# aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+# aws_JWT_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY")
 # aws_region = os.getenv("AWS_DEFAULT_REGION", "me-south-1") 
 
 # Lambada Fast exec. 
