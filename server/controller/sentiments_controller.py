@@ -34,40 +34,58 @@ def analyze_sentiment():
         if not text:
             return jsonify({"error": "No text provided"}), 400
 
-        # Tokenize the text
-        inputs = tokenizer(text, return_tensors="pt", padding="max_length", 
-                         truncation=True, max_length=128)
-        print("🔹 Text tokenized successfully")
+        # Split text into segments
+        segments = text.split(". ")
+        all_emotions = []
 
-        # Get model prediction
-        with torch.no_grad():
-            outputs = model(**inputs)
-            probabilities = torch.sigmoid(outputs.logits).squeeze()
-        
-        print(f"🔹 Raw probabilities shape: {probabilities.shape}")
-        
-        # Get emotions above threshold (0.3 as in your original code)
-        threshold = 0.3
-        emotions = []
-        for idx, prob in enumerate(probabilities):
-            if prob > threshold:
-                emotions.append({
-                    "code": idx,
-                    "label": EMOTIONS[idx],
-                    "score": float(prob)
-                })
-        
-        # If no emotions above threshold, get the top emotion
-        if not emotions:
-            max_idx = torch.argmax(probabilities).item()
-            emotions.append({
+        # Analyze each segment
+        for segment in segments:
+            if segment.strip():
+                # Tokenize the segment
+                inputs = tokenizer(segment, return_tensors="pt", padding="max_length", 
+                                truncation=True, max_length=128)
+                
+                # Get model prediction for segment
+                with torch.no_grad():
+                    outputs = model(**inputs)
+                    segment_probabilities = torch.sigmoid(outputs.logits).squeeze().tolist()
+                
+                # Store emotions for this segment
+                for idx, prob in enumerate(segment_probabilities):
+                    if prob > 0.2:  # threshold
+                        all_emotions.append({
+                            "code": idx,
+                            "label": EMOTIONS[idx],
+                            "score": float(prob)
+                        })
+
+        # If no emotions found in any segment, analyze the full text
+        if not all_emotions:
+            inputs = tokenizer(text, return_tensors="pt", padding="max_length", 
+                            truncation=True, max_length=128)
+            
+            with torch.no_grad():
+                outputs = model(**inputs)
+                probabilities = torch.sigmoid(outputs.logits).squeeze().tolist()
+            
+            max_idx = probabilities.index(max(probabilities))
+            all_emotions.append({
                 "code": max_idx,
                 "label": EMOTIONS[max_idx],
                 "score": float(probabilities[max_idx])
             })
         
-        # Sort emotions by score
+        # Sort all emotions by score and remove duplicates (keep highest score for each emotion)
+        seen_emotions = {}
+        for emotion in all_emotions:
+            label = emotion["label"]
+            if label not in seen_emotions or emotion["score"] > seen_emotions[label]["score"]:
+                seen_emotions[label] = emotion
+
+        # Convert back to list and sort
+        emotions = list(seen_emotions.values())
         emotions.sort(key=lambda x: x['score'], reverse=True)
+        
         print(f"✅ Detected emotions: {emotions}")
         
         return jsonify({
