@@ -12,7 +12,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 
-import { fetchJournalEntries } from "./services/ApiService";
+import { fetchJournalEntries,fetchJournalDates, calculateStreak } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -41,6 +41,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [isMenuOpen, setMenuOpen] = useState(false);
   const menuPosition = useState(new Animated.Value(0))[0];
   const rotation = useState(new Animated.Value(0))[0];
+  const [streak, setStreak] = useState(0);
+
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
   useFocusEffect(
@@ -145,6 +147,24 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   }, []); */
 
 
+  //calculate streak
+  useEffect(() => {
+    const loadStreak = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+  
+      try {
+        const dates = await fetchJournalDates(token);
+        const calculatedStreak = calculateStreak(dates);
+        setStreak(calculatedStreak);
+      } catch (err) {
+        console.error('❌ Error fetching streak:', err);
+      }
+    };
+  
+    loadStreak();
+  }, []);
+  
 
   const toggleMenu = () => {
     if (isMenuOpen) {
@@ -247,7 +267,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       <View style={styles.header}>
         <Text style={styles.title}>Your Entries</Text>
         <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate("DiaryMain")}>
-          <Text style={styles.streakText}>5</Text>
+          <Text style={styles.streakText}>{streak}</Text>
           <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
         </TouchableOpacity>
       </View>

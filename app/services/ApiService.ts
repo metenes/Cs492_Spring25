@@ -2,9 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.104:5000";
+const API_URL = "http://192.168.1.29:5000";
 // const API_URL = "http://10.203.122.69:5000";
-const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+//const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -624,6 +624,57 @@ export const fetchJournalEntries = async (token: string) => {
     return { error: "Network error" };
   }
 };
+
+export const fetchJournalDates = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/get-journal-dates`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      console.error("Unexpected response format:", data);
+      return [];
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching journal dates:", error);
+    return [];
+  }
+};
+
+export const calculateStreak = (dates: string[]): number => {
+  const dateSet = new Set(dates);
+  let streakCount = 0;
+
+  const formatDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  let currentDate = new Date();
+  const todayFormatted = formatDate(currentDate);
+
+  // If the user journaled today, include today in the streak
+  if (dateSet.has(todayFormatted)) {
+    streakCount++;
+  }
+
+  // Keep counting streak backwards from the day before the last counted day
+  currentDate.setDate(currentDate.getDate() - 1);
+  while (dateSet.has(formatDate(currentDate))) {
+    streakCount++;
+    currentDate.setDate(currentDate.getDate() - 1);
+  }
+
+  console.log("✅ Final Streak Count:", streakCount);
+  return streakCount;
+};
+
+
+
 
 // **********************************************
 // ****** User Setting Preferences API

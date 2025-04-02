@@ -203,6 +203,41 @@ def get_period_of_day(timestamp):
         return 'Afternoon'
     return 'Evening'
 
+
+@app.route('/get-journal-dates', methods=['GET'])
+@jwt_required()
+def get_journal_dates():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Fetching journal dates for user_id: {user_id}")
+
+        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not entry_doc or "journalEntries" not in entry_doc:
+            print("ℹ️ No entries found for user")
+            return jsonify([]), 200
+
+        dates = set()
+        for entry in entry_doc["journalEntries"]:
+            raw_date = entry.get("entryDate")
+            if not raw_date:
+                continue
+
+            if isinstance(raw_date, str):
+                date_str = raw_date.split("T")[0]
+            else:
+                date_str = raw_date.strftime("%Y-%m-%d")
+            dates.add(date_str)
+
+        print("✅ Final list of journal dates:", dates)
+        return jsonify(list(dates)), 200
+
+    except Exception as e:
+        print("❌ Error fetching journal dates:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+
+
 # ---------------------------------------
 # Function to create a JWT token
 # ---------------------------------------
