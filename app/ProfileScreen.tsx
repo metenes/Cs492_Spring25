@@ -16,6 +16,8 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { MediaType } from 'expo-image-picker';
+
 import { Ionicons } from "@expo/vector-icons";
 import BottomNavigation from './BottomNavigation';
 import axios from 'axios';
@@ -125,52 +127,36 @@ const ProfileScreen = () => {
 
   // Pick an image from the gallery (only one image)
   const pickImage = async () => {
-    console.log("🟡 Opening gallery...");
     setModalVisible(false);
-  
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-  
-      if (!result.canceled && result.assets.length > 0) {
-        const selectedUri = result.assets[0].uri;
-        console.log("✅ Image picked:", selectedUri);
-        Alert.alert("Image Picked", selectedUri); // <-- force feedback
-        setProfileImage(selectedUri); // You can comment this too to isolate
-      } else {
-        console.log("❌ No image selected");
-      }
-    } catch (err) {
-      console.error("❌ Picker crashed:", err);
-      Alert.alert("Error", "Picker crashed: " + err.message);
+
+    // Option 1: Using the enum without array
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      await uploadImage(result.assets[0].uri);
     }
   };
-  
-  
-  
-  
+
   // Take a photo using the camera
   const takePhoto = async () => {
     setModalVisible(false);
-  
+
     let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaType.Image, // ✅ also fix this here
+      mediaTypes: "images",
       allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
+      aspect: [1, 1], // Crop to square
+      quality: 0.8,
     });
-  
-    if (!result.canceled && result.assets.length > 0) {
-      const photoUri = result.assets[0].uri;
-      setProfileImage(photoUri);
-      await uploadImage(photoUri);
+
+    if (!result.canceled) {
+      await uploadImage(result.assets[0].uri);
     }
   };
-  
 
   // Upload image to server (S3 via backend)
   const uploadImage = async (imageUri : any) => {
@@ -188,6 +174,7 @@ const ProfileScreen = () => {
         type,
       } as any);
 
+      // TODO DOGA PROFILE PICTURE
       // Send to server
       const response = await axios.post(`/api/users/${userId}/profile-image`, formData, {
         headers: {
@@ -195,6 +182,8 @@ const ProfileScreen = () => {
           Authorization: `Bearer ${token}`
         }
       });
+
+      
 
       if (response.data && response.data.profileImageUrl) {
         setProfileImage(response.data.profileImageUrl);
@@ -278,22 +267,14 @@ const ProfileScreen = () => {
       <View style={[styles.profileContainer, { backgroundColor: theme.cardBackground }]}>
         <TouchableOpacity onPress={() => setModalVisible(true)}>
           <View style={styles.avatarWrapper}>
-          {profileImage && profileImage.trim() !== "" ? (
-          <Image
-            source={{ uri: profileImage }}
-            style={styles.avatar}
-            onError={() => {
-              console.warn("⚠️ Failed to load image, reverting to default.");
-              setProfileImage(null); // fallback in case image fails
-            }}
-          />
-        ) : (
-          <Image
-            source={require("../assets/default-avatar.jpeg")}
-            style={styles.avatar}
-          />
-        )}
-
+            <Image
+              source={
+                profileImage
+                  ? { uri: profileImage }
+                  : require("../assets/default-avatar.jpeg")
+              }
+              style={styles.avatar}
+            />
             <View style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}>
               <Ionicons name="camera-outline" size={18} color={theme.text} />
             </View>

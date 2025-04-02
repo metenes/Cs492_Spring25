@@ -1,3 +1,4 @@
+from typing import Optional
 from flask_jwt_extended import JWTManager
 from flask import request, jsonify
 import jwt
@@ -5,8 +6,10 @@ import os
 from functools import wraps
 from datetime import datetime, timedelta
 
-# Load SECRET_KEY from environment variables or use a default
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "sentioSecretKey")
+# Environment variables and configuration
+JWT_SECRET = os.getenv("JWT_SECRET", "sentioSecretKey")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 
 # Initialize Flask JWT Manager
 jwt_manager = JWTManager()
@@ -16,17 +19,17 @@ def generate_token(user_id):
     token = jwt.encode(
         {
             "user_id": str(user_id),
-            "exp": datetime.utcnow() + timedelta(days=1)  # Token expires in 1 day
+            "exp": datetime.now() + timedelta(days=1)  # Token expires in 1 day
         },
-        SECRET_KEY,
-        algorithm="HS256"
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM
     )
     return token
 
 # Function to decode a JWT token
 def decode_token(token):
     try:
-        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         return decoded_token["user_id"]
     except jwt.ExpiredSignatureError:
         return {"error": "Token has expired"}
@@ -43,9 +46,9 @@ def token_required(f):
             return jsonify({"error": "Token is missing"}), 403
 
         try:
-            # Decode the token using the SECRET_KEY
+            # Decode the token using the JWT_SECRET
             token = token.split(" ")[1]  # Extract token from "Bearer token" format
-            decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             request.user = decoded  # Store decoded data in request for access in route
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401

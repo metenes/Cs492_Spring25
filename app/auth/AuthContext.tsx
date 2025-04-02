@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
 
 // Define the context properties
 interface AuthContextProps {
@@ -16,7 +15,6 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 interface AuthProviderProps {
   children: React.ReactNode;
 }
-/*  */
 
 export const storeToken = async (token: string) => {
   try {

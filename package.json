@@ -111,7 +111,8 @@
     "react-native-vector-icons": "^10.2.0",
     "react-native-vision-camera": "^4.6.4",
     "react-native-web": "~0.19.6",
-    "recharts": "^2.15.1"
+    "recharts": "^2.15.1",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.8",

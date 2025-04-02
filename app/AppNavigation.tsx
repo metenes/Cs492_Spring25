@@ -20,6 +20,7 @@ import HomeScreen from "./HomeScreen";
 import RegisterScreen from "./RegisterScreen";
 import ForgotPasswordScreen from "./ForgotPasswordScreen";
 import ChatbotScreen from "./ChatbotScreen";
+import ResetPasswordScreen from "./ResetPasswordScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 import CheckInScreen from "./CheckInScreen";
 import FaceEmotionScreen from "./FaceEmotionScreen";
@@ -29,7 +30,7 @@ import GuidedJournalingScreen from "./GuidedJournalingScreen";
 import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
 import ActivityLogScreen from "./ActivityLogScreen";
-
+import EntryDetailScreen from "./EntryDetailScreen";
 // Bottom Menu
 import BottomNavigation from "./BottomNavigation";
 
@@ -114,6 +115,7 @@ const AppNavigation = () => {
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
         <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
+        <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
 
         {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
         {/* Fix the Header Title for DiaryMain */}
@@ -129,7 +131,8 @@ const AppNavigation = () => {
         <Stack.Screen name="GuidedJournaling" component={GuidedJournalingScreen} />
         <Stack.Screen name="Journal" component={JournalScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
-       
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+
         <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
         <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
        

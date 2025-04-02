@@ -1,3 +1,4 @@
+from functools import wraps
 import os
 import pymongo
 import certifi
@@ -43,80 +44,25 @@ from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
+from controller.check_in_controller import check_bp; 
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
 from utils.load_model import model
-from utils.jwt_config import jwt_manager, SECRET_KEY
+from utils.jwt_config import jwt_manager
 from datetime import datetime
 from bson import ObjectId
 from botocore.exceptions import ClientError
 # Chat API from chat.py
-from chat import *
-
-# Models
-class User(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class UserInDB(User):
-    hashed_password: str
-    user_id: str
-    created_at: str
-    model_path: Optional[str] = None
-    model_version: int = 0
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-
-class TokenData(BaseModel):
-    user_id: Optional[str] = None
-
-class ChatMessage(BaseModel):
-    role: str = "user"
-    content: str
-
-class ChatHistory(BaseModel):
-    messages: List[ChatMessage] = []
-
-class ChatRequest(BaseModel):
-    message: str
-    update_model: bool = False  # Whether to update the model based on this interaction
-    context: Optional[Dict[str, Any]] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    conversation_id: str
-    model_version: int
-    model_updated: bool = False
-    inference_time: float = 0.0
-
-class ModelTrainingRequest(BaseModel):
-    training_data: List[Dict[str, str]]
-    hyperparameters: Optional[Dict[str, Any]] = None
-
-class ModelTrainingResponse(BaseModel):
-    job_id: str
-    status: str
-    estimated_completion_time: Optional[str] = None
-
-class ModelStatus(BaseModel):
-    user_id: str
-    model_path: str
-    model_version: int
-    last_updated: str
-    training_jobs: List[Dict[str, Any]] = []
-    performance_metrics: Optional[Dict[str, float]] = None
-
+# from chat import Chat
 
 app = Flask(__name__)
 CORS(app)
 
 JWT_SECRET = os.getenv("JWT_SECRET", "sentioSecretKey")
 JWT_ALGORITHM = "HS256"
+app.config['JWT_SECRET_KEY'] = 'sentioSecretKey'  # Replace with a strong random key
+app.config['SECRET_KEY'] = 'sentioSecretKey'    # If you want to use the same key for both Flask and JWT
 JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 # Load ML Model
 
@@ -124,7 +70,8 @@ model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
+
+app.config["JWT_SECRET"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 # datetime.timedelta(days=1)
 
@@ -160,7 +107,7 @@ def token_required(f):
             return jsonify({"error": "Token is missing"}), 403
 
         try:
-            # Decode the token using the SECRET_KEY
+            # Decode the token using the JWT_SECRET
             token = token.split(" ")[1]  # Extract token from "Bearer token" format
             decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             request.user = decoded  # Store decoded data in request for access in route
@@ -173,6 +120,53 @@ def token_required(f):
 
     return decorator
 
+
+# ---------------------------------------
+#  Time classification 
+# ---------------------------------------
+def get_period_of_day(timestamp):
+    hour = timestamp.hour
+    if hour < 12:
+        return 'Morning'
+    elif hour < 17:
+        return 'Afternoon'
+    return 'Evening'
+
+
+@app.route('/get-journal-dates', methods=['GET'])
+@jwt_required()
+def get_journal_dates():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Fetching journal dates for user_id: {user_id}")
+
+        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not entry_doc or "journalEntries" not in entry_doc:
+            print("ℹ️ No entries found for user")
+            return jsonify([]), 200
+
+        dates = set()
+        for entry in entry_doc["journalEntries"]:
+            raw_date = entry.get("entryDate")
+            if not raw_date:
+                continue
+
+            if isinstance(raw_date, str):
+                date_str = raw_date.split("T")[0]
+            else:
+                date_str = raw_date.strftime("%Y-%m-%d")
+            dates.add(date_str)
+
+        print("✅ Final list of journal dates:", dates)
+        return jsonify(list(dates)), 200
+
+    except Exception as e:
+        print("❌ Error fetching journal dates:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+
+
 # ---------------------------------------
 # Function to create a JWT token
 # ---------------------------------------
@@ -182,16 +176,20 @@ def token_required(f):
 #        'user_id': user_id,
 #        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time (1 hour)
 #    }
-#    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+#    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 #    return token
 
 
+# 1. First define the route
+
+
+# 2. THEN register all blueprints
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
 app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
-
+app.register_blueprint(check_bp, url_prefix="/check-in")
 
 # ---------------------------------------
 #  **Protected Route**
@@ -233,13 +231,13 @@ s3 = boto3.client('s3')
 # s3 = boto3.client(
 #   's3',
 #    aws_access_key_id="YOUR_ACCESS_KEY",
-#    aws_secret_access_key="YOUR_SECRET_KEY",
+#    aws_secret_access_key="YOUR_JWT_SECRET",
 #    region_name="YOUR_REGION"
 # )
 
 # Add to upper part if necessary
 # aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-# aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+# aws_JWT_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY")
 # aws_region = os.getenv("AWS_DEFAULT_REGION", "me-south-1") 
 
 # Lambada Fast exec. 
