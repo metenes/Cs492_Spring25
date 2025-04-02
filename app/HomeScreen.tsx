@@ -248,7 +248,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         onPress={() => navigation.navigate("EntryDetail", { entry: item })}
       >
         <View style={styles.entryIcon}>
-          <Icon name="edit-2" size={20} color="#000" />
+          <Text>
+            <Icon name={iconName} size={20} color="#000" />
+          </Text>
         </View>
         <View style={styles.entryContent}>
           <Text style={styles.entryDate}>{formattedDate}</Text>
@@ -268,8 +270,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       <View style={styles.header}>
         <Text style={styles.title}>Your Entries</Text>
         <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate("DiaryMain")}>
-          <Text style={styles.streakText}>5</Text>
-          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
+          <Text style={styles.streakText}>{streak}</Text>
+          <Text>
+            <MaterialCommunityIcons name="fire" size={20} color="black" />
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -326,8 +330,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to Free Journal...")
-                navigation.navigate("FreeJournaling");
+                navigation.navigate("FreeJournaling", {selectedDate : "TODO"});
               }}
             >
               <Text>

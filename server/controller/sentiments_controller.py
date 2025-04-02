@@ -7,6 +7,9 @@ from bson import ObjectId
 from utils.load_model import model, tokenizer
 import torch
 import torch.nn.functional as F
+import numpy as np
+import json
+from pathlib import Path
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
@@ -19,6 +22,18 @@ EMOTIONS = [
     "nervousness", "optimism", "pride", "realization", "relief", "remorse",
     "sadness", "surprise", "neutral"
 ]
+
+# Load the thresholds at module level
+SERVER_DIR = Path(__file__).parent.parent
+THRESHOLDS_PATH = SERVER_DIR / "ml" / "best_thresholds.json"
+
+try:
+    with open(THRESHOLDS_PATH) as f:
+        EMOTION_THRESHOLDS = json.load(f)
+    print("✅ Loaded emotion thresholds from best_thresholds.json")
+except Exception as e:
+    print(f"❌ Error loading thresholds: {e}")
+    EMOTION_THRESHOLDS = {emotion: 0.3 for emotion in EMOTIONS}  # fallback
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -48,11 +63,18 @@ def analyze_sentiment():
                 # Get model prediction for segment
                 with torch.no_grad():
                     outputs = model(**inputs)
-                    segment_probabilities = torch.sigmoid(outputs.logits).squeeze().tolist()
+                    logits = outputs.logits
+                    probabilities = torch.sigmoid(logits).squeeze()
+                    
+                    # Convert to numpy for easier handling
+                    if len(probabilities.shape) == 0:
+                        probabilities = probabilities.unsqueeze(0)
+                    probs_np = probabilities.cpu().numpy()
                 
-                # Store emotions for this segment
-                for idx, prob in enumerate(segment_probabilities):
-                    if prob > 0.2:  # threshold
+                # Store emotions for this segment using trained thresholds
+                for idx, prob in enumerate(probs_np):
+                    threshold = EMOTION_THRESHOLDS[EMOTIONS[idx]]
+                    if prob > threshold:
                         all_emotions.append({
                             "code": idx,
                             "label": EMOTIONS[idx],
@@ -66,13 +88,23 @@ def analyze_sentiment():
             
             with torch.no_grad():
                 outputs = model(**inputs)
-                probabilities = torch.sigmoid(outputs.logits).squeeze().tolist()
+                logits = outputs.logits
+                probabilities = torch.sigmoid(logits).squeeze()
+                
+                if len(probabilities.shape) == 0:
+                    probabilities = probabilities.unsqueeze(0)
+                probs_np = probabilities.cpu().numpy()
             
-            max_idx = probabilities.index(max(probabilities))
+            # Get the emotion with highest probability relative to its threshold
+            threshold_adjusted_probs = [
+                prob / EMOTION_THRESHOLDS[EMOTIONS[idx]]
+                for idx, prob in enumerate(probs_np)
+            ]
+            max_idx = np.argmax(threshold_adjusted_probs)
             all_emotions.append({
-                "code": max_idx,
+                "code": int(max_idx),
                 "label": EMOTIONS[max_idx],
-                "score": float(probabilities[max_idx])
+                "score": float(probs_np[max_idx])
             })
         
         # Sort all emotions by score and remove duplicates (keep highest score for each emotion)
