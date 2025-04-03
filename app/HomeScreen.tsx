@@ -109,25 +109,33 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         // Fetch check-ins
         const checkInResponse = await getCheckInHistory(token);
     
-        if (!checkInResponse.history) {
+        let fetchedCheckIns = [];
+        if (Array.isArray(checkInResponse.history)) {
+          fetchedCheckIns = checkInResponse.history;
+          console.log("✅ Check-in entries:", fetchedCheckIns);
+        } else {
           console.warn("⚠️ No check-ins found.");
-          return;
-        }
+}
+
     
-        const fetchedCheckIns = checkInResponse.history;
-        console.log("✅ Check-in entries:", fetchedCheckIns);
+        //const fetchedCheckIns = checkInResponse.history;
+        //console.log("✅ Check-in entries:", fetchedCheckIns);
     
         // Convert check-ins to match journal entry structure
         const formattedCheckIns = fetchedCheckIns.map((checkIn: { entry_id: any; comments: string | any[]; created_at: any; sentiments: any; }) => ({
           _id: checkIn.entry_id, // Match ID structure
           entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments", // Use first comment as content
-          entryDate: checkIn.created_at || new Date().toISOString(), // Ensure valid date
+          entryDate: checkIn.date || new Date().toISOString(), // Ensure valid date
           createdAt: checkIn.created_at,
           category: "checkin", // Mark as check-in
           images: [], // Check-ins likely have no images
           journalSentiments: checkIn.sentiments || [], // Keep sentiments
           prompt: "", // No prompt for check-ins
         }));
+
+        console.log("HERE ARE THE CHECKIN ENTRIESSSSSS")
+        console.log("✅ Fetched raw check-ins:", fetchedCheckIns);
+        console.log("✅ Formatted check-ins:", formattedCheckIns);
     
         // Merge journals and check-ins
         let allEntries = [...fetchedEntries, ...formattedCheckIns];
@@ -137,7 +145,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         // Limit to last 30 entries
         allEntries = allEntries.slice(0, 30);
 
-        console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
+        //console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
     
         setEntries(allEntries);
         setFilteredEntries(allEntries); // Initially show all entries

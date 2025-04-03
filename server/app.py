@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 import os
 
 import torch
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Blueprint
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime, timedelta
@@ -164,7 +164,64 @@ def get_journal_dates():
         print("❌ Error fetching journal dates:", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
+check_bp = Blueprint('check_in', __name__)
+check_in_collection = db["check_in_entries"]
 
+@check_bp.route("/submit", methods=["POST"])
+@jwt_required()
+def submit_check_in():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        sentiments = data.get("sentiments", [])
+        causes = data.get("causes", [])
+        comments = data.get("comments", [])
+        timestamp = datetime.utcnow()
+
+        if not sentiments or not causes:
+            return jsonify({"error": "Sentiments and causes are required."}), 400
+
+        new_check_in = {
+            "userId": user_id,
+            "sentiments": sentiments,
+            "causes": causes,
+            "comments": comments,
+            "timestamp": timestamp
+        }
+
+        check_in_collection.insert_one(new_check_in)
+        return jsonify({"message": "Check-in saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving check-in:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+@check_bp.route("/fetch", methods=["GET"])
+@jwt_required()
+def fetch_check_ins():
+    try:
+        user_id = get_jwt_identity()
+        entries = list(check_in_collection.find({"userId": user_id}))
+
+        result = []
+        for entry in entries:
+            result.append({
+                "entry_id": str(entry["_id"]),
+                "created_at": entry["timestamp"].isoformat(),
+                "type": "checkin",
+                "date": entry["timestamp"].strftime("%Y-%m-%d"),
+                "sentiments": entry.get("sentiments", []),
+                "causes": entry.get("causes", []),
+                "comments": entry.get("comments", []),
+            })
+
+        
+
+        return jsonify({"history": result}), 200
+    except Exception as e:
+        print("❌ Error fetching check-ins:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # ---------------------------------------
