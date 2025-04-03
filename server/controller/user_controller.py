@@ -18,6 +18,8 @@ from bson.objectid import ObjectId
 import boto3
 from botocore.exceptions import ClientError
 import os
+from werkzeug.utils import secure_filename
+import time
 
 """
 // Sample MongoDB User Schema 
@@ -68,6 +70,30 @@ s3_client  = boto3.client(
         aws_secret_access_key='OmcaeMTjuMPO6kY2LtYuzdPkeMiaHbAEODL2OgaK',
         region_name='eu-north-1'
     )
+
+# Print S3 client configuration
+print("S3 Client Configuration:")
+print("Access Key ID:", s3_client._request_signer._credentials.access_key)
+print("Secret Access Key:", s3_client._request_signer._credentials.secret_key)
+print("Region Name:", s3_client.meta.region_name)
+
+# List all buckets
+try:
+    response = s3_client.list_buckets()
+    print("Buckets available:")
+    for bucket in response['Buckets']:
+        print(f"  - {bucket['Name']}")
+except ClientError as e:
+    print("Error listing buckets:", e)
+
+# List objects in your specific bucket
+try:
+    response = s3_client.list_objects_v2(Bucket=S3_BUCKET)
+    print(f"Objects in {S3_BUCKET}:")
+    for obj in response.get('Contents', []):
+        print(f"  - {obj['Key']}")
+except ClientError as e:
+    print("Error listing objects in bucket:", e)
 
 # ---------------------------------------
 #  **User Registration**
@@ -256,68 +282,54 @@ def update_user(user_id):
 @user_bp.route('/<user_id>/profile-image', methods=['POST'])
 @jwt_required()
 def upload_profile_image(user_id):
-    # Verify the requesting user is updating their own profile
-    current_user_id = get_jwt_identity()
-    if current_user_id != user_id:
-        return jsonify({"error": "Unauthorized access"}), 403
-    
-    # Check if the post request has the file part
-    if 'profileImage' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-    
-    file = request.files['profileImage']
-    
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-    
-    # Check if user exists
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    # Generate a unique filename
-    file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    filename = f"{user_id}_{uuid.uuid4().hex}.{file_extension}"
-    
-    profile_image_url = ""
-    
-    # If S3 is configured, upload to S3
-    if s3_client:
+    try:
+        # Verify user is updating their own profile
+        current_user_id = get_jwt_identity()
+        if str(current_user_id) != user_id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        if 'profileImage' not in request.files:
+            return jsonify({"error": "No image provided"}), 400
+
+        file = request.files['profileImage']
+        
+        # Create a unique filename
+        filename = f"profile-images/{user_id}/{int(time.time())}_{secure_filename(file.filename)}"
+        
+        # Upload to S3
         try:
-            # Upload to S3
             s3_client.upload_fileobj(
                 file,
                 S3_BUCKET,
-                f"profile-images/{filename}",
+                filename,
                 ExtraArgs={
                     "ContentType": file.content_type
                 }
             )
+
+            # Generate the URL for the uploaded image
+            image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{filename}"
             
-            # Generate the URL for the uploaded file
-            profile_image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/profile-images/{filename}"
+            # Update user's profile image URL in database
+            user = users_collection.find_one({"_id": ObjectId(user_id)})
+            if user:
+                users_collection.update_one(
+                    {"_id": ObjectId(user_id)},
+                    {"$set": {"profileImageUrl": image_url}}
+                )
+            
+            return jsonify({
+                "message": "Profile image uploaded successfully",
+                "profileImageUrl": image_url
+            }), 200
+
         except ClientError as e:
-            return jsonify({"error": str(e)}), 500
-    else:
-        # If S3 is not configured, save to local filesystem
-        uploads_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'profile-images')
-        os.makedirs(uploads_dir, exist_ok=True)
-        file_path = os.path.join(uploads_dir, filename)
-        file.save(file_path)
-        
-        # Generate URL for the uploaded file
-        profile_image_url = f"/static/uploads/profile-images/{filename}"
-    
-    # Update user document with profile image URL
-    users_collection.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"profileImageUrl": profile_image_url}}
-    )
-    
-    return jsonify({
-        "message": "Profile image uploaded successfully",
-        "profileImageUrl": profile_image_url
-    }), 200
+            print(f"Error uploading to S3: {e.response['Error']['Message']}")
+            return jsonify({"error": "Failed to upload image"}), 500
+
+    except Exception as e:
+        print(f"Error in upload_profile_image: {str(e)}")
+        return jsonify({"error": "Server error"}), 500
 
 # ---------------------------------------
 #  **Delete User**
