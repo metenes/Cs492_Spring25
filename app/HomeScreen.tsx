@@ -256,7 +256,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         onPress={() => navigation.navigate("EntryDetail", { entry: item })}
       >
         <View style={styles.entryIcon}>
-          <Icon name={iconName} size={20} color="#000" />
+          <Text>
+            <Icon name={iconName} size={20} color="#000" />
+          </Text>
         </View>
         <View style={styles.entryContent}>
           <Text style={styles.entryDate}>{formattedDate}</Text>
@@ -277,7 +279,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         <Text style={styles.title}>Your Entries</Text>
         <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate("DiaryMain")}>
           <Text style={styles.streakText}>{streak}</Text>
-          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
+          <Text>
+            <MaterialCommunityIcons name="fire" size={20} color="black" />
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -309,11 +313,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               onPress={() => {
                 setMenuOpen(false);
                 navigation.navigate("Chatbot");
-
-                console.log("Check-in Selected");
               }}
             >
-              <Icon name="message-circle" size={20} color="black" /> {/* message-square de kullanabiliriz */}
+              <Text>
+                <Icon name="message-circle" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Chatbot</Text>
             </TouchableOpacity>
 
@@ -324,7 +328,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 navigation.navigate("CheckIn");
               }}
             >
-              <Icon name="smile" size={20} color="black" />
+              <Text>
+                <Icon name="smile" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Check-in</Text>
             </TouchableOpacity>
 
@@ -332,11 +338,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to Free Journal...")
                 navigation.navigate("FreeJournaling", {selectedDate : "TODO"});
               }}
             >
-              <Icon name="edit-2" size={20} color="black" />
+              <Text>
+                <Icon name="edit-2" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>New Journal</Text>
             </TouchableOpacity>
 
@@ -344,12 +351,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to FreeJournaling...")
-
                 navigation.navigate("PromptSelection");
               }}
             >
-              <Icon name="book-open" size={20} color="black" />
+              <Text>
+                <Icon name="book-open" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Prompts</Text>
             </TouchableOpacity>
 
@@ -357,21 +364,23 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to FaceEmotion...")
                 navigation.navigate("FaceEmotion");
               }}
             >
-              <Icon name="smile" size={20} color="black" />
+              <Text>
+                <Icon name="smile" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Face Analysis</Text>
             </TouchableOpacity>
-
           </Animated.View>
         )}
 
         {/* FAB Toggle Button */}
         <Animated.View style={[styles.fab, { transform: [{ rotate: rotationInterpolate }] }]}>
           <TouchableOpacity onPress={toggleMenu}>
-            <Icon name="plus" size={24} color="#FFF" />
+            <Text>
+              <Icon name="plus" size={24} color="#FFF" />
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

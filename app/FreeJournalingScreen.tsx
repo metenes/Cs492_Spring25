@@ -176,7 +176,7 @@ const FreeJournalingScreen = () => {
               textAlignVertical: "top",
             }}
             multiline
-            placeholder="Write your thoughts... (or tap the mic button on your keyboard) 🎤"
+            placeholder="Write your thoughts... (or tap the mic button on your keyboard)"
             placeholderTextColor="#666"
             value={content}
             onChangeText={(text) => {
@@ -252,7 +252,9 @@ const FreeJournalingScreen = () => {
             }}
             onPress={pickImage}
           >
-            <Text style={{ color: "#FFF", fontSize: 14 }}>📸 Upload Images</Text>
+            <Text style={{ color: "#FFF", fontSize: 14 }}>
+              <Text>📸</Text> Upload Images
+            </Text>
           </TouchableOpacity>
 
           {/* Save Entry Button */}
@@ -266,7 +268,9 @@ const FreeJournalingScreen = () => {
             }}
             onPress={handleSaveEntry}
           >
-            <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
+            <Text style={{ color: "#FFF", fontSize: 14 }}>
+              <Text>💾</Text> Save Entry
+            </Text>
           </TouchableOpacity>
         </View>
 

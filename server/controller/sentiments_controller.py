@@ -7,6 +7,9 @@ from bson import ObjectId
 from utils.load_model import model, tokenizer
 import torch
 import torch.nn.functional as F
+import numpy as np
+import json
+from pathlib import Path
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
@@ -19,6 +22,18 @@ EMOTIONS = [
     "nervousness", "optimism", "pride", "realization", "relief", "remorse",
     "sadness", "surprise", "neutral"
 ]
+
+# Load the thresholds at module level
+SERVER_DIR = Path(__file__).parent.parent
+THRESHOLDS_PATH = SERVER_DIR / "ml" / "best_thresholds.json"
+
+try:
+    with open(THRESHOLDS_PATH) as f:
+        EMOTION_THRESHOLDS = json.load(f)
+    print("✅ Loaded emotion thresholds from best_thresholds.json")
+except Exception as e:
+    print(f"❌ Error loading thresholds: {e}")
+    EMOTION_THRESHOLDS = {emotion: 0.3 for emotion in EMOTIONS}  # fallback
 
 # ---------------------------------------
 #  **Sentiment Analysis**
@@ -34,40 +49,75 @@ def analyze_sentiment():
         if not text:
             return jsonify({"error": "No text provided"}), 400
 
-        # Tokenize the text
-        inputs = tokenizer(text, return_tensors="pt", padding="max_length", 
-                         truncation=True, max_length=128)
-        print("🔹 Text tokenized successfully")
+        # Split text into segments
+        segments = text.split(". ")
+        all_emotions = []
 
-        # Get model prediction
-        with torch.no_grad():
-            outputs = model(**inputs)
-            probabilities = torch.sigmoid(outputs.logits).squeeze()
-        
-        print(f"🔹 Raw probabilities shape: {probabilities.shape}")
-        
-        # Get emotions above threshold (0.3 as in your original code)
-        threshold = 0.3
-        emotions = []
-        for idx, prob in enumerate(probabilities):
-            if prob > threshold:
-                emotions.append({
-                    "code": idx,
-                    "label": EMOTIONS[idx],
-                    "score": float(prob)
-                })
-        
-        # If no emotions above threshold, get the top emotion
-        if not emotions:
-            max_idx = torch.argmax(probabilities).item()
-            emotions.append({
-                "code": max_idx,
+        # Analyze each segment
+        for segment in segments:
+            if segment.strip():
+                # Tokenize the segment
+                inputs = tokenizer(segment, return_tensors="pt", padding="max_length", 
+                                truncation=True, max_length=128)
+                
+                # Get model prediction for segment
+                with torch.no_grad():
+                    outputs = model(**inputs)
+                    logits = outputs.logits
+                    probabilities = torch.sigmoid(logits).squeeze()
+                    
+                    # Convert to numpy for easier handling
+                    if len(probabilities.shape) == 0:
+                        probabilities = probabilities.unsqueeze(0)
+                    probs_np = probabilities.cpu().numpy()
+                
+                # Store emotions for this segment using trained thresholds
+                for idx, prob in enumerate(probs_np):
+                    threshold = EMOTION_THRESHOLDS[EMOTIONS[idx]]
+                    if prob > threshold:
+                        all_emotions.append({
+                            "code": idx,
+                            "label": EMOTIONS[idx],
+                            "score": float(prob)
+                        })
+
+        # If no emotions found in any segment, analyze the full text
+        if not all_emotions:
+            inputs = tokenizer(text, return_tensors="pt", padding="max_length", 
+                            truncation=True, max_length=128)
+            
+            with torch.no_grad():
+                outputs = model(**inputs)
+                logits = outputs.logits
+                probabilities = torch.sigmoid(logits).squeeze()
+                
+                if len(probabilities.shape) == 0:
+                    probabilities = probabilities.unsqueeze(0)
+                probs_np = probabilities.cpu().numpy()
+            
+            # Get the emotion with highest probability relative to its threshold
+            threshold_adjusted_probs = [
+                prob / EMOTION_THRESHOLDS[EMOTIONS[idx]]
+                for idx, prob in enumerate(probs_np)
+            ]
+            max_idx = np.argmax(threshold_adjusted_probs)
+            all_emotions.append({
+                "code": int(max_idx),
                 "label": EMOTIONS[max_idx],
-                "score": float(probabilities[max_idx])
+                "score": float(probs_np[max_idx])
             })
         
-        # Sort emotions by score
+        # Sort all emotions by score and remove duplicates (keep highest score for each emotion)
+        seen_emotions = {}
+        for emotion in all_emotions:
+            label = emotion["label"]
+            if label not in seen_emotions or emotion["score"] > seen_emotions[label]["score"]:
+                seen_emotions[label] = emotion
+
+        # Convert back to list and sort
+        emotions = list(seen_emotions.values())
         emotions.sort(key=lambda x: x['score'], reverse=True)
+        
         print(f"✅ Detected emotions: {emotions}")
         
         return jsonify({
