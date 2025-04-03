@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.29:5000";
+const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
@@ -909,7 +909,7 @@ export const submitCheckIn = async (token: string, sentiments: string[], causes:
 };
 
 // Function to get user's check-in history
-export const getCheckInHistory = async (token: string) => {
+/* export const getCheckInHistory = async (token: string) => {
   try {
     // First get the user ID from the token (if not stored separately)
     const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
@@ -971,7 +971,32 @@ export const getCheckInEntry = async (token: string, entryId: number) => {
     console.error('Error fetching check-in entry:', error);
     throw error;
   }
+}; */
+export const getCheckInHistory = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/check-in/fetch`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch check-in history');
+    }
+
+    console.log("YARDIM CIGLIKLARIIII")
+    console.log(data);
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching check-in history:', error);
+    throw error;
+  }
 };
+
 
 
 // Function to delete a specific check-in

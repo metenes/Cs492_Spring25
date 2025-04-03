@@ -124,28 +124,64 @@ const EntryDetail = () => {
           {entry.prompt && <Text style={styles.prompt}>Prompt: {entry.prompt}</Text>}
         </View>
         
-        {isEditing ? (
-          <TextInput
-            style={styles.editor}
-            multiline
-            value={editedContent}
-            onChangeText={setEditedContent}
-            autoFocus
-          />
-        ) : (
-          <Text style={styles.entryContent}>{entry.entryContent}</Text>
-        )}
-        
-        {entry.journalSentiments && entry.journalSentiments.length > 0 && (
-          <View style={styles.sentimentsContainer}>
-            <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
-            {entry.journalSentiments.map((sentiment: { type: string | number ; score: string | number }, index: React.Key | null | undefined) => (
-              <Text key={index} style={styles.sentimentItem}>
-                {sentiment.type}: {sentiment.score}
-              </Text>
-            ))}
-          </View>
-        )}
+        {entry.category === "checkin" ? (
+            <>
+              <Text style={styles.sectionTitle}>Check-in Summary</Text>
+
+              {entry.journalSentiments && entry.journalSentiments.length > 0 && (
+                <View style={styles.detailBlock}>
+                  <Text style={styles.detailLabel}>Emotions:</Text>
+                  {entry.journalSentiments.map((s: string, index: number) => (
+                    <Text key={index} style={styles.detailItem}>{s}</Text>
+                  ))}
+                </View>
+              )}
+
+              {entry.causes && entry.causes.length > 0 && (
+                <View style={styles.detailBlock}>
+                  <Text style={styles.detailLabel}>Causes:</Text>
+                  {entry.causes.map((c: string, index: number) => (
+                    <Text key={index} style={styles.detailItem}>{c}</Text>
+                  ))}
+                </View>
+              )}
+
+              {entry.comments && entry.comments.length > 0 && (
+                <View style={styles.detailBlock}>
+                  <Text style={styles.detailLabel}>Comments:</Text>
+                  {entry.comments.map((c: string, index: number) => (
+                    <Text key={index} style={styles.detailItem}>{c}</Text>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              {isEditing ? (
+                <TextInput
+                  style={styles.editor}
+                  multiline
+                  value={editedContent}
+                  onChangeText={setEditedContent}
+                  autoFocus
+                />
+              ) : (
+                <Text style={styles.entryContent}>{entry.entryContent}</Text>
+              )}
+
+              {entry.journalSentiments && entry.journalSentiments.length > 0 && (
+                <View style={styles.sentimentsContainer}>
+                  <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
+                  {entry.journalSentiments.map((sentiment: { type: string; score: string }, index) => (
+                    <Text key={index} style={styles.sentimentItem}>
+                      {sentiment.type}: {sentiment.score}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -231,6 +267,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 4,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  
+  detailBlock: {
+    marginBottom: 16,
+  },
+  
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  
+  detailItem: {
+    fontSize: 14,
+    color: "#444",
+    marginLeft: 10,
+  },
+  
 });
 
 export default EntryDetail;
