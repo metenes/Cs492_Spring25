@@ -71,11 +71,32 @@ s3_client  = boto3.client(
         region_name='eu-north-1'
     )
 
-# Print S3 client configuration
-print("S3 Client Configuration:")
-print("Access Key ID:", s3_client._request_signer._credentials.access_key)
-print("Secret Access Key:", s3_client._request_signer._credentials.secret_key)
-print("Region Name:", s3_client.meta.region_name)
+# Initialize STS client to check identity
+sts_client = boto3.client(
+    'sts',
+    aws_access_key_id='AKIAXGZAMH3HUVQSPNED',
+    aws_secret_access_key='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',
+    region_name='eu-north-1'
+)
+
+# Check AWS identity
+try:
+    identity = sts_client.get_caller_identity()
+    print("Caller identity:", identity)
+except ClientError as e:
+    print("❌ Failed to get caller identity:", e)
+
+# Test S3 write permissions with simple put_object
+try:
+    s3_client.put_object(
+        Bucket=S3_BUCKET,
+        Key='test-upload.txt',
+        Body='This is a test',
+        ContentType='text/plain'
+    )
+    print("✅ S3 write permission OK")
+except ClientError as e:
+    print("❌ S3 write permission failed:", e)
 
 # List all buckets
 try:
@@ -288,27 +309,50 @@ def upload_profile_image(user_id):
         if str(current_user_id) != user_id:
             return jsonify({"error": "Unauthorized"}), 403
 
+        # Log request details
+        print(f"Request files: {request.files}")
+        print(f"Request form: {request.form}")
+
         if 'profileImage' not in request.files:
+            print("No 'profileImage' found in request.files")
             return jsonify({"error": "No image provided"}), 400
 
         file = request.files['profileImage']
+        print(f"File received: filename={file.filename}, content_type={file.content_type}")
         
-        # Create a unique filename
-        filename = f"profile-images/{user_id}/{int(time.time())}_{secure_filename(file.filename)}"
+        # Handle missing filename
+        original_filename = "profile-image.jpg"  # Use a guaranteed valid name
+        filename = f"profile-images/{user_id}/{int(time.time())}_{secure_filename(original_filename)}"
+
+        print(f"Generated S3 filename: {filename}")
+        
+        # Try to read the file
+        try:
+            file_content = file.read()
+            file_size = len(file_content)
+            print(f"File size read: {file_size} bytes")
+            # Seek back to beginning for upload
+            file.seek(0)
+        except Exception as read_error:
+            print(f"Error reading file: {str(read_error)}")
+            return jsonify({"error": "Could not read uploaded file"}), 400
         
         # Upload to S3
         try:
+            print(f"Attempting to upload to S3: bucket={S3_BUCKET}, filename={filename}")
             s3_client.upload_fileobj(
-                file,
-                S3_BUCKET,
-                filename,
-                ExtraArgs={
-                    "ContentType": file.content_type
-                }
-            )
+            file.stream, 
+            S3_BUCKET,
+            filename,
+            ExtraArgs={
+                "ContentType": file.content_type or "image/jpeg"
+            }
+        )
+            print("S3 upload successful")
 
             # Generate the URL for the uploaded image
             image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{filename}"
+            print(f"Generated image URL: {image_url}")
             
             # Update user's profile image URL in database
             user = users_collection.find_one({"_id": ObjectId(user_id)})
@@ -317,6 +361,7 @@ def upload_profile_image(user_id):
                     {"_id": ObjectId(user_id)},
                     {"$set": {"profileImageUrl": image_url}}
                 )
+                print(f"Updated user {user_id} profile with new image URL")
             
             return jsonify({
                 "message": "Profile image uploaded successfully",
@@ -324,11 +369,16 @@ def upload_profile_image(user_id):
             }), 200
 
         except ClientError as e:
-            print(f"Error uploading to S3: {e.response['Error']['Message']}")
-            return jsonify({"error": "Failed to upload image"}), 500
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            print(f"Error uploading to S3: {error_message}")
+            print(f"Error code: {e.response.get('Error', {}).get('Code', 'Unknown')}")
+            print(f"Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
+            return jsonify({"error": f"Failed to upload image: {error_message}"}), 500
 
     except Exception as e:
+        import traceback
         print(f"Error in upload_profile_image: {str(e)}")
+        traceback.print_exc()  # Print the full stack trace
         return jsonify({"error": "Server error"}), 500
 
 # ---------------------------------------

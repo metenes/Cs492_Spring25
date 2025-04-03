@@ -311,7 +311,7 @@ const ProfileScreen = () => {
         // Create FormData and append the image
         const formData = new FormData();
         formData.append('profileImage', {
-          uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+          uri: imageUri, // Do not strip 'file://' prefix
           type: 'image/jpeg',
           name: 'profile-image.jpg',
         } as any);
@@ -319,7 +319,7 @@ const ProfileScreen = () => {
         // Log FormData contents for debugging
         console.log('FormData structure:', {
           profileImage: {
-            uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+            uri: imageUri,
             type: 'image/jpeg',
             name: 'profile-image.jpg',
             size: fileSize
