@@ -129,7 +129,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           createdAt: checkIn.created_at,
           category: "checkin", // Mark as check-in
           images: [], // Check-ins likely have no images
-          journalSentiments: checkIn.sentiments || [], // Keep sentiments
+          sentiments: checkIn.sentiments || [], // Keep sentiments
+          causes: checkIn.causes || [],
+          comments: checkIn.comments || [],
           prompt: "", // No prompt for check-ins
         }));
 
