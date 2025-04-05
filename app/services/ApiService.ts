@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.68:5000";
+const API_URL = "http://192.168.1.33:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
@@ -909,69 +909,6 @@ export const submitCheckIn = async (token: string, sentiments: string[], causes:
 };
 
 // Function to get user's check-in history
-/* export const getCheckInHistory = async (token: string) => {
-  try {
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-
-    const userData = await userResponse.json();
-    const userId = userData._id;
-
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
-
-    const response = await fetch(`${API_URL}/check-in/history/${userId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    const data = await response.json();
-    console.log("here" , data)
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch check-in history');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching check-in history:', error);
-    throw error;
-  }
-};
-
-// Function to get a specific check-in entry
-export const getCheckInEntry = async (token: string, entryId: number) => {
-  try {
-    const response = await fetch(`${API_URL}/check-in/${entryId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch check-in entry');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching check-in entry:', error);
-    throw error;
-  }
-}; */
 export const getCheckInHistory = async (token: string) => {
   try {
     const response = await fetch(`${API_URL}/check-in/fetch`, {
@@ -1031,3 +968,38 @@ export const deleteCheckIn = async (checkInId: string) => {
 // **********************************************
 // ** CheckIn  API **
 // **********************************************
+
+const CHECK_IN_DRAFT_KEY = 'checkInDraft'; // Create a consistent key
+
+// Check-in draft functions
+export const saveCheckInDraft = async (checkInData: any) => {
+  try {
+    await AsyncStorage.setItem('checkInDraft', JSON.stringify(checkInData));
+    console.log("Check-in draft saved successfully");
+    return true;
+  } catch (error) {
+    console.error("Error saving check-in draft:", error);
+    return false;
+  }
+};
+
+export const getCheckInDraft = async () => {
+  try {
+    const savedData = await AsyncStorage.getItem('checkInDraft');
+    return savedData ? JSON.parse(savedData) : null;
+  } catch (error) {
+    console.error("Error loading check-in draft:", error);
+    return null;
+  }
+};
+
+export const clearCheckInDraft = async () => {
+  try {
+    await AsyncStorage.removeItem('checkInDraft');
+    console.log("Check-in draft cleared");
+    return true;
+  } catch (error) {
+    console.error("Error clearing check-in draft:", error);
+    return false;
+  }
+};
