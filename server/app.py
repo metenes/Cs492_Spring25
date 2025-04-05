@@ -163,6 +163,36 @@ def get_journal_dates():
     except Exception as e:
         print("❌ Error fetching journal dates:", str(e))
         return jsonify({"error": "Internal server error"}), 500
+    
+@journal_bp.route("/guided", methods=["POST"])
+@jwt_required()
+def save_guided_journal():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        entry_content = data.get("entryContent", "")
+        prompt = data.get("prompt", "")
+        if not entry_content or not prompt:
+            return jsonify({"error": "Entry content and prompt are required."}), 400
+
+        new_entry = {
+            "userId": user_id,
+            "entryContent": entry_content,
+            "category": "guided",
+            "prompt": prompt,
+            "createdAt": datetime.utcnow(),
+            "entryDate": datetime.utcnow().strftime("%Y-%m-%d"),
+            "images": [],
+            "journalSentiments": []
+        }
+
+        journal_entries_collection.insert_one(new_entry)
+        return jsonify({"message": "Guided journal entry saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving guided entry:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
 
 check_bp = Blueprint('check_in', __name__)
 check_in_collection = db["check_in_entries"]
