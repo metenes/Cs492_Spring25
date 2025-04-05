@@ -1,1 +1,1 @@
-export const API_URL = 'http://192.168.1.35:5000';  // Update with your actual backend URL 
+export const API_URL = 'http://192.168.1.33:5000';  // Update with your actual backend URL 

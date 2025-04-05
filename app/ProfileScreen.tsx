@@ -27,7 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
-const API_URL = 'http://192.168.1.68:5000';
+const API_URL = 'http://192.168.1.33:5000';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
