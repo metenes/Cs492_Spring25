@@ -44,7 +44,8 @@ from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
-from controller.check_in_controller import check_bp; 
+from controller.check_in_controller import check_bp
+from controller.notification_controller import notification_bp
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
@@ -93,44 +94,6 @@ app.config["MAIL_ASCII_ATTACHMENTS"] = False
 mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
-
-# ---------------------------------------
-#  User Token check 
-# ---------------------------------------
-
-# Middleware to verify token
-def token_required(f):
-    @wraps(f)
-    def decorator(*args, **kwargs):
-        token = request.headers.get("Authorization")
-        if not token:
-            return jsonify({"error": "Token is missing"}), 403
-
-        try:
-            # Decode the token using the JWT_SECRET
-            token = token.split(" ")[1]  # Extract token from "Bearer token" format
-            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            request.user = decoded  # Store decoded data in request for access in route
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
-
-        return f(*args, **kwargs)
-
-    return decorator
-
-
-# ---------------------------------------
-#  Time classification 
-# ---------------------------------------
-def get_period_of_day(timestamp):
-    hour = timestamp.hour
-    if hour < 12:
-        return 'Morning'
-    elif hour < 17:
-        return 'Afternoon'
-    return 'Evening'
 
 
 @app.route('/get-journal-dates', methods=['GET'])
@@ -277,6 +240,7 @@ app.register_blueprint(activities_bp, url_prefix="/activity")
 app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
 app.register_blueprint(check_bp, url_prefix="/check-in")
+app.register_blueprint(notification_bp, url_prefix="/notification")
 
 # ---------------------------------------
 #  **Protected Route**

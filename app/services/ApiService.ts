@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_URL = "http://192.168.1.33:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-
+// const API_URL = "http://192.168.1.40:5000"; kgn
 // Define the emotions array to match the backend
 const EMOTIONS = [
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -1003,3 +1003,28 @@ export const clearCheckInDraft = async () => {
     return false;
   }
 };
+
+// **********************************************
+// ** Notifications API **
+// **********************************************
+
+export const saveNotificationToken = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/notification/save-push-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save notification token: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error saving notification token:", error);
+    throw error;
+  }
+}
