@@ -23,13 +23,13 @@ class Chat(Document):
     user_id = StringField(required=True)  # Reference to User
     conversation_id = StringField(required=True, unique=True)
     messages = ListField(ReferenceField(Message))
-    started_at = DateTimeField(default=datetime.utcnow)
-    last_updated = DateTimeField(default=datetime.utcnow)
+    started_at = DateTimeField(default=datetime.now)
+    last_updated = DateTimeField(default=datetime.now)
     model_version = StringField(default="1.0")
     model_updated = BooleanField(default=False)
-    
+
     meta = {'collection': 'chats'}
-    
+
     def to_json(self):
         return {
             "user_id": self.user_id,

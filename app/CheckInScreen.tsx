@@ -15,7 +15,7 @@ import { ScrollView } from "react-native";
 // import {setToken } from "./auth/AuthContext"
 import { RootStackParamList } from "./types/types";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { submitCheckIn } from "./services/ApiService"; // Import the API function
+import { saveCheckIn } from "./services/ApiService"; // Import the API function
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type CheckInNavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
@@ -73,7 +73,7 @@ const CheckInScreen = () => {
   );
 
   // Function to handle the check-in submission
-  const handleSubmitCheckIn = async () => {
+  const handlesaveCheckIn = async () => {
     const token = await AsyncStorage.getItem('userToken');
     console.log("🔹 retrive token to fetch profile:", token);
       if (token ) {
@@ -91,7 +91,7 @@ const CheckInScreen = () => {
           const comments = comment.trim() ? [comment] : [];
           
           // Call the API to submit the check-in
-          const result = await submitCheckIn(token, selectedEmotions, selectedReasons, comments);
+          const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
           
           // Show success message
           Alert.alert(
@@ -211,7 +211,7 @@ const CheckInScreen = () => {
               {/* Complete Check-in Button */}
               <TouchableOpacity 
                 style={styles.completeButton} 
-                onPress={handleSubmitCheckIn}
+                onPress={handlesaveCheckIn}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (

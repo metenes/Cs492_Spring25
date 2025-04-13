@@ -84,14 +84,18 @@ const SentimentAnalysisPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
+        const token = await AsyncStorage.getItem("userToken");
+        if(token === null){
+          throw new Error("Retrive user token is null");
+        }
         const startDateStr = toLocalDateString(selectedStartDate);
         const endDateStr = toLocalDateString(selectedEndDate);
-        const data = await fetchJournalEntriesWithDate(startDateStr, endDateStr);
+        const data = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
         if (data.error) {
           throw new Error(data.error);
         }
-        setJournalEntries(data.entries || []);
-        console.log("Initial entries:", data.entries);
+        setJournalEntries(data || []);
+        console.log("Initial entries:", data);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -106,12 +110,16 @@ const SentimentAnalysisPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      const token = await AsyncStorage.getItem("userToken");
+      if(token === null){
+        throw new Error("Retrive user token is null");
+      }
       const startDateStr = toLocalDateString(selectedStartDate);
       const endDateStr = toLocalDateString(selectedEndDate);
-      const data = await fetchJournalEntriesWithDate(startDateStr, endDateStr);
+      const data = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
       if (data.error) throw new Error(data.error);
-      setJournalEntries(data.entries || []);
-      console.log("Weekly entries:", data.entries);
+      setJournalEntries(data || []);
+      console.log("Weekly entries:", data);
     } catch (err: any) {
       setError(err.message);
     } finally {

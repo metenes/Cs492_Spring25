@@ -55,11 +55,13 @@ user_bp = Blueprint("user_bp", __name__)
 bcrypt = Bcrypt()
 
 # ---------------------------------------
-#  ** S3 Configure ** Profile Images only 
+#  ** S3 Configure ** Profile Images 
+#  ** Base Model Upload for inference  
 # ---------------------------------------
 
 # AWS S3 bucket
 S3_BUCKET = "sentiobucket"
+BASE_MODEL_PATH = "models/model.pt"
 
 # S3 Configuration (for profile images)
 s3_client  = boto3.client(
@@ -87,7 +89,7 @@ def register():
             return jsonify({"error": "User already exists"}), 400
 
         # Hash password before saving
-        registration_time = datetime.now()
+        registration_time = datetime.now().isoformat()
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = {
             "email": email,
@@ -98,9 +100,9 @@ def register():
             "phone": "+1234567890",
             "location": "City, Country",
             "profileImageUrl": "",
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-            "last_login": datetime.now(),
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "last_login": datetime.now().isoformat(),
             "preferences": {
                 "darkMode": "false",
                 "notifications": {
@@ -113,6 +115,25 @@ def register():
             "role": "user"               # user, admin
         }
         users_collection.insert_one(new_user)
+
+        # Upload base model to S3 
+        user_model_path = f"models/{ObjectId(new_user["_id"])}/model.pt"
+        print(user_model_path," creating user model ")
+        try:
+            s3_client.copy_object(
+                Bucket=S3_BUCKET,
+                CopySource=f"{S3_BUCKET}/{BASE_MODEL_PATH}",
+                Key=user_model_path
+            )
+            print(f"User model initialized at {S3_BUCKET}/{user_model_path}")
+        except Exception as e:
+            print(f"Error copying base model: {e}")
+
+        print("model for user ", new_user["_id"], "created in registraion")
+        # for real time infarence upload the sagamaker 
+
+
+        
         return jsonify({"message": "User registered successfully"}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500

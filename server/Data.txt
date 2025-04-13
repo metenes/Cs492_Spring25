@@ -11,3 +11,27 @@ AWS Sentio Credential - aws configure
 Access Key : AKIAXGZAMH3HUVQSPNED
 Secret Key : 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 
 Region : Europe (Stockholm) me-south-1 or eu-north-1 (dont write both)
+
+aws sagemaker describe-endpoint --endpoint-name user-model-endpoint
+{
+    "EndpointName": "user-model-endpoint",
+    "EndpointArn": "arn:aws:sagemaker:eu-north-1:495599763151:endpoint/user-model-endpoint",
+    "EndpointConfigName": "user-model-config",
+    "EndpointStatus": "Creating",
+    "CreationTime": "2025-04-03T23:09:23.065000+03:00",
+    "LastModifiedTime": "2025-04-03T23:09:23.308000+03:00"
+}
+
+
+aws sagemaker list-endpoints --region eu-north-1
+{
+    "Endpoints": [
+        {
+            "EndpointName": "user-model-endpoint",
+            "EndpointArn": "arn:aws:sagemaker:eu-north-1:495599763151:endpoint/user-model-endpoint",
+            "CreationTime": "2025-04-03T23:09:23.065000+03:00",
+            "LastModifiedTime": "2025-04-03T23:09:23.308000+03:00",
+            "EndpointStatus": "Creating"
+        }
+    ]
+}

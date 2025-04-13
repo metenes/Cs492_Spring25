@@ -1,13 +1,17 @@
 from flask import Blueprint, request, jsonify
+from datetime import datetime, timedelta
 from bson import ObjectId
 from utils.database import check_in_collection, users_collection, sentiments_collection, prompt_collection
 from datetime import datetime
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from bson import ObjectId
 
 # Initialize Blueprint for check-in routes
 check_bp = Blueprint("check_bp", __name__)
 
 # Route to submit a new check-in entry using PyMongo
 @check_bp.route('/submit', methods=['POST'])
+@jwt_required()
 def create_check_in():
     try:
         data = request.get_json()
@@ -48,8 +52,8 @@ def create_check_in():
         return jsonify({"error": str(e)}), 500
 
 
-
 @check_bp.route('/history/<user_id>', methods=['GET'])
+@jwt_required()
 def get_check_in_history(user_id):
     try:
         user = users_collection.find_one({"_id": ObjectId(user_id)})
@@ -83,6 +87,7 @@ def get_check_in_history(user_id):
 
 # Route to get a specific check-in entry
 @check_bp.route('/<int:entry_id>', methods=['GET'])
+@jwt_required()
 def get_check_in_entry(entry_id):
     try:
         entry = check_in_collection.find_one({"entry_id": entry_id})
@@ -99,6 +104,54 @@ def get_check_in_entry(entry_id):
         }
 
         return jsonify(entry_data), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@check_bp.route("/check-in/edit/<entry_id>", methods=["PUT"])
+@jwt_required()
+def edit_checkin(entry_id):
+    try:
+        data = request.json
+        token = request.headers.get("Authorization").split(" ")[1]
+        user_id = get_jwt_identity()
+
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        update_data = {
+            "sentiments": data["sentiments"],
+            "causes": data["causes"],
+            "comments": data.get("comments", []),
+        }
+
+        result = check_in_collection.update_one({"_id": ObjectId(entry_id), "user_id": user_id}, {"$set": update_data})
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Entry not found or unauthorized"}), 404
+
+        return jsonify({"message": "Check-in updated successfully!"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@check_bp.route("/delete/<entry_id>", methods=["DELETE"])
+@jwt_required()
+def delete_checkin(entry_id):
+    try:
+        token = request.headers.get("Authorization").split(" ")[1]
+        user_id = get_jwt_identity()
+
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        result = check_in_collection.delete_one({"_id": ObjectId(entry_id), "user_id": user_id})
+
+        if result.deleted_count == 0:
+            return jsonify({"error": "Entry not found or unauthorized"}), 404
+
+        return jsonify({"message": "Check-in deleted successfully!"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

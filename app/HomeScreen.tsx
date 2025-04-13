@@ -11,7 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 
-import { fetchJournalEntries , getCheckInHistory } from "./services/ApiService";
+import { fetchJournalEntries , fetchCheckIn } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -105,7 +105,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         console.log("📖 Journal entries:", fetchedEntries);
     
         // Fetch check-ins
-        const checkInResponse = await getCheckInHistory(token);
+        const checkInResponse = await fetchCheckIn(token);
     
         if (!checkInResponse.history) {
           console.warn("⚠️ No check-ins found.");

@@ -125,50 +125,19 @@ export const fetchSentimentAnalysis = async (
   }
 };
 
-export const fetchJournalEntriesWithDate = async (
-  start_date: string,
-  end_date: string
-) => {
-  try {
-    const token = await AsyncStorage.getItem("userToken");
-    if (!token) {
-      throw new Error("No token found. Please log in.");
-    }
-    const params = new URLSearchParams();
-    params.append("start_date", start_date);
-    params.append("end_date", end_date);
-
-    // Updated endpoint to match new data structure
-    const response = await fetch(`${API_URL}/journal/api/journal-entries?${params.toString()}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    // Assuming the response now directly contains the journalEntries array
-    return data;
-  } catch (error) {
-    console.error("Error fetching journal entries:", error);
-    return { error: "Failed to fetch journal entries." };
-  }
-};
-
 // **********************************************
 // ** Chat API** - Send message
 // **********************************************
 export const sendMessage = async (message: string) => {
   try {
-    const response = await fetch(`${API_URL}/chat/test`, {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/perchat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+
       },
       body: JSON.stringify({ message }),
     });
@@ -580,6 +549,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
 
     console.log("Final mapped sentiments:", mappedSentiments);
     console.log("CATEGORY : " , category)
+
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
@@ -613,6 +583,81 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
 
   } catch (error) {
     console.error("❌ Error in saveJournalEntry:", error);
+    throw error;
+  }
+};
+
+export const editJournalEntry = async (entryId: string, newContent: string, images?: string[], category?: string, prompt?: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    // RECALCULATE sentiment analysis
+    const sentimentResult = await analyzeSentiment(newContent);
+
+    // Define Emotion type
+    type Emotion = { code: string; score: number };
+
+    // Sort emotions by score (highest first)
+    const sortedEmotions = sentimentResult.emotions.sort(
+      (a: Emotion, b: Emotion) => b.score - a.score
+    );
+
+    // Get dominant emotion (highest score)
+    const dominantEmotion = sortedEmotions[0];
+
+    // Filter additional high-scoring emotions (>= 0.65)
+    const additionalEmotions = sortedEmotions
+      .slice(1)
+      .filter((emotion: Emotion) => emotion.score >= 0.65);
+
+    // Combine dominant emotion with high-scoring ones
+    const selectedEmotions: Emotion[] = [dominantEmotion, ...additionalEmotions];
+
+    console.log("Dominant emotion:", dominantEmotion);
+    console.log("Additional emotions meeting threshold:", additionalEmotions);
+
+    // Map selected emotions
+    const mappedSentiments = selectedEmotions.map((emotion: Emotion) => ({
+      emotion: emotion.code,
+      percentage: emotion.score,
+    }));
+
+    console.log("Final mapped sentiments:", mappedSentiments);
+    console.log("CATEGORY : " , category)
+
+    const requestBody = {
+      entryContent: newContent,
+      entryDate: new Date().toISOString(),
+      images: images?.map(image => ({
+        fileName: `uploads/${image}`,
+        signedUrl: image
+      })) || [],
+      journalSentiments: mappedSentiments,
+      category: category,
+      prompt: prompt
+    };
+
+    console.log("Final data being RESETNT:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(`${API_URL}/journal/update-journal-entry/${entryId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Edit journal entry failed:", errorText);
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error in editJournalEntry:", error);
     throw error;
   }
 };
@@ -652,35 +697,72 @@ export const fetchJournalEntries = async (token: string) => {
 };
 
 
+export const fetchJournalEntriesWithDate = async (
+  token: string,
+  start_date: string,
+  end_date: string
+) => {
+  try {
+    const params = new URLSearchParams();
+    params.append("start_date", start_date);
+    params.append("end_date", end_date);
+
+    // Updated endpoint to match new data structure
+    const response = await fetch(`${API_URL}/journal/api/journal-entries?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    // Return the entries array 
+    const data = await response.json();
+    console.log("✅ Received Journal Entries:", data.entries);
+    return data.entries;
+
+  } catch (error) {
+    console.error("Error fetching journal entries:", error);
+    return { error: "Failed to fetch journal entries." };
+  }
+};
+
+
+export const deleteJournalEntry = async (entryId: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    const response = await fetch(`${API_URL}/journal/delete-journal-entry/${entryId}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Delete journal entry failed:", errorText);
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error in deleteJournalEntry:", error);
+    throw error;
+  }
+};
+
+
 // **********************************************
 // ** Homepage API ** - Entry Details 
 // **********************************************
 
-export const deleteEntry = async (entry : any) => {
-  try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) throw new Error("No token found");
-      // Fetch from the database
-      const response = await fetch(`${API_URL}/journal/delete-journal`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        }
-      });
 
-      if (response.ok) {
-        console.error("Success", "Journal entry deleted successfully");
-        return await response.json(); 
-
-      } else {
-        throw new Error("Failed to fetch journal entries");
-      }
-  } catch (error) {
-    console.error("Error deleting entry:", error);
-    throw new Error("Something went wrong while deleting the entry");
-  }
-};
 
 // **********************************************
 // ** Homepage API ** - Entry 
@@ -715,7 +797,7 @@ export const fetchAllEntries = async (token: string) => {
 // **********************************************
 
 // Modify app preferences (dark mode, etc.)
-export const updatePreferences = async (token: string, preferences: object) => {
+export const updateAppPreferences = async (token: string, preferences: object) => {
   const response = await fetch(`${API_URL}/update-preferences`, {
     method: "POST",
     headers: {
@@ -756,7 +838,6 @@ export const loadAppPreferences = async () => {
   }
 };
 
-
 export const saveDraft = async (content: string, images: string[] = []) => {
   try {
     await AsyncStorage.setItem('journalDraft', JSON.stringify({ content, images }));
@@ -789,7 +870,7 @@ export const clearDraft = async () => {
 // **********************************************
 
 // Function to submit a check-in entry
-export const submitCheckIn = async (token: string, sentiments: string[], causes: string[], comments: string[] = []) => {
+export const saveCheckIn = async (token: string, sentiments: string[], causes: string[], comments: string[] = []) => {
   try {
     console.log("Submitting check-in:", { token, sentiments, causes, comments });
 
@@ -859,7 +940,7 @@ export const submitCheckIn = async (token: string, sentiments: string[], causes:
 };
 
 // Function to get user's check-in history
-export const getCheckInHistory = async (token: string) => {
+export const fetchCheckIn = async (token: string) => {
   try {
     // First get the user ID from the token (if not stored separately)
     const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
@@ -924,8 +1005,42 @@ export const getCheckInEntry = async (token: string, entryId: number) => {
 };
 
 
+export const editCheckIn = async (entryId: string, sentiments: string[], causes: string[], comments: string[] = []) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    const requestBody = {
+      sentiments: sentiments,
+      causes: causes,
+      comments: comments,
+    };
+
+    const response = await fetch(`${API_URL}/check-in/edit/${entryId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Edit check-in failed:", errorText);
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error in editCheckIn:", error);
+    throw error;
+  }
+};
+
+
 // Function to delete a specific check-in
-export const deleteCheckIn = async (checkInId: string) => {
+export const deleteCheckIn = async (entry : any) => {
   try {
     const token = await AsyncStorage.getItem('userToken');
     
@@ -933,7 +1048,7 @@ export const deleteCheckIn = async (checkInId: string) => {
       throw new Error('Authentication required');
     }
     
-    const response = await fetch(`${API_URL}/checkin/${checkInId}`, {
+    const response = await fetch(`${API_URL}/check-in/delete/${entry._id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`

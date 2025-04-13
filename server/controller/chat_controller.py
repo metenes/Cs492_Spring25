@@ -6,18 +6,20 @@ import boto3
 import json
 import logging
 import time
-import uuid
+import sagemaker
 import jwt
 from flask import Flask, request, jsonify, Blueprint
-from ml.sentiment_model import load_model, predict_sentiment
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
-from flask_mail import Mail, Message
+from flask_mail import Mail
 from bson.objectid import ObjectId
 from bson import ObjectId
+import torch
+from transformers import BertTokenizer, BertForSequenceClassification
+import json
 
 # User token 
 from functools import wraps
@@ -30,26 +32,37 @@ from typing import Dict, List, Optional, Any, Union
 from botocore.exceptions import ClientError
 
 # utils 
-from models.chat import Chat, ChatRequest, ChatResponse, ModelTrainingRequest, ModelTrainingResponse  # Import the Chat model
-from utils.database import db, chat_collection, users_collection, activities_collection, sentiments_collection
+from models.chat import Chat, Message, ChatRequest, ChatResponse, ModelTrainingRequest, ModelTrainingResponse  # Import the Chat model
+from utils.database import db, chat_collection, users_collection, activities_collection, sentiments_collection, model_collection
 from utils.load_model import model, tokenizer
 from utils.jwt_config import * 
-
+from ml.chat_emotion_model import load_model, predict_emotions, predict_emotions_with_segments   # Import the module
 # Device for PyTorch
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Create chat blueprint
 chat_bp = Blueprint("chat_bp", __name__)
 
+model_bp = Blueprint("model_bp", __name__)
+
 # AWS Configuration
-AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY", "AKIAXGZAMH3HUVQSPNED")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY", "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")
-S3_BUCKET = os.getenv("S3_BUCKET", "user-models-bucket")
-SAGEMAKER_ENDPOINT = os.getenv("SAGEMAKER_ENDPOINT", "user-model-endpoint")
-BASE_MODEL_PATH = os.getenv("BASE_MODEL_PATH", "base-models/base-model.pt")
+AWS_REGION = "eu-north-1"
+AWS_ACCESS_KEY = "AKIAXGZAMH3HUVQSPNED"
+AWS_SECRET_KEY = "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"
+S3_BUCKET = "sentiobucket"
+SAGEMAKER_ENDPOINT = os.getenv("SAGEMAKER_ENDPOINT", "sentio-user-model-endpoint")
+BASE_MODEL_PATH = "models/model.pt"
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt2")  # Default model architecture
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
+
+# Define the emotion labels
+emotion_labels = [
+    "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+    "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+    "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+    "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+    "sadness", "surprise", "neutral"
+]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -89,6 +102,8 @@ try:
         aws_secret_access_key=AWS_SECRET_KEY
     )
     
+    sagemaker.Session()
+
     # Lambda client
     lambda_client = boto3.client(
         'lambda',
@@ -97,8 +112,10 @@ try:
         aws_secret_access_key=AWS_SECRET_KEY
     )
     
+
     # Initialize tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
     
     logger.info("✅ AWS and DB clients initialized successfully")
         
@@ -121,6 +138,9 @@ def get_current_user(token):
     except Exception as e:
         logger.error(f"Error validating token: {e}")
         return None
+# ---------------------------------------
+#  ** Chat Endpoints - Test/Send
+# ---------------------------------------
 
 # Chat endpoints
 @chat_bp.route("/test", methods=["POST"])
@@ -129,11 +149,21 @@ def chat_basic():
     data = request.json
     message = data.get("message", "")
 
-    print("HERE IN TEST CHAT ... ", data)
+    print("HERE IN TEST CHAT ... ", data)  # Debugging input
+
     try:
-        # Encode input with attention mask and pad token
-        inputs = tokenizer(message, return_tensors="pt", padding=True, truncation=True)
-        inputs = {k: v.to(DEVICE) for k, v in inputs.items()}  # Move inputs to device
+        # Set pad_token if missing
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token  # Set PAD token to EOS if missing
+
+        # Tokenize input with padding
+        inputs = tokenizer(
+            message, 
+            return_tensors="pt", 
+            padding=True, 
+            truncation=True
+        )
+        inputs = {k: v.to(DEVICE) for k, v in inputs.items()}  
 
         with torch.no_grad():
             outputs = model.generate(
@@ -143,55 +173,82 @@ def chat_basic():
                 num_return_sequences=1,
                 do_sample=True,
                 temperature=0.7,
-                pad_token_id=tokenizer.eos_token_id  # Fix warning
+                pad_token_id=tokenizer.pad_token_id  # Ensure PAD token is set
             )
 
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        print("Generated Response:", response)  # Debug output
+
         return jsonify({"response": response})
 
     except Exception as e:
         logger.error(f"Error in basic chat: {e}")
         return jsonify({"error": str(e)}), 500
-    
-@chat_bp.route("/chat", methods=["POST"])
+
+@chat_bp.route("/perchat", methods=["POST"])
 @jwt_required()
 def personalized_chat():
     """Chat endpoint that uses the user's personalized model"""
+    print("personilized")
     data = request.json
     chat_request = ChatRequest(**data)
     user_id = get_jwt_identity()
-    
+    print("personilez chat - ", user_id , " and ", data)
     try:
         # Generate conversation ID if new conversation
         conversation_id = data.get("conversation_id", f"conv_{user_id}_{int(time.time())}")
-        
+        print("Starting Personalized Chat for user:", user_id)
+
         # Get user info
         user = users_collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             return jsonify({"error": "User not found"}), 404
         
         # Get model version
-        # model_info = db.user_models.find_one({"user_id": user_id})
+        # model_info = model_collection.find_one({"user_id": user_id})
         # model_version = model_info.get("version", "1.0") if model_info else "1.0"
         
+        # Ensure user model exists in S3
+        user_model_path = f"models/{user_id}/model.pt"
+        # local_model_path = f"/tmp/{user_id}_model.pt"
+            # Check S3 for user model
+        print("Checking S3 model path:", user_model_path)
+        try:
+            s3_client.head_object(Bucket=S3_BUCKET, Key=user_model_path)
+        except  Exception as e:
+            print("⚠️ Model not found in S3, attempting to create:", e)
+            create_user_model(user_id) # if not used
+        
+        # Load the model
+        # model = download_model_from_s3(user_model_path, local_model_path)
+        # model.eval() # evaluate too 
+        # if not model:
+        #    return jsonify({"error": "Model could not be loaded"}), 500
+
+        # Start model 
         # Invoke user's model or create if doesn't exist
+        print("Invoking user model...")
         response_text, inference_time = invoke_user_model(
             user_id=user_id,
             message=chat_request.message,
             context=chat_request.context
         )
-        
+        print("Model response:", response_text)
         # Log conversation
+        print("Logging conversation...")
         log_conversation(
             user_id=user_id,
             conversation_id=conversation_id,
             message=chat_request.message,
             response=response_text
         )
-        
+        print("Logging conversation done")
+        model_version = 1.0
         # Update model if requested
         model_updated = False
         if chat_request.update_model:
+            print("Updating the model as requested")
             chat_data = {
                 "user_message": chat_request.message,
                 "model_response": response_text,
@@ -202,7 +259,8 @@ def personalized_chat():
             _, new_version = update_user_model(user_id, chat_data)
             model_version = new_version
             model_updated = True
-        
+
+        print("Returning response...")
         # Prepare and return response
         response = ChatResponse(
             response=response_text,
@@ -211,7 +269,7 @@ def personalized_chat():
             model_updated=model_updated,
             inference_time=inference_time
         )
-        
+        print("Returning response done")
         return jsonify(response.dict())
     except Exception as e:
         logger.error(f"Error in personalized chat: {e}")
@@ -222,10 +280,9 @@ def personalized_chat():
 def get_model_status_endpoint():
     """Get information about the user's personalized model"""
     user_id = get_jwt_identity()
-    
     try:
         # Get model metadata
-        model_info = db.user_models.find_one({"user_id": user_id})
+        model_info = model_collection.find_one({"user_id": user_id})
         
         if not model_info:
             return jsonify({
@@ -240,7 +297,7 @@ def get_model_status_endpoint():
         status = {
             "has_custom_model": True,
             "model_version": model_info.get("version", "1.0"),
-            "last_updated": model_info.get("last_updated", datetime.utcnow()),
+            "last_updated": model_info.get("last_updated", datetime.now().isoformat()),
             "update_count": model_info.get("update_count", 0),
             "interaction_count": interaction_count,
             "base_model": MODEL_NAME
@@ -259,14 +316,14 @@ def reset_user_model_endpoint():
     
     try:
         # Delete user model from S3
-        user_model_key = f"user_models/{user_id}/model.pt"
+        user_model_key = f"models/{user_id}/model.pt"
         try:
             s3_client.delete_object(Bucket=S3_BUCKET, Key=user_model_key)
         except Exception:
             pass  # Model might not exist yet
         
         # Delete model metadata from MongoDB
-        db.user_models.delete_one({"user_id": user_id})
+        model_collection.delete_one({"user_id": user_id})
         
         return jsonify({
             "success": True,
@@ -318,22 +375,22 @@ def force_model_update_endpoint():
         torch.save(model.state_dict(), local_model_path)
         
         # Upload to S3
-        user_model_key = f"user_models/{user_id}/model.pt"
+        user_model_key = f"models/{user_id}/model.pt"
         upload_model_to_s3(local_model_path, user_model_key)
         
         # Update metadata
         current_version = 1.0
-        model_info = db.user_models.find_one({"user_id": user_id})
+        model_info = model_collection.find_one({"user_id": user_id})
         if model_info and "version" in model_info:
             current_version = float(model_info["version"])
         
         new_version = current_version + 1.0
         
-        db.user_models.update_one(
+        model_collection.update_one(
             {"user_id": user_id},
             {
                 "$set": {
-                    "last_updated": datetime.utcnow(),
+                    "last_updated": datetime.now().isoformat(),
                     "training_samples": len(history),
                     "full_retrain": True,
                     "version": str(new_version)
@@ -429,7 +486,7 @@ def train_model_endpoint():
             "started_at": datetime.now().isoformat()
         }
         
-        db.user_models.update_one(
+        model_collection.update_one(
             {"user_id": user_id},
             {"$push": {"training_jobs": training_job}},
             upsert=True
@@ -438,7 +495,7 @@ def train_model_endpoint():
         response = ModelTrainingResponse(
             job_id=job_name,
             status="InProgress",
-            estimated_completion_time=(datetime.now() + timedelta(hours=1)).isoformat()
+            estimated_completion_time=(datetime.now().isoformat() + timedelta(hours=1)).isoformat()
         )
         
         return jsonify(response.dict())
@@ -470,7 +527,7 @@ def health_check():
 # Helper Functions
 def get_user_model_path(user_id: str) -> str:
     """Get the path to the user's model, or initialize if needed"""
-    user_model_key = f"user_models/{user_id}/model.pt"
+    user_model_key = f"models/{user_id}/model.pt"
     
     try:
         # Check if user model exists in S3
@@ -483,9 +540,9 @@ def get_user_model_path(user_id: str) -> str:
             CopySource=f"{S3_BUCKET}/{BASE_MODEL_PATH}",
             Key=user_model_key
         )
-        
+        print("pot bef")
         # Create model metadata
-        db.user_models.update_one(
+        model_collection.update_one(
             {"user_id": user_id},
             {
                 "$set": {
@@ -497,17 +554,20 @@ def get_user_model_path(user_id: str) -> str:
             },
             upsert=True
         )
-        
+        print("pot af")
+
         return user_model_key
 
 def download_model_from_s3(model_path: str, local_path: str):
     """Download model from S3 to local file system"""
     try:
         s3_client.download_file(S3_BUCKET, model_path, local_path)
+        model = torch.load(local_path, map_location=torch.device('cpu'))
         logger.info(f"Downloaded model from s3://{S3_BUCKET}/{model_path} to {local_path}")
+        return model
     except Exception as e:
         logger.error(f"Error downloading model: {e}")
-        raise
+        raise HTTPException(status_code=500, detail=f"Error during download of model from S3: {str(e)}")
 
 def upload_model_to_s3(local_path: str, model_path: str):
     """Upload model from local path to S3"""
@@ -516,181 +576,199 @@ def upload_model_to_s3(local_path: str, model_path: str):
         logger.info(f"Uploaded model to s3://{S3_BUCKET}/{model_path}")
     except Exception as e:
         logger.error(f"Error uploading model: {e}")
-        raise
+        raise HTTPException(status_code=500, detail=f"Error during upload of model to S3: {str(e)}")
+
+def check_s3_object_exists(bucket: str, key: str) -> bool:
+    """Check if an object exists in S3."""
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            return False
+        else:
+            raise
+
+def copy_s3_object(src_bucket: str, src_key: str, dest_bucket: str, dest_key: str):
+    """Copy an object within S3."""
+    s3_client.copy_object(
+        Bucket=dest_bucket,
+        CopySource={'Bucket': src_bucket, 'Key': src_key},
+        Key=dest_key
+    )
+
+def create_user_model(user_id):
+    """Create model for specif user -same for register- S3"""
+    user_model_path = f"models/{user_id}/model.pt"
+    try:
+        s3_client.copy_object(
+            Bucket=S3_BUCKET,
+            CopySource=f"{S3_BUCKET}/{BASE_MODEL_PATH}",
+            Key=user_model_path
+        )
+        print(f"User model initialized at {S3_BUCKET}/{user_model_path}")
+        return user_model_path
+    except Exception as e:
+        print(f"Error copying base model: {e}")
+
+
+def predict_emotions(text, threshold=0.3):
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+    inputs = tokenizer(text, return_tensors="pt", padding="max_length", truncation=True, max_length=128)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        logits = outputs.logits
+        probabilities = torch.sigmoid(logits).squeeze().numpy()
+
+    predictions = probabilities > threshold
+
+    predicted_emotions = [emotion_labels[i] for i in range(len(predictions)) if predictions[i]]
+
+    emotion_probabilities = {emotion_labels[i]: float(probabilities[i]) for i in range(len(probabilities))}
+
+    response = {
+        "input_text": text,
+        "predicted_emotions": predicted_emotions,
+        "emotion_probabilities": emotion_probabilities,
+        "top_emotions": sorted(emotion_probabilities.items(), key=lambda x: x[1], reverse=True)[:5]
+    }
+
+    return json.dumps(response, indent=4)  # Standardized JSON output
+
+
 
 def invoke_user_model(user_id: str, message: str, context: Dict = None):
-    """Invoke the user's personalized model for inference"""
+    """Invoke the user's personalized model from S3."""
     try:
-        # Get user model path
-        model_path = get_user_model_path(user_id)
-        
-        # For production: Use SageMaker for inference
+        print("SAGAMAKER operational, invoking SAGAMAKER model ...")
+
+        user_model_path = f"models/{user_id}/model.pt"
+
+        # If user model does not exist, initialize from base model
+        if not check_s3_object_exists(S3_BUCKET, user_model_path):
+            copy_s3_object(S3_BUCKET, "models/model.pt", S3_BUCKET, user_model_path)
+
+        # Use SageMaker for production inference
+        # if SAGEMAKER_ENDPOINT:s
         if SAGEMAKER_ENDPOINT:
-            # Prepare payload for inference
             payload = {
                 "user_id": user_id,
-                "model_path": model_path,
+                "model_path": user_model_path,
                 "message": message,
                 "context": context or {}
             }
-            
-            # Call SageMaker runtime for inference
+
+            logger.info(f"Invoking user model at {SAGEMAKER_ENDPOINT} for user {user_id}")
             start_time = time.time()
-            response = sagemaker_runtime.invoke_endpoint(
-                EndpointName=SAGEMAKER_ENDPOINT,
-                ContentType='application/json',
-                Body=json.dumps(payload)
-            )
-            
-            # Parse response
-            result = json.loads(response['Body'].read().decode())
-            inference_time = time.time() - start_time
-            
-            return result.get("response", ""), inference_time
-        
-        # For development: Local inference
-        else:
-            # Download and load model
-            local_model_path = f"/tmp/{user_id}_model.pt"
-            download_model_from_s3(model_path, local_model_path)
-            
-            model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-            model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
-            model.to(DEVICE)
-            model.eval()
-            
-            # Generate response
-            start_time = time.time()
-            inputs = tokenizer(message, return_tensors="pt").to(DEVICE)
-            
-            with torch.no_grad():
-                outputs = model.generate(
-                    inputs.input_ids,
-                    max_length=150,
-                    num_return_sequences=1,
-                    do_sample=True,
-                    temperature=0.7
+            try:
+                response = sagemaker_runtime.invoke_endpoint(
+                    EndpointName=SAGEMAKER_ENDPOINT,
+                    ContentType='application/json',
+                    Body=json.dumps(payload),
                 )
-            
-            # Decode the response
-            response_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            # Extract just the newly generated text (not the input context)
-            response_text = response_text[len(tokenizer.decode(inputs.input_ids[0], skip_special_tokens=True)):]
-            
+                logger.info(f"Response received: {response}")
+            except Exception as e:
+                logger.error(f"Error invoking endpoint: {e}")
+
             inference_time = time.time() - start_time
-            return response_text, inference_time
-            
+
+        # Local inference (development mode)
+        else:
+            print("SAGAMAKER not operational, invoking USER model ...")
+            local_model_path = f"/tmp/{user_id}_model.pt"
+            print("Downloading model may take time ...")
+
+            download_model_from_s3(user_model_path, local_model_path)
+            model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=28)
+            model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
+            # model.to(DEVICE)
+            model.eval()
+
+            # Generate response
+            print("USER - prediction generation")
+            start_time = time.time()
+            output = predict_emotions(message)
+            inference_time = time.time() - start_time
+            # output
+            print("USER - prediction outout : " , output)
+            return output, inference_time
+
+
     except Exception as e:
         logger.error(f"Error invoking user model: {e}")
         return f"I'm sorry, I encountered an error: {str(e)}", 0.0
 
+
 def update_user_model(user_id: str, chat_data: Dict):
-    """Update the user's model based on chat interaction"""
+    """Update the user's model based on chat interaction (stored in S3)."""
     try:
-        # Get current model path and version
-        model_info = db.user_models.find_one({"user_id": user_id})
+        # Define model paths
+        base_model_path = f"models/base_model.pt"
+        user_model_path = f"models/{user_id}/model.pt"
         
-        if not model_info:
-            # Initialize user model if it doesn't exist
-            get_user_model_path(user_id)
-            model_info = db.user_models.find_one({"user_id": user_id})
-        
-        current_model_path = model_info.get("model_path")
-        current_version = float(model_info.get("version", "1.0"))
-        new_version = current_version + 0.1  # Increment by 0.1 for minor updates
-        new_model_path = f"user_models/{user_id}/model_v{new_version}.pt"
-        
-        # For production: Use Lambda for async model update
-        if AWS_REGION:
-            # Invoke Lambda function for model update
-            payload = {
-                "user_id": user_id,
-                "current_model_path": current_model_path,
-                "new_model_path": new_model_path,
-                "chat_data": chat_data,
-                "model_version": str(new_version),
-                "s3_bucket": S3_BUCKET
-            }
-            
-            lambda_client.invoke(
-                FunctionName="update-user-model",
-                InvocationType="Event",  # Asynchronous
-                Payload=json.dumps(payload)
-            )
-        
-        # For development: Update model directly
-        else:
-            # Download current model
-            local_model_path = f"/tmp/{user_id}_model.pt"
-            download_model_from_s3(current_model_path, local_model_path)
-            
-            # Load model and update
-            model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-            model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
-            model.train()
-            
-            # Prepare training data
-            user_message = chat_data["user_message"]
-            model_response = chat_data["model_response"]
-            
-            # Simple training step
-            optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
-            
-            inputs = tokenizer(user_message, return_tensors="pt").to(DEVICE)
-            labels = tokenizer(model_response, return_tensors="pt").input_ids.to(DEVICE)
-            
-            # Forward pass
-            outputs = model(**inputs, labels=labels)
-            loss = outputs.loss
-            
-            # Backward pass and optimization
-            loss.backward()
-            optimizer.step()
-            
-            # Save updated model
-            torch.save(model.state_dict(), local_model_path)
-            
-            # Upload to S3
-            upload_model_to_s3(local_model_path, new_model_path)
-        
-        # Update metadata in MongoDB
-        db.user_models.update_one(
-            {"user_id": user_id},
-            {
-                "$set": {
-                    "model_path": new_model_path,
-                    "version": str(new_version),
-                    "last_updated": datetime.now().isoformat(),
-                    "updating": True
-                }
-            },
-            upsert=True
-        )
-        
-        logger.info(f"Initiated model update for user {user_id} to version {new_version}")
-        return new_model_path, str(new_version)
+        # Check if user model exists, else copy base model
+        if not check_s3_object_exists(S3_BUCKET, user_model_path):
+            copy_s3_object(S3_BUCKET, base_model_path, S3_BUCKET, user_model_path)
+
+        # Download current model from S3
+        local_model_path = f"/tmp/{user_id}_model.pt"
+        # download_model_from_s3(user_model_path, local_model_path)
+
+        # Load model
+        model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=28)
+        model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
+        # model.to(DEVICE)
+        model.train()
+
+        # Prepare training data
+        user_message = chat_data["user_message"]
+        model_response = chat_data["model_response"]
+
+        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+
+        inputs = tokenizer(user_message, return_tensors="pt").to(DEVICE)
+        labels = tokenizer(model_response, return_tensors="pt").input_ids.to(DEVICE)
+
+        # Training step
+        outputs = model(**inputs, labels=labels)
+        loss = outputs.loss
+        loss.backward()
+        optimizer.step()
+
+        # Save updated model
+        torch.save(model.state_dict(), local_model_path)
+
+        # Upload updated model to S3
+        upload_model_to_s3(local_model_path, user_model_path)
+
+        logger.info(f"Updated model for user {user_id}")
+
+        return user_model_path, "latest"
     except Exception as e:
         logger.error(f"Error updating user model: {e}")
         raise
 
+
 def log_conversation(user_id: str, conversation_id: str, message: str, response: str):
-    """Log conversation to memory and database"""
-    # In-memory storage
+    """Logs a conversation into memory and MongoDB properly"""
+    timestamp = datetime.now().isoformat()
+
+    # In-memory logging
     if conversation_id not in conversations:
         conversations[conversation_id] = []
 
-    # Get the timestampt
-    timestamp = datetime.now()
-    
-    # Add to in-memory store
     conversations[conversation_id].append({
         "timestamp": timestamp,
         "user_id": user_id,
         "message": message,
         "response": response
     })
-    
-    # Store in MongoDB
+    print("added to conversations")
+
+    # Store in MongoDB (chat message history)
+    # Assuming chat_collection is a valid MongoDB collection
     chat_collection.insert_one({
         "conversation_id": conversation_id,
         "user_id": user_id,
@@ -698,60 +776,13 @@ def log_conversation(user_id: str, conversation_id: str, message: str, response:
         "response": response,
         "timestamp": timestamp
     })
-    
-    # Update chat document
-    chat = chat_collection.find_one({"conversation_id": conversation_id})
-    if not chat:
-        # Create new chat
-        user_message = Message(role="user", content=message, timestamp=timestamp)
-        user_message.save()
-        
-        assistant_message = Message(role="assistant", content=response, timestamp=timestamp)
-        assistant_message.save()
-        
-        chat = Chat(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            messages=[user_message.id, assistant_message.id],
-            started_at=timestamp,
-            last_updated=timestamp
-        )
+    print("added to chat_collections")
+    # Fetch or create a chat document
 
-        chat.save()
-    else:
-        # Update existing chat
-        user_message = Message(role="user", content=message, timestamp=timestamp)
-        user_message.save()
 
-        assistant_message = Message(role="assistant", content=response, timestamp=timestamp)
-        assistant_message.save()
 
-        chat.user_id=user_id,
-        chat.conversation_id=conversation_id,
-        chat.messages=[user_message.id, assistant_message.id],
-        chat.started_at=timestamp,
-        chat.last_updated=timestamp
 
-# AI Model Loading and Inference Methods
 
-async def load_model(model_path, device="cuda"):
-    """Load AI model from path"""
-    try:
-        # Load tokenizer and model
-        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-        
-        # If a specific model path is provided, load those weights
-        if model_path:
-            model.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
-        
-        model.to(device)
-        model.eval()  # Set to evaluation mode
-        
-        logger.info(f"Model loaded successfully from {model_path}")
-        return model
-    except Exception as e:
-        logger.error(f"Error loading model: {e}")
-        raise
 
 async def generate_response(model, tokenizer, prompt, max_length=150, temperature=0.7, device="cuda"):
     """Generate response from the model"""
@@ -787,7 +818,7 @@ async def process_chat_for_inference(user_id, message, context=None, history_lim
         # Get chat history if needed
         history = []
         if history_limit > 0:
-            history = await get_chat_history(user_id, history_limit)
+            history = await get_chat_histoy(user_id, history_limit)
         
         # Format context
         formatted_context = ""
@@ -845,10 +876,10 @@ async def invoke_inference(user_id, message, context=None, use_sagemaker=True):
             local_model_path = f"/tmp/{user_id}_model.pt"
             
             # Download model
-            await download_model_from_s3(model_path, local_model_path)
-            
+            model = await download_model_from_s3(model_path, local_model_path)
             # Load model
-            model = await load_model(local_model_path)
+            model.to(DEVICE)
+            model.eval()  # Set to evaluation mode
             
             # Process context and history
             prompt = await process_chat_for_inference(user_id, message, context)
@@ -880,7 +911,7 @@ async def analyze_and_log_sentiment(user_id, message, response):
         # Log to database
         sentiment_record = {
             "user_id": user_id,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now().isoformat(),
             "user_message": message,
             "bot_response": response,
             "user_sentiment": {
@@ -910,7 +941,7 @@ async def flag_conversation_for_review(user_id, message, response, sentiment_sco
     try:
         review_record = {
             "user_id": user_id,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now().isoformat(),
             "user_message": message,
             "bot_response": response,
             "sentiment_score": sentiment_score,
@@ -960,7 +991,7 @@ async def evaluate_model_performance(user_id):
         # Update model metrics in database
         await users_collection.update_one(
             {"_id": user_id},
-            {"$set": {"model_performance_metrics": metrics, "last_evaluated": datetime.utcnow()}}
+            {"$set": {"model_performance_metrics": metrics, "last_evaluated": datetime.now().isoformat()}}
         )
         
         return {
@@ -1024,7 +1055,80 @@ async def prepare_training_data(user_id):
             "message": str(e)
         }
 
+# --------------------------------------- Model Analysis  ---------------------------------------
+# We use AWS API 
 
+# ---------------------------------------
+#  **Sentimental Analysis Model**
+# ---------------------------------------
+# Define Request Model from AWS cloud, no processing to be done inside local machine
+
+
+#s3 = boto3.client('s3')
+#s3.download_file('sentiobucket', 'model.pt', '/tmp/model.pt')
+#model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
+
+# Look db_info.txt for aws credentials
+# s3 = boto3.client(
+#   's3',
+#    aws_access_key_id="YOUR_ACCESS_KEY",
+#    aws_secret_access_key="YOUR_JWT_SECRET",
+#    region_name="YOUR_REGION"
+# )
+
+# Add to upper part if necessary
+# aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+# aws_JWT_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY")
+# aws_region = os.getenv("AWS_DEFAULT_REGION", "me-south-1") 
+
+# Lambada Fast exec. 
+def lambda_handler(event, context):
+    input_text = event["text"]
+    output = model(input_text)
+    return {"prediction": output}
+ 
+# Lambada Fast predict.  
+# @app.route('/predict', methods=['POST'])
+def nonpred():
+    user_id = request.json["user_id"]
+    input_text = request.json["text"]
+    # Load personalized or global model
+    model_path = f"s3://sentiobucket/models/{user_id}/"
+    
+    model = torch.load(model_path)
+    response = model(input_text)
+    
+    return jsonify({"response": response})
+
+# ---------------------------------------
+#  **Continiues Trainig  Model**
+# ---------------------------------------
+#  Personalized AI
+#  Train wth Sagamaker Pipeline on cloud 
+
+#sagemaker = boto3.client('sagemaker')
+
+""" def train_personal_model(user_id):
+    response = sagemaker.create_training_job(
+        TrainingJobName=f"sentio-user-model-{user_id}",
+        AlgorithmSpecification={"TrainingImage": "your-custom-image"},
+        InputDataConfig=[{"ChannelName": "train", "DataSource": {"S3DataSource": {"S3Uri": f"s3://your-bucket/{user_id}/data.json"}}}],
+        OutputDataConfig={"S3OutputPath": f"s3://your-bucket/models/{user_id}/"},
+        ResourceConfig={"InstanceType": "ml.m5.large", "InstanceCount": 1, "VolumeSizeInGB": 10},
+        StoppingCondition={"MaxRuntimeInSeconds": 3600}
+    )
+    return response  """
+
+#  Global AI
+#  Train wth Sagamaker Pipeline on cloud 
+#stepfunctions = boto3.client('stepfunctions')
+
+""" def start_global_ai_training():
+    response = stepfunctions.start_execution(
+        stateMachineArn="arn:aws:states:us-east-1:123456789012:stateMachine:GlobalAIUpdate",
+        input="{}"
+    )
+    return response """
 
 
 

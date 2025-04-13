@@ -43,12 +43,11 @@ from controller.user_controller import user_bp
 from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
-from controller.chat_controller import chat_bp
+from controller.chat_controller import chat_bp, model_bp
 from controller.check_in_controller import check_bp; 
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
-from utils.load_model import model
 from utils.jwt_config import jwt_manager
 from datetime import datetime
 from bson import ObjectId
@@ -66,7 +65,7 @@ app.config['SECRET_KEY'] = 'sentioSecretKey'    # If you want to use the same ke
 JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 # Load ML Model
 
-model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+# model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 # if we need to use own fine tuning 
 # model = pipeline("sentiment-analysis", model="./fine_tuned_model")
 # JWT Config
@@ -143,6 +142,8 @@ app.register_blueprint(activities_bp, url_prefix="/activity")
 app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
 app.register_blueprint(check_bp, url_prefix="/check-in")
+app.register_blueprint(model_bp, url_prefix="/models") # metadata for S3 models 
+
 
 # ---------------------------------------
 #  **Protected Route**
@@ -165,82 +166,6 @@ def protected():
     except jwt.InvalidTokenError:
         return jsonify({"error": "Invalid token"}), 401
 
-
-# --------------------------------------- Model Analysis  ---------------------------------------
-# We use AWS API 
-
-# ---------------------------------------
-#  **Sentimental Analysis Model**
-# ---------------------------------------
-# Define Request Model from AWS cloud, no processing to be done inside local machine
-import torch
-import boto3
-
-s3 = boto3.client('s3')
-#s3.download_file('sentiobucket', 'model.pt', '/tmp/model.pt')
-#model = torch.load('/tmp/model.pt', map_location=torch.device("cpu"))
-
-# Look db_info.txt for aws credentials
-# s3 = boto3.client(
-#   's3',
-#    aws_access_key_id="YOUR_ACCESS_KEY",
-#    aws_secret_access_key="YOUR_JWT_SECRET",
-#    region_name="YOUR_REGION"
-# )
-
-# Add to upper part if necessary
-# aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-# aws_JWT_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY")
-# aws_region = os.getenv("AWS_DEFAULT_REGION", "me-south-1") 
-
-# Lambada Fast exec. 
-def lambda_handler(event, context):
-    input_text = event["text"]
-    output = model(input_text)
-    return {"prediction": output}
- 
-# Lambada Fast predict.  
-@app.route('/predict', methods=['POST'])
-def predict():
-    user_id = request.json["user_id"]
-    input_text = request.json["text"]
-    # Load personalized or global model
-    model_path = f"s3://sentiobucket/models/{user_id}/"
-    
-    model = torch.load(model_path)
-    response = model(input_text)
-    
-    return jsonify({"response": response})
-
-# ---------------------------------------
-#  **Continiues Trainig  Model**
-# ---------------------------------------
-#  Personalized AI
-#  Train wth Sagamaker Pipeline on cloud 
-
-#sagemaker = boto3.client('sagemaker')
-
-""" def train_personal_model(user_id):
-    response = sagemaker.create_training_job(
-        TrainingJobName=f"user-model-{user_id}",
-        AlgorithmSpecification={"TrainingImage": "your-custom-image"},
-        InputDataConfig=[{"ChannelName": "train", "DataSource": {"S3DataSource": {"S3Uri": f"s3://your-bucket/{user_id}/data.json"}}}],
-        OutputDataConfig={"S3OutputPath": f"s3://your-bucket/models/{user_id}/"},
-        ResourceConfig={"InstanceType": "ml.m5.large", "InstanceCount": 1, "VolumeSizeInGB": 10},
-        StoppingCondition={"MaxRuntimeInSeconds": 3600}
-    )
-    return response  """
-
-#  Global AI
-#  Train wth Sagamaker Pipeline on cloud 
-#stepfunctions = boto3.client('stepfunctions')
-
-""" def start_global_ai_training():
-    response = stepfunctions.start_execution(
-        stateMachineArn="arn:aws:states:us-east-1:123456789012:stateMachine:GlobalAIUpdate",
-        input="{}"
-    )
-    return response """
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

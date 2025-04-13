@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@aws-amplify/auth": "^6.12.1",
+    "@aws-sdk/client-sagemaker": "^3.782.0",
     "@expo-google-fonts/space-grotesk": "^0.2.2",
     "@expo/image-utils": "^0.6.5",
     "@expo/metro-runtime": "~4.0.1",

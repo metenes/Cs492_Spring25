@@ -45,7 +45,7 @@ def save_journal_entry():
             "entryDate": entry_date,
             "images": images,
             "journalSentiments": journal_sentiments,
-            "createdAt": datetime.now(),
+            "createdAt": datetime.now().isoformat(),
             "category" : category,
             "prompt" : prompt
         }
@@ -368,6 +368,45 @@ def sentiment_analysis():
         print(f"Error in sentiment_analysis: {str(e)}")
         import traceback
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# TODO
+@journal_bp.route("/update-journal-entry/<entry_id>", methods=["PUT"])
+@jwt_required()
+def update_journal_entry(entry_id):
+    try:
+        data = request.json
+        user_id  = get_jwt_identity()  # Get the user ID
+
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        update_data = {
+            "_id": data["_id"],
+            "entryContent": data["entryContent"],
+            "images": data.get("images", []),
+            "journalSentiments": data.get("journal_sentiments"),
+            "createdAt": datetime.now().isoformat(),
+            "category" : data.get("category"),
+            "prompt" : data.get("prompt")
+        }
+
+        # Update the current journal 
+        result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "journalEntries": update_data
+                    }
+                }
+            )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Entry not found or unauthorized"}), 404
+
+        return jsonify({"message": "Journal entry updated successfully!"})
+
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
