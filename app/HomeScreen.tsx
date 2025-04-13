@@ -11,7 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 
-import { fetchJournalEntries , fetchCheckIn } from "./services/ApiService";
+import { fetchJournalEntries,fetchJournalDates, calculateStreak, fetchCheckIn } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -35,6 +35,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [isMenuOpen, setMenuOpen] = useState(false);
   const menuPosition = useState(new Animated.Value(0))[0];
   const rotation = useState(new Animated.Value(0))[0];
+  const [streak, setStreak] = useState(0);
+
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
   // Filtering state
@@ -107,25 +109,38 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         // Fetch check-ins
         const checkInResponse = await fetchCheckIn(token);
     
-        if (!checkInResponse.history) {
+        let fetchedCheckIns = [];
+        if (Array.isArray(checkInResponse.history)) {
+          fetchedCheckIns = checkInResponse.history;
+          console.log("✅ Check-in entries:", fetchedCheckIns);
+        } else {
           console.warn("⚠️ No check-ins found.");
-          return;
-        }
+}
+
     
-        const fetchedCheckIns = checkInResponse.history;
-        console.log("✅ Check-in entries:", fetchedCheckIns);
+        //const fetchedCheckIns = checkInResponse.history;
+        //console.log("✅ Check-in entries:", fetchedCheckIns);
     
         // Convert check-ins to match journal entry structure
-        const formattedCheckIns = fetchedCheckIns.map((checkIn: { entry_id: any; comments: string | any[]; created_at: any; sentiments: any; }) => ({
+        const formattedCheckIns = fetchedCheckIns.map((checkIn: {
+          date: string;
+          causes: never[]; entry_id: any; comments: string | any[]; created_at: any; sentiments: any; 
+}) => ({
           _id: checkIn.entry_id, // Match ID structure
           entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments", // Use first comment as content
-          entryDate: checkIn.created_at || new Date().toISOString(), // Ensure valid date
+          entryDate: checkIn.date || new Date().toISOString(), // Ensure valid date
           createdAt: checkIn.created_at,
           category: "checkin", // Mark as check-in
           images: [], // Check-ins likely have no images
-          journalSentiments: checkIn.sentiments || [], // Keep sentiments
+          sentiments: checkIn.sentiments || [], // Keep sentiments
+          causes: checkIn.causes || [],
+          comments: checkIn.comments || [],
           prompt: "", // No prompt for check-ins
         }));
+
+        console.log("HERE ARE THE CHECKIN ENTRIESSSSSS")
+        console.log("✅ Fetched raw check-ins:", fetchedCheckIns);
+        console.log("✅ Formatted check-ins:", formattedCheckIns);
     
         // Merge journals and check-ins
         let allEntries = [...fetchedEntries, ...formattedCheckIns];
@@ -135,7 +150,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         // Limit to last 30 entries
         allEntries = allEntries.slice(0, 30);
 
-        console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
+        //console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
     
         setEntries(allEntries);
         setFilteredEntries(allEntries); // Initially show all entries
@@ -148,6 +163,26 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     loadEntries();
   }, []);
   
+
+  //calculate streak
+  useEffect(() => {
+    const loadStreak = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+  
+      try {
+        const dates = await fetchJournalDates(token);
+        const calculatedStreak = calculateStreak(dates);
+        setStreak(calculatedStreak);
+      } catch (err) {
+        console.error('❌ Error fetching streak:', err);
+      }
+    };
+  
+    loadStreak();
+  }, []);
+  
+
   const toggleMenu = () => {
     if (isMenuOpen) {
       // Close animation
@@ -226,10 +261,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         onPress={() => navigation.navigate("EntryDetail", { entry: item })}
       >
         <View style={styles.entryIcon}>
-          <Icon name={iconName} size={20} color="#000" />
+          <Text>
+            <Icon name={iconName} size={20} color="#000" />
+          </Text>
         </View>
         <View style={styles.entryContent}>
-          <Text style={styles.entryDate}>{formattedDate}</Text>
+          <Text style={[styles.entryDate, { fontWeight: 'bold' }]}>{formattedDate}</Text>
           <Text style={styles.entrySubtitle} numberOfLines={2}>
             {item.entryContent || "No content"}
           </Text>
@@ -246,8 +283,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       <View style={styles.header}>
         <Text style={styles.title}>Your Entries</Text>
         <TouchableOpacity style={styles.streakContainer} onPress={() => navigation.navigate("DiaryMain")}>
-          <Text style={styles.streakText}>5</Text>
-          <MaterialCommunityIcons name="fire" size={20} color="black" /* style={{ marginLeft: 5 }}  *//>
+          <Text style={styles.streakText}>{streak}</Text>
+          <Text>
+            <MaterialCommunityIcons name="fire" size={20} color="black" />
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -279,11 +318,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               onPress={() => {
                 setMenuOpen(false);
                 navigation.navigate("Chatbot");
-
-                console.log("Check-in Selected");
               }}
             >
-              <Icon name="message-circle" size={20} color="black" /> {/* message-square de kullanabiliriz */}
+              <Text>
+                <Icon name="message-circle" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Chatbot</Text>
             </TouchableOpacity>
 
@@ -294,7 +333,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 navigation.navigate("CheckIn");
               }}
             >
-              <Icon name="smile" size={20} color="black" />
+              <Text>
+                <Icon name="smile" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Check-in</Text>
             </TouchableOpacity>
 
@@ -302,11 +343,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to Free Journal...")
                 navigation.navigate("FreeJournaling", {selectedDate : "TODO"});
               }}
             >
-              <Icon name="edit-2" size={20} color="black" />
+              <Text>
+                <Icon name="edit-2" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>New Journal</Text>
             </TouchableOpacity>
 
@@ -314,12 +356,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to FreeJournaling...")
-
                 navigation.navigate("PromptSelection");
               }}
             >
-              <Icon name="book-open" size={20} color="black" />
+              <Text>
+                <Icon name="book-open" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Prompts</Text>
             </TouchableOpacity>
 
@@ -327,21 +369,23 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                console.log("Navigating to FaceEmotion...")
                 navigation.navigate("FaceEmotion");
               }}
             >
-              <Icon name="smile" size={20} color="black" />
+              <Text>
+                <Icon name="smile" size={20} color="black" />
+              </Text>
               <Text style={styles.menuText}>Face Analysis</Text>
             </TouchableOpacity>
-
           </Animated.View>
         )}
 
         {/* FAB Toggle Button */}
         <Animated.View style={[styles.fab, { transform: [{ rotate: rotationInterpolate }] }]}>
           <TouchableOpacity onPress={toggleMenu}>
-            <Icon name="plus" size={24} color="#FFF" />
+            <Text>
+              <Icon name="plus" size={24} color="#FFF" />
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

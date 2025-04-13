@@ -35,6 +35,7 @@ class User(Document):
     email = EmailField(required=True, unique=True)
     password = StringField(required=True, min_length=6, trim=True)
     created_at = DateField(default=datetime.now)
+    profileImageUrl = StringField()
     
     
     def to_json(self):
@@ -42,7 +43,8 @@ class User(Document):
             "id": str(self.id),
             "name": self.name,
             "email": self.email,
-            "created_at": self.created_at
+            "created_at": self.created_at,
+            "profileImageUrl": self.profileImageUrl
         }
 
     meta = { 'collection': 'users' }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   View, 
   Text, 
@@ -9,13 +9,13 @@ import {
   Alert, 
   TextInput
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Feather";
 import { ScrollView } from "react-native";
 // import {setToken } from "./auth/AuthContext"
 import { RootStackParamList } from "./types/types";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { saveCheckIn } from "./services/ApiService"; // Import the API function
+import { saveCheckIn, getCheckInDraft, saveCheckInDraft, clearCheckInDraft } from "./services/ApiService"; // Import the API functions
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type CheckInNavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
@@ -47,6 +47,7 @@ const CheckInScreen = () => {
   const [selectedReasons, setSelectedReasons] = useState([]);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [userId, setUserId] = useState(""); 
   const [token, setToken] = useState("");
@@ -72,6 +73,54 @@ const CheckInScreen = () => {
     </TouchableOpacity>
   );
 
+  // Load saved check-in data when component mounts or screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadSavedData = async () => {
+        try {
+          setIsLoading(true);
+          const savedData = await getCheckInDraft();
+          
+          if (savedData) {
+            console.log("Loaded saved check-in data:", savedData);
+            if (savedData.step) setStep(savedData.step);
+            if (savedData.emotions) setSelectedEmotions(savedData.emotions);
+            if (savedData.reasons) setSelectedReasons(savedData.reasons);
+            if (savedData.comment) setComment(savedData.comment);
+          }
+        } catch (error) {
+          console.error("Error loading saved check-in:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      loadSavedData();
+      
+      // Cleanup function not needed here
+      return () => {};
+    }, [])
+  );
+  
+  // Auto-save when any relevant state changes
+  useEffect(() => {
+    if (isLoading) return; // Don't save during initial load
+    
+    const saveData = async () => {
+      const checkInData = {
+        step,
+        emotions: selectedEmotions,
+        reasons: selectedReasons,
+        comment
+      };
+      
+      console.log("Auto-saving check-in data:", checkInData);
+      await saveCheckInDraft(checkInData);
+    };
+    
+    saveData();
+  }, [step, selectedEmotions, selectedReasons, comment, isLoading]);
+
   // Function to handle the check-in submission
   const handlesaveCheckIn = async () => {
     const token = await AsyncStorage.getItem('userToken');
@@ -93,6 +142,9 @@ const CheckInScreen = () => {
           // Call the API to submit the check-in
           const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
           
+          // Clear the saved draft after successful submission
+          await clearCheckInDraft();
+          
           // Show success message
           Alert.alert(
             "Check-in Submitted", 
@@ -110,6 +162,16 @@ const CheckInScreen = () => {
         }
     }
   };
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="black" />
+        <Text style={{marginTop: 20}}>Loading your check-in...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

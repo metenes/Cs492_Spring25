@@ -24,6 +24,7 @@
     "android": {
       "icon": "./assets/images/app-icon-android-legacy.png",
       "package": "com.sentio",
+      "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
         "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
@@ -32,7 +33,12 @@
         "image": "./assets/images/splash-logo-android-universal.png",
         "resizeMode": "contain",
         "backgroundColor": "#191015"
-      }
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "ios": {
       "icon": "./assets/images/app-icon-ios.png",
@@ -43,6 +49,11 @@
         "tabletImage": "./assets/images/splash-logo-ios-tablet.png",
         "resizeMode": "contain",
         "backgroundColor": "#191015"
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to your camera to take profile pictures.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select profile pictures.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library."
       }
     },
     "web": {
@@ -67,24 +78,16 @@
           }
         }
       ],
-      "expo-font",
-      [
-        "onesignal-expo-plugin",
-        {
-          "mode": "development"
-        }
-      ]
+      "expo-font"
     ],
     "experiments": {
       "tsconfigPaths": true
     },
     "extra": {
       "eas": {
-        "projectId": "de3f67a9-9ce0-4d3f-b73b-762734032bcb"
-      },
-      "oneSignalAppId": "88797c65-325d-4a7f-b3d3-9ffb487e6f13"
-    },
-    "owner": "mmmsd"
+        "projectId": "7a1ebae1-22df-407b-a30c-a4ec4de30d57"
+      }
+    }
   },
   "ignite": {
     "version": "10.0.5"

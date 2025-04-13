@@ -1,10 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 const API_URL = "http://192.168.1.104:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+// const API_URL = "http://192.168.1.40:5000"; kgn
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -696,6 +695,56 @@ export const fetchJournalEntries = async (token: string) => {
   }
 };
 
+export const fetchJournalDates = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/get-journal-dates`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      console.error("Unexpected response format:", data);
+      return [];
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching journal dates:", error);
+    return [];
+  }
+};
+
+export const calculateStreak = (dates: string[]): number => {
+  const dateSet = new Set(dates);
+  let streakCount = 0;
+
+  const formatDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  let currentDate = new Date();
+  const todayFormatted = formatDate(currentDate);
+
+  // If the user journaled today, include today in the streak
+  if (dateSet.has(todayFormatted)) {
+    streakCount++;
+  }
+
+  // Keep counting streak backwards from the day before the last counted day
+  currentDate.setDate(currentDate.getDate() - 1);
+  while (dateSet.has(formatDate(currentDate))) {
+    streakCount++;
+    currentDate.setDate(currentDate.getDate() - 1);
+  }
+
+  console.log("✅ Final Streak Count:", streakCount);
+  return streakCount;
+};
+
+
+
 
 export const fetchJournalEntriesWithDate = async (
   token: string,
@@ -942,26 +991,7 @@ export const saveCheckIn = async (token: string, sentiments: string[], causes: s
 // Function to get user's check-in history
 export const fetchCheckIn = async (token: string) => {
   try {
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-
-    const userData = await userResponse.json();
-    const userId = userData._id;
-
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
-
-    const response = await fetch(`${API_URL}/check-in/history/${userId}`, {
+    const response = await fetch(`${API_URL}/check-in/fetch`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -969,11 +999,14 @@ export const fetchCheckIn = async (token: string) => {
     });
 
     const data = await response.json();
-    console.log("here" , data)
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to fetch check-in history');
     }
-    
+
+    console.log("YARDIM CIGLIKLARIIII")
+    console.log(data);
+
     return data;
   } catch (error) {
     console.error('Error fetching check-in history:', error);
@@ -981,28 +1014,6 @@ export const fetchCheckIn = async (token: string) => {
   }
 };
 
-// Function to get a specific check-in entry
-export const getCheckInEntry = async (token: string, entryId: number) => {
-  try {
-    const response = await fetch(`${API_URL}/check-in/${entryId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch check-in entry');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching check-in entry:', error);
-    throw error;
-  }
-};
 
 
 export const editCheckIn = async (entryId: string, sentiments: string[], causes: string[], comments: string[] = []) => {
@@ -1071,3 +1082,63 @@ export const deleteCheckIn = async (entry : any) => {
 // **********************************************
 // ** CheckIn  API **
 // **********************************************
+
+const CHECK_IN_DRAFT_KEY = 'checkInDraft'; // Create a consistent key
+
+// Check-in draft functions
+export const saveCheckInDraft = async (checkInData: any) => {
+  try {
+    await AsyncStorage.setItem('checkInDraft', JSON.stringify(checkInData));
+    console.log("Check-in draft saved successfully");
+    return true;
+  } catch (error) {
+    console.error("Error saving check-in draft:", error);
+    return false;
+  }
+};
+
+export const getCheckInDraft = async () => {
+  try {
+    const savedData = await AsyncStorage.getItem('checkInDraft');
+    return savedData ? JSON.parse(savedData) : null;
+  } catch (error) {
+    console.error("Error loading check-in draft:", error);
+    return null;
+  }
+};
+
+export const clearCheckInDraft = async () => {
+  try {
+    await AsyncStorage.removeItem('checkInDraft');
+    console.log("Check-in draft cleared");
+    return true;
+  } catch (error) {
+    console.error("Error clearing check-in draft:", error);
+    return false;
+  }
+};
+
+// **********************************************
+// ** Notifications API **
+// **********************************************
+
+export const saveNotificationToken = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/notification/save-push-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save notification token: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error saving notification token:", error);
+    throw error;
+  }
+}

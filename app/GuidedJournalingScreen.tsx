@@ -9,11 +9,13 @@ import {
   TouchableWithoutFeedback,
   Image,
   Modal,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { saveJournalEntry } from "./services/ApiService";
 import BottomNavigation from "./BottomNavigation";
+//import { saveGuidedJournalEntry } from "./services/ApiService";
 
 const MAX_CHAR_COUNT = 10000;
 
@@ -26,21 +28,35 @@ const GuidedJournalingScreen = () => {
   const { prompt } = route.params;
 
   const handleSaveEntry = async () => {
-    const token = await AsyncStorage.getItem("userToken");
-    if (!token) {
-      alert("Authentication error. Please log in again.");
+    if (!content.trim()) {
+      Alert.alert("Empty Entry", "Please write something before saving.");
       return;
     }
-
-    const response = await saveJournalEntry(content, imageUris ,"guided", prompt); // need to save the prompt for guided category
-
-    if (response.error) {
-      alert("Failed to save journal entry.");
-    } else {
-      alert("Journal entry saved successfully!");
+  
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "User not authenticated.");
+        return;
+      }
+  
+      // Reuse the same function used for freeform journals
+      const response = await saveJournalEntry(content, [], "guided", prompt);
+  
+      if (response.error) {
+        Alert.alert("Error", "Failed to save entry.");
+        return;
+      }
+  
+      Alert.alert("Saved", "Your guided entry has been saved.");
       navigation.navigate("Home");
+    } catch (error) {
+      console.error("Error saving guided entry:", error);
+      Alert.alert("Error", "Something went wrong.");
     }
   };
+  
+  
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

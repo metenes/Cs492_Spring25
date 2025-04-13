@@ -9,6 +9,25 @@ import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import { deleteJournalEntry, editJournalEntry, editCheckIn, deleteCheckIn } from "./services/ApiService"; // ✅ Import both delete & update functions
 import { format } from "date-fns";
+import { deleteEntry } from "./services/ApiService";
+
+import { Feather } from "@expo/vector-icons"; // for emotion and reason icons
+
+const emotionIcons: { [key: string]: string } = {
+  Admiration: "star", Amusement: "smile", Anger: "frown", Annoyance: "meh", Approval: "thumbs-up", Caring: "heart",
+  Confusion: "help-circle", Curiosity: "search", Desire: "target", Disappointment: "frown", Disapproval: "thumbs-down",
+  Disgust: "x-circle", Embarrassment: "alert-circle", Excitement: "zap", Fear: "alert-triangle", Gratitude: "gift",
+  Grief: "cloud-drizzle", Joy: "sun", Love: "heart", Nervousness: "corner-up-right", Optimism: "trending-up",
+  Pride: "award", Realization: "eye", Relief: "check-circle", Remorse: "corner-down-left", Sadness: "cloud-rain",
+  Surprise: "send"
+};
+
+const reasonIcons: { [key: string]: string } = {
+  Work: "briefcase", School: "book", Friends: "users", Family: "home", Travel: "map", Relationship: "heart",
+  Health: "activity", Exercise: "barbell", Food: "coffee", Hobbies: "music", News: "tv", Weather: "cloud",
+  Sleep: "moon", Music: "headphones", Technology: "cpu"
+};
+
 
 type Entry = {
   _id: string;
@@ -17,6 +36,9 @@ type Entry = {
   createdAt?: string;
   images?: string[];
   journalSentiments?: any[];
+  sentiments?: string[];
+  causes?: string[];
+  comments?: string[];
   category: string;
   prompt: string;
 };
@@ -87,7 +109,7 @@ const EntryDetail = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Journal Entry</Text>
+        <Text style={styles.headerTitle}>{entry.category === "checkin" ? "Check-in Entry" : "Journal Entry"}</Text>
         <View style={styles.actionButtons}>
           {isEditing ? (
             <TouchableOpacity onPress={handleSaveEntry} style={styles.actionButton}>
@@ -95,46 +117,96 @@ const EntryDetail = () => {
             </TouchableOpacity>
           ) : (
             <>
-              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.actionButton}>
-                <Icon name="edit" size={24} color="#000" />
-              </TouchableOpacity>
+              {entry.category !== "checkin" && (
+                <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.actionButton}>
+                  <Icon name="edit" size={24} color="#000" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={handleDeleteEntry} style={styles.actionButton}>
                 <Icon name="trash-2" size={24} color="#FF0000" />
               </TouchableOpacity>
             </>
           )}
         </View>
+
       </View>
 
       <ScrollView style={styles.content}>
         <View style={styles.entryDetails}>
           <Text style={styles.date}>{formattedDate}</Text>
-          {entry.category && <Text style={styles.category}>{entry.category}</Text>}
+          {/* {entry.category && <Text style={styles.category}>{entry.category}</Text>} */}
           {entry.prompt && <Text style={styles.prompt}>Prompt: {entry.prompt}</Text>}
         </View>
+        
+        {entry.category === "checkin" ? (
+          <>
+            <Text style={styles.sectionTitle}>Check-in Summary</Text>
 
-        {isEditing ? (
-          <TextInput
-            style={styles.editor}
-            multiline
-            value={editedContent}
-            onChangeText={setEditedContent}
-            autoFocus
-          />
+            {entry.sentiments && entry.sentiments.length > 0 && (
+              <View style={styles.detailBlock}>
+                <Text style={styles.detailLabel}>Emotions:</Text>
+                <View style={styles.gridContainer}>
+                  {entry.sentiments.map((emotion: string, index: number) => (
+                    <View key={index} style={styles.gridItem}>
+                      <Feather name={emotionIcons[emotion] || "help-circle"} size={20} color="#444" />
+                      <Text style={styles.gridLabel}>{emotion}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {entry.causes && entry.causes.length > 0 && (
+              <View style={styles.detailBlock}>
+                <Text style={styles.detailLabel}>Causes:</Text>
+                <View style={styles.gridContainer}>
+                  {entry.causes.map((cause: string, index: number) => (
+                    <View key={index} style={styles.gridItem}>
+                      <Feather name={reasonIcons[cause] || "help-circle"} size={20} color="#444" />
+                      <Text style={styles.gridLabel}>{cause}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {entry.comments && entry.comments.length > 0 && (
+              <View style={styles.detailBlock}>
+                <Text style={styles.detailLabel}>Comments:</Text>
+                {entry.comments.map((comment: string, index: number) => (
+                  <Text key={index} style={styles.detailItem}>{comment}</Text>
+                ))}
+              </View>
+            )}
+          </>
         ) : (
-          <Text style={styles.entryContent}>{entry.entryContent}</Text>
-        )}
 
-        {entry.journalSentiments && entry.journalSentiments.length > 0 && (
-          <View style={styles.sentimentsContainer}>
-            <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
-            {entry.journalSentiments.map((sentiment: { type: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; score: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; }, index: React.Key | null | undefined) => (
-              <Text key={index} style={styles.sentimentItem}>
-                {sentiment.type}: {sentiment.score}
-              </Text>
-            ))}
-          </View>
-        )}
+            <>
+              {isEditing ? (
+                <TextInput
+                  style={styles.editor}
+                  multiline
+                  value={editedContent}
+                  onChangeText={setEditedContent}
+                  autoFocus
+                />
+              ) : (
+                <Text style={styles.entryContent}>{entry.entryContent}</Text>
+              )}
+
+              {entry.journalSentiments && entry.journalSentiments.length > 0 && (
+                <View style={styles.sentimentsContainer}>
+                  <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
+                  {entry.journalSentiments.map((sentiment: { type: string; score: string }, index) => (
+                    <Text key={index} style={styles.sentimentItem}>
+                      {sentiment.type}: {sentiment.score}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -142,22 +214,126 @@ const EntryDetail = () => {
 
 // Styles remain unchanged
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#EFEFEF" },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: "600" },
-  actionButtons: { flexDirection: "row" },
-  actionButton: { padding: 8, marginLeft: 10 },
-  content: { flex: 1, padding: 16 },
-  entryDetails: { marginBottom: 20 },
-  date: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
-  category: { fontSize: 16, color: "#666", marginBottom: 4 },
-  prompt: { fontSize: 16, fontStyle: "italic", color: "#666", marginBottom: 16 },
-  entryContent: { fontSize: 16, lineHeight: 24 },
-  editor: { fontSize: 16, lineHeight: 24, padding: 12, borderWidth: 1, borderColor: "#CCCCCC", borderRadius: 8, backgroundColor: "#F9F9F9", minHeight: 200 },
-  sentimentsContainer: { marginTop: 20, padding: 16, backgroundColor: "#F0F0F0", borderRadius: 8 },
-  sentimentsTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  sentimentItem: { fontSize: 14, marginBottom: 4 },
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EFEFEF",
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  actionButtons: {
+    flexDirection: "row",
+  },
+  actionButton: {
+    padding: 8,
+    marginLeft: 10,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  entryDetails: {
+    marginBottom: 20,
+  },
+  date: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  category: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 4,
+  },
+  prompt: {
+    fontSize: 16,
+    fontStyle: "italic",
+    color: "#666",
+    marginBottom: 16,
+  },
+  entryContent: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  editor: {
+    fontSize: 16,
+    lineHeight: 24,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#CCCCCC",
+    borderRadius: 8,
+    backgroundColor: "#F9F9F9",
+    minHeight: 200,
+  },
+  sentimentsContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 8,
+  },
+  sentimentsTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  sentimentItem: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  
+  detailBlock: {
+    marginBottom: 16,
+  },
+  
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  
+  detailItem: {
+    fontSize: 14,
+    color: "#444",
+    marginLeft: 10,
+  },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  gridItem: {
+    width: "30%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    marginRight: "3.33%",
+  },
+  gridLabel: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: "#444",
+  },
+  
+  
 });
 
 export default EntryDetail;

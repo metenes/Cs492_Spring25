@@ -115,7 +115,7 @@ const AppNavigation = () => {
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
         <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
-        <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
+        <Stack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ headerShown: false }}/>
 
         {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
         {/* Fix the Header Title for DiaryMain */}

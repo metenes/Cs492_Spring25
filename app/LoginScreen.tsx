@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   View, 
   TextInput, 
@@ -12,6 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import { loginUser } from "./services/ApiService";
 import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as Keychain from 'react-native-keychain';
 
 // Get screen width & height dynamically
 const { width, height } = Dimensions.get("window");
@@ -23,18 +24,39 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
   const navigation = useNavigation<LoginScreenNavigationProp>();
 
+  // Load saved credentials when component mounts
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const credentials = await Keychain.getGenericPassword();
+      if (credentials) {
+        setEmail(credentials.username);
+        setPassword(credentials.password);
+      }
+    } catch (error) {
+      console.log('Error loading credentials:', error);
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const response = await loginUser(email, password);
-      // loginUser already saves the token as "userToken" in AsyncStorage
-   
       
       if (!response.access_token) {
         Alert.alert("Error", "No access token received!");
         throw new Error("No access token received");
       }
+
+      // Save credentials securely if login successful
+      try {
+        await Keychain.setGenericPassword(email, password);
+      } catch (error) {
+        console.log('Error saving credentials:', error);
+      }
   
-      // No need to save token again - it's already saved in the loginUser function
       Alert.alert("Success", "Logged in successfully!");
       navigation.navigate("Home");
     } catch (error: unknown) {

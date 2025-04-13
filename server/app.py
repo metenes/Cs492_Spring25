@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 import os
 
 import torch
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Blueprint
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime, timedelta
@@ -44,7 +44,8 @@ from controller.sentiments_controller import sentiments_bp
 from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp, model_bp
-from controller.check_in_controller import check_bp; 
+from controller.check_in_controller import check_bp
+from controller.notification_controller import notification_bp
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
@@ -93,31 +94,127 @@ mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-# ---------------------------------------
-#  User Token check 
-# ---------------------------------------
 
-# Middleware to verify token
-def token_required(f):
-    @wraps(f)
-    def decorator(*args, **kwargs):
-        token = request.headers.get("Authorization")
-        if not token:
-            return jsonify({"error": "Token is missing"}), 403
+@app.route('/get-journal-dates', methods=['GET'])
+@jwt_required()
+def get_journal_dates():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Fetching journal dates for user_id: {user_id}")
 
-        try:
-            # Decode the token using the JWT_SECRET
-            token = token.split(" ")[1]  # Extract token from "Bearer token" format
-            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            request.user = decoded  # Store decoded data in request for access in route
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
+        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not entry_doc or "journalEntries" not in entry_doc:
+            print("ℹ️ No entries found for user")
+            return jsonify([]), 200
 
-        return f(*args, **kwargs)
+        dates = set()
+        for entry in entry_doc["journalEntries"]:
+            raw_date = entry.get("entryDate")
+            if not raw_date:
+                continue
 
-    return decorator
+            if isinstance(raw_date, str):
+                date_str = raw_date.split("T")[0]
+            else:
+                date_str = raw_date.strftime("%Y-%m-%d")
+            dates.add(date_str)
+
+        print("✅ Final list of journal dates:", dates)
+        return jsonify(list(dates)), 200
+
+    except Exception as e:
+        print("❌ Error fetching journal dates:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+    
+@journal_bp.route("/guided", methods=["POST"])
+@jwt_required()
+def save_guided_journal():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        entry_content = data.get("entryContent", "")
+        prompt = data.get("prompt", "")
+        if not entry_content or not prompt:
+            return jsonify({"error": "Entry content and prompt are required."}), 400
+
+        new_entry = {
+            "userId": user_id,
+            "entryContent": entry_content,
+            "category": "guided",
+            "prompt": prompt,
+            "createdAt": datetime.utcnow(),
+            "entryDate": datetime.utcnow().strftime("%Y-%m-%d"),
+            "images": [],
+            "journalSentiments": []
+        }
+
+        journal_entries_collection.insert_one(new_entry)
+        return jsonify({"message": "Guided journal entry saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving guided entry:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+check_bp = Blueprint('check_in', __name__)
+check_in_collection = db["check_in_entries"]
+
+@check_bp.route("/submit", methods=["POST"])
+@jwt_required()
+def submit_check_in():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        sentiments = data.get("sentiments", [])
+        causes = data.get("causes", [])
+        comments = data.get("comments", [])
+        timestamp = datetime.utcnow()
+
+        if not sentiments or not causes:
+            return jsonify({"error": "Sentiments and causes are required."}), 400
+
+        new_check_in = {
+            "userId": user_id,
+            "sentiments": sentiments,
+            "causes": causes,
+            "comments": comments,
+            "timestamp": timestamp
+        }
+
+        check_in_collection.insert_one(new_check_in)
+        return jsonify({"message": "Check-in saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving check-in:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+@check_bp.route("/fetch", methods=["GET"])
+@jwt_required()
+def fetch_check_ins():
+    try:
+        user_id = get_jwt_identity()
+        entries = list(check_in_collection.find({"userId": user_id}))
+
+        result = []
+        for entry in entries:
+            result.append({
+                "entry_id": str(entry["_id"]),
+                "created_at": entry["timestamp"].isoformat(),
+                "type": "checkin",
+                "date": entry["timestamp"].strftime("%Y-%m-%d"),
+                "sentiments": entry.get("sentiments", []),
+                "causes": entry.get("causes", []),
+                "comments": entry.get("comments", []),
+            })
+
+        
+
+        return jsonify({"history": result}), 200
+    except Exception as e:
+        print("❌ Error fetching check-ins:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
 
 # ---------------------------------------
 # Function to create a JWT token
@@ -144,6 +241,7 @@ app.register_blueprint(chat_bp, url_prefix="/chat")
 app.register_blueprint(check_bp, url_prefix="/check-in")
 app.register_blueprint(model_bp, url_prefix="/models") # metadata for S3 models 
 
+app.register_blueprint(notification_bp, url_prefix="/notification")
 
 # ---------------------------------------
 #  **Protected Route**

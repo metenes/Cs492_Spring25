@@ -2,12 +2,15 @@ import React, { useEffect } from "react";
 import AppNavigation from "./AppNavigation";
 import { AuthProvider } from "./auth/AuthContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-
+import { usePushNotifications } from './usePushNotifications';
 interface AppProps {
   hideSplashScreen: () => Promise<void>;
 }
 
 const App: React.FC<AppProps> = ({ hideSplashScreen }: AppProps) => {
+  // Initialize push notifications
+  const { notification, expoPushToken } = usePushNotifications();
+
   useEffect(() => {
     const prepareApp = async () => {
       try {

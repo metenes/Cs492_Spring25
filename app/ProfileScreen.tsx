@@ -14,18 +14,20 @@ import {
   useColorScheme,
   Dimensions,
   Platform,
+  PermissionsAndroid,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { MediaType } from 'expo-image-picker';
-
-import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from "expo-media-library";
+import { Audio } from "expo-av";
+import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { fetchProfile , uploadProfileImage, updateProfile, deleteAccount} from "./services/ApiService";
+import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
+const API_URL = 'http://192.168.1.33:5000';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
@@ -37,7 +39,7 @@ const ProfileScreen = () => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   
   // Profile data
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -50,45 +52,130 @@ const ProfileScreen = () => {
   // App preferences
   const [darkMode, setDarkMode] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState<string | null>(null);
   
   // Determine current theme
   const theme = darkMode ? darkTheme : lightTheme;
 
   useEffect(() => {
+    const initializeProfile = async () => {
+      try {
+        // First check if user is authenticated
+        const userToken = await AsyncStorage.getItem('userToken');
+        console.log("Checking token:", userToken ? "Found token" : "No token found");
+
+        if (!userToken) {
+          console.log("No token found, redirecting to login");
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          return;
+        }
+
+        // Store token in state first
+        setToken(userToken);
+
+        // Get user ID from token payload
+        try {
+          // Split the token and get the payload
+          const parts = userToken.split('.');
+          console.log("Token parts length:", parts.length);
+          
+          if (parts.length !== 3) {
+            throw new Error('Invalid token format - token should have 3 parts');
+          }
+
+          // Decode the payload
+          const payload = parts[1];
+          console.log("Raw payload:", payload);
+          
+          // Add padding if needed
+          const paddedPayload = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '=');
+          
+          // First try standard base64 decode
+          let decodedPayload;
+          try {
+            const base64 = paddedPayload.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonStr = atob(base64);
+            decodedPayload = JSON.parse(jsonStr);
+          } catch (e) {
+            console.log("Standard decode failed, trying URL decode:", e);
+            // If that fails, try URL decode
+            const jsonStr = decodeURIComponent(
+              atob(paddedPayload.replace(/-/g, '+').replace(/_/g, '/'))
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            );
+            decodedPayload = JSON.parse(jsonStr);
+          }
+
+          console.log("Decoded payload:", decodedPayload);
+          
+          const userId = decodedPayload.userId || decodedPayload.sub || decodedPayload.id;
+          if (!userId) {
+            console.log("Available fields in payload:", Object.keys(decodedPayload));
+            throw new Error('No user ID found in token payload');
+          }
+          
+          console.log("Extracted user ID:", userId);
+          setUserId(userId);
+
+          // Load user profile data
+          const response = await fetchProfile(userToken);
+          console.log("Profile data loaded successfully");
+          
+          setEmail(response.email || '');
+          setName(response.name || '');
+          setBio(response.bio || '');
+          setPhone(response.phone || '');
+          setLocation(response.location || '');
+          setProfileImage(response.profileImageUrl || null);
+        } catch (tokenError) {
+          console.error("Error parsing token:", tokenError);
+          Alert.alert(
+            'Authentication Error',
+            'Your session appears to be invalid. Please log in again.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  AsyncStorage.clear();
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                }
+              }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Error initializing profile:', error);
+        Alert.alert(
+          'Error',
+          'Failed to load profile. Please try logging in again.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                AsyncStorage.clear();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              }
+            }
+          ]
+        );
+      }
+    };
+
     requestPermissions();
-    loadUserData();
+    initializeProfile();
     loadAppPreferences();
   }, []);
-
-  // Load user data from API
-  const loadUserData = async () => {
-    try {
-      setIsLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
-      console.log("🔹 retrive token to fetch profile:", token);
-      if (token ) {
-        console.log("🔹 Using token to fetch profile:", token);
-        setToken(token);
-        const response = fetchProfile(token); 
-        
-        setEmail((await response).email || '');
-        setName((await response).name || '');
-        setBio((await response).bio || '');
-        setPhone((await response).phone || '');
-        setLocation((await response).location || '');
-        setProfileImage((await response).profileImageUrl || null);
-      } else {
-        // Redirect to login if no token found
-        navigation.navigate('Login');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load profile data');
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Load app preferences from AsyncStorage
   const loadAppPreferences = async () => {
@@ -115,90 +202,239 @@ const ProfileScreen = () => {
     }
   };
 
-  // Request permissions for Camera & Media Library
+  // Request permissions for Media Library
   const requestPermissions = async () => {
-    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (cameraStatus !== "granted" || mediaStatus !== "granted") {
-      Alert.alert("Permissions Required", "Please enable camera and gallery permissions in settings.");
-    }
+    console.log('Requesting permissions...');
+    const mediaLibrary = await MediaLibrary.requestPermissionsAsync();
+    console.log('MediaLibrary permission result:', mediaLibrary);
   };
 
-  // Pick an image from the gallery (only one image)
+  // Pick an image from the gallery
   const pickImage = async () => {
-    setModalVisible(false);
+    try {
+      console.log('Starting image picker...');
+      setModalVisible(false);
+      
+      // Wait for modal animation to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    // Option 1: Using the enum without array
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      console.log('Image picker result:', result);
 
-    if (!result.canceled) {
-      await uploadImage(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets[0]) {
+        console.log('Selected image:', result.assets[0].uri);
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image from gallery');
     }
   };
 
   // Take a photo using the camera
   const takePhoto = async () => {
-    setModalVisible(false);
+    try {
+      console.log('Starting camera...');
+      setModalVisible(false);
+      
+      // Wait for modal animation to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      let result = await ImagePicker.launchCameraAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1], // Crop to square
-      quality: 0.8,
-    });
+      console.log('Camera result:', result);
 
-    if (!result.canceled) {
-      await uploadImage(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets[0]) {
+        console.log('Captured photo:', result.assets[0].uri);
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo');
     }
   };
 
   // Upload image to server (S3 via backend)
-  const uploadImage = async (imageUri : any) => {
+  const uploadImage = async (imageUri: string) => {
     try {
-      setIsLoading(true);
-      
-      // Create form data for image upload
-      const formData = new FormData();
-      const filename = imageUri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename || '');
-      const type = match ? `image/${match[1]}` : 'image';
-      formData.append('profileImage', {
-        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
-        name: filename,
-        type,
-      } as any);
+      const currentToken = await AsyncStorage.getItem('userToken');
+      console.log('Checking token for upload:', currentToken ? 'Token exists' : 'No token');
 
-      // TODO DOGA PROFILE PICTURE
-      // Send to server
-      const response = await axios.post(`/api/users/${userId}/profile-image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      
-
-      if (response.data && response.data.profileImageUrl) {
-        setProfileImage(response.data.profileImageUrl);
-        Alert.alert('Success', 'Profile picture updated successfully');
+      if (!currentToken) {
+        console.log('No token found for upload');
+        Alert.alert('Error', 'Not authenticated. Please log in again.');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+        return;
       }
-    } catch (error) {
+
+      try {
+        // Split and decode token
+        const parts = currentToken.split('.');
+        if (parts.length !== 3) {
+          throw new Error('Invalid token format - token should have 3 parts');
+        }
+
+        const payload = parts[1];
+        // Add padding if needed
+        const paddedPayload = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '=');
+        const base64 = paddedPayload.replace(/-/g, '+').replace(/_/g, '/');
+        const decodedPayload = JSON.parse(atob(base64));
+
+        console.log("Upload token payload:", decodedPayload);
+        
+        const currentUserId = decodedPayload.userId || decodedPayload.sub || decodedPayload.id;
+        if (!currentUserId) {
+          throw new Error('No user ID found in token');
+        }
+
+        console.log('Using user ID for upload:', currentUserId);
+        setIsLoading(true);
+        
+        // Get file size for logging
+        const fileSize = await getFileSize(imageUri);
+        console.log('File size before upload:', fileSize, 'bytes');
+        
+        // Create FormData and append the image
+        const formData = new FormData();
+        formData.append('profileImage', {
+          uri: imageUri, // Do not strip 'file://' prefix
+          type: 'image/jpeg',
+          name: 'profile-image.jpg',
+        } as any);
+
+        // Log FormData contents for debugging
+        console.log('FormData structure:', {
+          profileImage: {
+            uri: imageUri,
+            type: 'image/jpeg',
+            name: 'profile-image.jpg',
+            size: fileSize
+          }
+        });
+
+        // Updated endpoint to include user ID
+        const uploadEndpoint = `${API_URL}/user/${currentUserId}/profile-image`;
+        console.log('Making upload request to:', uploadEndpoint);
+
+        try {
+          const response = await fetch(uploadEndpoint, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: formData
+          });
+
+          console.log('Response status:', response.status);
+          const responseData = await response.json();
+          console.log('Response data:', responseData);
+
+          if (!response.ok) {
+            throw new Error(responseData.error || 'Upload failed');
+          }
+
+          if (responseData && responseData.profileImageUrl) {
+            setProfileImage(responseData.profileImageUrl);
+            Alert.alert('Success', 'Profile picture updated successfully');
+          } else {
+            throw new Error('No profile image URL received in response');
+          }
+        } catch (error: any) {
+          console.error('Error processing upload:', error.message);
+          if (error.response?.status === 400) {
+            Alert.alert(
+              'Error',
+              'The image could not be uploaded. Please make sure you\'ve selected a valid image file.'
+            );
+          } else if (error.response?.status === 500) {
+            Alert.alert(
+              'Error',
+              'There was a problem uploading your image. Please try again later.'
+            );
+          } else {
+            Alert.alert(
+              'Error',
+              error.message || 'Failed to upload profile picture'
+            );
+          }
+          throw error;
+        }
+      } catch (error: any) {
+        console.error('Error processing upload:', error.response?.data || error.message);
+        console.error('Full error object:', JSON.stringify(error, null, 2));
+        
+        if (error.response?.status === 500) {
+          console.error('Server error details:', error.response?.data);
+          console.error('Server error headers:', error.response?.headers);
+          Alert.alert(
+            'Error',
+            'There was a problem uploading your image. Please try again with a different image or contact support if the problem persists.'
+          );
+        } else if (error.response?.status === 404) {
+          Alert.alert(
+            'Error',
+            'The upload endpoint was not found. Please contact support.'
+          );
+        } else if (error.response?.status === 405) {
+          Alert.alert(
+            'Error',
+            'The server does not accept this type of request. Please try again later.'
+          );
+        } else {
+          Alert.alert(
+            'Error',
+            'Failed to upload profile picture. Please try again later.'
+          );
+        }
+        throw error;
+      }
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload profile picture');
+      if (!error.message.includes('endpoint was not found')) {
+        Alert.alert(
+          'Error',
+          error.response?.data?.error || error.message || 'Failed to upload profile picture. Please try again.'
+        );
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Helper function to get file size
+  const getFileSize = async (uri: string): Promise<number> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return blob.size;
+    } catch (error) {
+      console.error('Error getting file size:', error);
+      return 0;
+    }
+  };
+
   // Save profile changes
   const saveProfileChanges = async () => {
+    if (!token) {
+      Alert.alert('Error', 'Not authenticated');
+      return;
+    }
+
     // Validate inputs
     if (newPassword && newPassword !== confirmPassword) {
       return Alert.alert('Error', 'Passwords do not match');
@@ -215,10 +451,10 @@ const ProfileScreen = () => {
         ...(newPassword ? { password: newPassword } : {})
       };
 
-      updateProfile(token, profileData); 
+      await updateProfile(token, profileData); 
 
       Alert.alert('Success', 'Profile updated successfully');
-      // Reset tje password field
+      // Reset password fields
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
@@ -231,11 +467,16 @@ const ProfileScreen = () => {
 
   // Delete account
   const handledeleteAccount = async () => {
+    if (!token) {
+      Alert.alert('Error', 'Not authenticated');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setDeleteModalVisible(false);
       // Delete the account 
-      deleteAccount(token); 
+      await deleteAccount(token); 
       // Clear local storage
       await AsyncStorage.clear();
       
@@ -633,7 +874,18 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "bold"
-  }
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 1000,
+  },
 });
 
 export default ProfileScreen;

@@ -6,7 +6,6 @@ import boto3
 import json
 import logging
 import time
-import sagemaker
 import jwt
 from flask import Flask, request, jsonify, Blueprint
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
@@ -17,9 +16,12 @@ from pymongo import MongoClient
 from flask_mail import Mail
 from bson.objectid import ObjectId
 from bson import ObjectId
-import torch
 from transformers import BertTokenizer, BertForSequenceClassification
-import json
+
+# Sagamaker AI
+import sagemaker
+from sagemaker.pytorch import PyTorchModel
+from sagemaker import get_execution_role
 
 # User token 
 from functools import wraps
@@ -30,6 +32,10 @@ from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
 from botocore.exceptions import ClientError
+import boto3
+import pymongo
+import certifi
+from transformers import BertTokenizer
 
 # utils 
 from models.chat import Chat, Message, ChatRequest, ChatResponse, ModelTrainingRequest, ModelTrainingResponse  # Import the Chat model
@@ -50,10 +56,12 @@ AWS_REGION = "eu-north-1"
 AWS_ACCESS_KEY = "AKIAXGZAMH3HUVQSPNED"
 AWS_SECRET_KEY = "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"
 S3_BUCKET = "sentiobucket"
-SAGEMAKER_ENDPOINT = os.getenv("SAGEMAKER_ENDPOINT", "sentio-user-model-endpoint")
+SAGEMAKER_ENDPOINT = "sentio-user-model-endpoint"
+# sentio-user-model-endpoint 
 BASE_MODEL_PATH = "models/model.pt"
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt2")  # Default model architecture
+USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-13-15-46-53-994"
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
+BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 
 # Define the emotion labels
 emotion_labels = [
@@ -70,22 +78,28 @@ logger = logging.getLogger(__name__)
 
 # In-memory conversation store (use DB in production)
 conversations = {}
+    # Set up the SageMaker session
+sagemaker_session = sagemaker.Session(default_bucket=S3_BUCKET)
+role = "arn:aws:iam::495599763151:role/service-role/AmazonSageMaker-ExecutionRole-20250302T091470"
+    
+model_data_location = f's3://{S3_BUCKET}/{BASE_MODEL_TAR_PATH}'
 
 # Initialize AWS clients
 try:
+    # S3 client
     s3_client = boto3.client(
         's3', 
         region_name=AWS_REGION,
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY
     )
-    
+
     # MongoDB connection
     client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())  
     db = client.get_database("chatbot")
     logger.info("✅ Chatbot - Connected to MongoDB successfully!")
     logger.info(f"✅ Chatbot - Available collections: {db.list_collection_names()}")
-    
+
     # SageMaker runtime client
     sagemaker_runtime = boto3.client(
         'sagemaker-runtime',
@@ -101,21 +115,17 @@ try:
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY
     )
-    
-    sagemaker.Session()
 
-    # Lambda client
+    # Lambda client (No changes here)
     lambda_client = boto3.client(
         'lambda',
         region_name=AWS_REGION,
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY
     )
-    
 
     # Initialize tokenizer
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-
     
     logger.info("✅ AWS and DB clients initialized successfully")
         
@@ -123,144 +133,168 @@ except Exception as e:
     logger.error(f"❌ Error initializing AWS clients: {e}")
     raise
 
-# Helper function for authentication
-def get_current_user(token):
-    """Validate token and get current user"""
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            return None
-        
-        # Get user from MongoDB
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
-        return user
-    except Exception as e:
-        logger.error(f"Error validating token: {e}")
-        return None
+
+   # Check if the model exists
+try:
+        response = sagemaker_client.describe_model(ModelName='sentio-user-model')
+        logger.info("✅ Model already exists.")
+except sagemaker_client.exceptions.ClientError as e:
+        if 'ModelNotFound' in str(e):
+            logger.info("❌ Model not found, creating model...")
+            response = sagemaker_client.create_model(
+                ModelName='sentio-user-model',
+                ExecutionRoleArn=role,
+                PrimaryContainer={
+                    'Image': '763104351884.dkr.ecr.eu-north-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310',
+                    'ModelDataUrl': 's3://sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-13-13-46-50-275/model.tar.gz',
+                    'Environment': {
+                        'SAGEMAKER_PROGRAM': 'inference.py',
+                        'SAGEMAKER_SUBMIT_DIRECTORY': 's3://sentiobucket/model-artifacts/inference_code.zip',
+                    }
+                }
+            )
+            logger.info("✅ Model created.")
+
+    # Check if the endpoint configuration exists
+try:
+        response = sagemaker_client.describe_endpoint_config(EndpointConfigName='sentio-config')
+        logger.info("✅ Endpoint configuration already exists.")
+except sagemaker_client.exceptions.ClientError as e:
+        if 'EndpointConfigNotFound' in str(e):
+            logger.info("❌ Endpoint configuration not found, creating configuration...")
+            response = sagemaker_client.create_endpoint_config(
+                EndpointConfigName='sentio-config',
+                ProductionVariants=[
+                    {
+                        'VariantName': 'AllTraffic',
+                        'ModelName': 'sentio-user-model',
+                        'InitialInstanceCount': 1,
+                        'InstanceType': 'ml.t2.medium',
+                    },
+                ]
+            )
+            logger.info("✅ Endpoint configuration created.")
+
+    # Check if the endpoint exists
+try:
+        response = sagemaker_client.describe_endpoint(EndpointName='sentio-user-endpoint')
+        logger.info("✅ Endpoint already exists.")
+except sagemaker_client.exceptions.ClientError as e:
+        if 'EndpointNotFound' in str(e):
+            logger.info("❌ Endpoint not found, creating endpoint...")
+            response = sagemaker_client.create_endpoint(
+                EndpointName='sentio-user-endpoint',
+                EndpointConfigName='sentio-config'
+            )
+            logger.info("✅ Endpoint created.")
+
+
 # ---------------------------------------
 #  ** Chat Endpoints - Test/Send
 # ---------------------------------------
-
-# Chat endpoints
-@chat_bp.route("/test", methods=["POST"])
-def chat_basic():
-    """Basic chat endpoint for testing"""
-    data = request.json
-    message = data.get("message", "")
-
-    print("HERE IN TEST CHAT ... ", data)  # Debugging input
-
-    try:
-        # Set pad_token if missing
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token  # Set PAD token to EOS if missing
-
-        # Tokenize input with padding
-        inputs = tokenizer(
-            message, 
-            return_tensors="pt", 
-            padding=True, 
-            truncation=True
-        )
-        inputs = {k: v.to(DEVICE) for k, v in inputs.items()}  
-
-        with torch.no_grad():
-            outputs = model.generate(
-                inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                max_length=100,
-                num_return_sequences=1,
-                do_sample=True,
-                temperature=0.7,
-                pad_token_id=tokenizer.pad_token_id  # Ensure PAD token is set
-            )
-
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        print("Generated Response:", response)  # Debug output
-
-        return jsonify({"response": response})
-
-    except Exception as e:
-        logger.error(f"Error in basic chat: {e}")
-        return jsonify({"error": str(e)}), 500
-
 @chat_bp.route("/perchat", methods=["POST"])
 @jwt_required()
 def personalized_chat():
     """Chat endpoint that uses the user's personalized model"""
-    print("personilized")
-    data = request.json
-    chat_request = ChatRequest(**data)
-    user_id = get_jwt_identity()
-    print("personilez chat - ", user_id , " and ", data)
     try:
+        # Validate incoming data
+        data = request.json
+        if not data:
+            return jsonify({"error": "Missing request data"}), 400
+            
+        # Extract user ID from JWT token
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({"error": "Invalid user identity"}), 401
+            
+        print(f"Personalized chat request - User: {user_id}")
+        
+        try:
+            # Validate request data with your ChatRequest model
+            chat_request = ChatRequest(**data)
+        except Exception as validation_error:
+            return jsonify({"error": f"Invalid request format: {str(validation_error)}"}), 400
+
         # Generate conversation ID if new conversation
         conversation_id = data.get("conversation_id", f"conv_{user_id}_{int(time.time())}")
-        print("Starting Personalized Chat for user:", user_id)
-
-        # Get user info
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
-        if not user:
-            return jsonify({"error": "User not found"}), 404
         
-        # Get model version
-        # model_info = model_collection.find_one({"user_id": user_id})
-        # model_version = model_info.get("version", "1.0") if model_info else "1.0"
-        
-        # Ensure user model exists in S3
-        user_model_path = f"models/{user_id}/model.pt"
-        # local_model_path = f"/tmp/{user_id}_model.pt"
-            # Check S3 for user model
-        print("Checking S3 model path:", user_model_path)
+        # Get user info from database
         try:
-            s3_client.head_object(Bucket=S3_BUCKET, Key=user_model_path)
-        except  Exception as e:
-            print("⚠️ Model not found in S3, attempting to create:", e)
-            create_user_model(user_id) # if not used
+            user = users_collection.find_one({"_id": ObjectId(user_id)})
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+        except Exception as db_error:
+            logger.error(f"Database error when fetching user: {db_error}")
+            return jsonify({"error": "Error accessing user data"}), 500
+
+        # Check for user's model in S3
+        user_model_path = f"models/{user_id}/model.pt"
+        model_exists = False
         
-        # Load the model
-        # model = download_model_from_s3(user_model_path, local_model_path)
-        # model.eval() # evaluate too 
-        # if not model:
-        #    return jsonify({"error": "Model could not be loaded"}), 500
-
-        # Start model 
-        # Invoke user's model or create if doesn't exist
-        print("Invoking user model...")
-        response_text, inference_time = invoke_user_model(
-            user_id=user_id,
-            message=chat_request.message,
-            context=chat_request.context
-        )
-        print("Model response:", response_text)
-        # Log conversation
-        print("Logging conversation...")
-        log_conversation(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            message=chat_request.message,
-            response=response_text
-        )
-        print("Logging conversation done")
-        model_version = 1.0
-        # Update model if requested
-        model_updated = False
-        if chat_request.update_model:
-            print("Updating the model as requested")
-            chat_data = {
-                "user_message": chat_request.message,
-                "model_response": response_text,
-                "context": chat_request.context or {},
-                "timestamp": time.time()
-            }
+        try:
+            # Check if user model exists in S3
+            s3_client.head_object(Bucket=S3_BUCKET, Key=user_model_path)
+            model_exists = True
+            logger.info(f"Model already exists for user {user_id} in S3.")
+        except Exception as s3_error:
+            logger.info(f"Model not found in S3 for user {user_id}: {s3_error}")
             
-            _, new_version = update_user_model(user_id, chat_data)
-            model_version = new_version
-            model_updated = True
+        # Create user model if it doesn't exist
+        if not model_exists:
+            try:
+                logger.info(f"Creating new model for user: {user_id}")
+                create_user_model(user_id)
+            except Exception as model_create_error:
+                logger.error(f"Failed to create user model: {model_create_error}")
+                return jsonify({"error": "Could not create personalized model"}), 500
 
-        print("Returning response...")
+        # Invoke the user's model
+        try:
+            response_text, inference_time = invoke_user_model(
+                user_id=user_id,
+                message=chat_request.message,
+                context=chat_request.context or {}
+            )
+        except Exception as inference_error:
+            logger.error(f"Model inference error: {inference_error}")
+            return jsonify({"error": "Failed to process with personalized model"}), 500
+
+        # Log the conversation
+        try:
+            log_conversation(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message=chat_request.message,
+                response=response_text
+            )
+        except Exception as log_error:
+            # Non-critical error, just log it
+            logger.warning(f"Failed to log conversation: {log_error}")
+
+        # Default model version
+        model_version = 1.0
+        model_updated = False
+        
+        # Update model if requested
+        if chat_request.update_model:
+            try:
+                chat_data = {
+                    "user_message": chat_request.message,
+                    "model_response": response_text,
+                    "context": chat_request.context or {},
+                    "timestamp": time.time()
+                }
+                
+                update_success, new_version = update_user_model(user_id, chat_data)
+                if update_success:
+                    model_version = new_version
+                    model_updated = True
+                else:
+                    logger.warning(f"Model update returned without success for user: {user_id}")
+            except Exception as update_error:
+                # Non-critical error, just log it
+                logger.warning(f"Failed to update model: {update_error}")
+
         # Prepare and return response
         response = ChatResponse(
             response=response_text,
@@ -269,262 +303,155 @@ def personalized_chat():
             model_updated=model_updated,
             inference_time=inference_time
         )
-        print("Returning response done")
+        
         return jsonify(response.dict())
+        
     except Exception as e:
-        logger.error(f"Error in personalized chat: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Unhandled error in personalized chat: {str(e)}", exc_info=True)
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
-@chat_bp.route("/model/status", methods=["GET"])
-@jwt_required()
-def get_model_status_endpoint():
-    """Get information about the user's personalized model"""
-    user_id = get_jwt_identity()
-    try:
-        # Get model metadata
-        model_info = model_collection.find_one({"user_id": user_id})
-        
-        if not model_info:
-            return jsonify({
-                "has_custom_model": False,
-                "using_base_model": True,
-                "base_model": MODEL_NAME
-            })
-        
-        # Get interaction counts
-        interaction_count = chat_collection.count_documents({"user_id": user_id})
-        
-        status = {
-            "has_custom_model": True,
-            "model_version": model_info.get("version", "1.0"),
-            "last_updated": model_info.get("last_updated", datetime.now().isoformat()),
-            "update_count": model_info.get("update_count", 0),
-            "interaction_count": interaction_count,
-            "base_model": MODEL_NAME
-        }
-        
-        return jsonify(status)
-    except Exception as e:
-        logger.error(f"Error getting model status: {e}")
-        return jsonify({"error": str(e)}), 500
 
-@chat_bp.route("/model/reset", methods=["POST"])
-@jwt_required()
-def reset_user_model_endpoint():
-    """Reset a user's model back to the base model"""
-    user_id = get_jwt_identity()
+def invoke_user_model(user_id: str, message: str, context: Dict = None):
+    """Invoke the user's personalized model from S3."""
+    context = context or {}  # Ensure context is not None
+    logger.info(f"Starting model invocation for user {user_id}")
     
     try:
-        # Delete user model from S3
-        user_model_key = f"models/{user_id}/model.pt"
+        # Step 1: Verify user model exists or copy from base
+        user_model_path = f"models/{user_id}/model.pt"
+        logger.info(f"Checking for user model at {user_model_path}")
+        
         try:
-            s3_client.delete_object(Bucket=S3_BUCKET, Key=user_model_key)
-        except Exception:
-            pass  # Model might not exist yet
-        
-        # Delete model metadata from MongoDB
-        model_collection.delete_one({"user_id": user_id})
-        
-        return jsonify({
-            "success": True,
-            "message": "User model has been reset to base model"
-        })
-    except Exception as e:
-        logger.error(f"Error resetting model: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@chat_bp.route("/model/force-update", methods=["POST"])
-@jwt_required()
-def force_model_update_endpoint():
-    """Force an update of the user's model based on all chat history"""
-    user_id = get_jwt_identity()
-    
-    try:
-        # Get all chat history
-        history = list(chat_collection.find({"user_id": user_id}).sort("timestamp", 1).limit(1000))
-        
-        if not history:
-            return jsonify({"error": "No chat history found for model training"}), 400
-        
-        # Load base model as starting point
-        local_model_path = f"/tmp/{user_id}_model.pt"
-        download_model_from_s3(BASE_MODEL_PATH, local_model_path)
-        
-        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-        model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
-        model.train()
-        
-        # Simple training loop
-        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
-        
-        for interaction in history:
-            # Prepare data
-            inputs = tokenizer(interaction["message"], return_tensors="pt").to(DEVICE)
-            labels = tokenizer(interaction["response"], return_tensors="pt").input_ids.to(DEVICE)
+            # Check if user model exists in S3
+            exists = check_s3_object_exists(S3_BUCKET, user_model_path)
+            logger.info(f"User model exists: {exists}")
             
-            # Forward pass
-            outputs = model(**inputs, labels=labels)
-            loss = outputs.loss
+            if not exists:
+                logger.info(f"Copying base model to user path {user_model_path}")
+                copy_s3_object(S3_BUCKET, "models/model.pt", S3_BUCKET, user_model_path)
+                logger.info("Base model copied successfully")
+        except Exception as e:
+            logger.error(f"Error managing model file: {str(e)}", exc_info=True)
+            return f"Error preparing your personalized model. Please try again later.", 0.0
+        
+        # Step 2: Process with SageMaker or locally
+        if SAGEMAKER_ENDPOINT and SAGEMAKER_ENDPOINT.strip():
+            logger.info(f"Using SageMaker endpoint: {SAGEMAKER_ENDPOINT}")
             
-            # Backward pass and optimization
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            # Basic payload - only include what your endpoint expects
+            payload = {"message": message}
+            
+            logger.info(f"Prepared payload: {payload}")
+            start_time = time.time()
+            
+            try:
+                # Make sure sagemaker_runtime is properly initialized
+                if not hasattr(invoke_user_model, 'sagemaker_runtime'):
+                    logger.info("Initializing SageMaker runtime client")
+                    sagemaker_runtime = boto3.client('sagemaker-runtime')
+                
+                logger.info(f"Sending request to SageMaker endpoint")
+                response = sagemaker_runtime.invoke_endpoint(
+                    EndpointName=SAGEMAKER_ENDPOINT,
+                    ContentType='application/json',
+                    Body=json.dumps(payload)
+                )
+                
+                logger.info(f"SageMaker raw response: {response}")
+                
+                # Process the response body
+                if 'Body' in response:
+                    try:
+                        # Read and decode the response body
+                        response_content = response['Body'].read()
+                        logger.info(f"Response content: {response_content}")
+                        
+                        response_text = response_content.decode('utf-8')
+                        logger.info(f"Decoded response: {response_text}")
+                        
+                        # Try to parse as JSON
+                        try:
+                            response_json = json.loads(response_text)
+                            logger.info(f"Parsed JSON response: {response_json}")
+                            
+                            # Extract the most relevant information based on response structure
+                            if isinstance(response_json, dict):
+                                if "predicted_emotions" in response_json:
+                                    result = f"Detected emotions: {', '.join(response_json['predicted_emotions'])}"
+                                elif "input_text" in response_json and "top_emotions" in response_json:
+                                    emotions = [f"{e[0]} ({e[1]:.2f})" for e in response_json["top_emotions"]]
+                                    result = f"For '{response_json['input_text']}', I detected: {', '.join(emotions)}"
+                                else:
+                                    # Use any field that seems like output
+                                    for key in ["output", "response", "result", "prediction", "text"]:
+                                        if key in response_json:
+                                            result = response_json[key]
+                                            break
+                                    else:
+                                        # If no recognized field, return the whole JSON
+                                        result = str(response_json)
+                            else:
+                                result = str(response_json)
+                        except json.JSONDecodeError:
+                            logger.warning("Response is not valid JSON, using text response")
+                            result = response_text
+                    except Exception as decode_error:
+                        logger.error(f"Error decoding response: {str(decode_error)}", exc_info=True)
+                        result = "Error processing model response"
+                else:
+                    logger.error("No 'Body' in SageMaker response")
+                    result = "Invalid response from the model service"
+                
+                inference_time = time.time() - start_time
+                logger.info(f"Inference completed in {inference_time:.2f}s with result: {result}")
+                return result, inference_time
+                
+            except Exception as sagemaker_error:
+                logger.error(f"SageMaker invocation error: {str(sagemaker_error)}", exc_info=True)
+                return f"Error processing your request. Technical details: {str(sagemaker_error)}", 0.0
         
-        # Save the updated model
-        torch.save(model.state_dict(), local_model_path)
-        
-        # Upload to S3
-        user_model_key = f"models/{user_id}/model.pt"
-        upload_model_to_s3(local_model_path, user_model_key)
-        
-        # Update metadata
-        current_version = 1.0
-        model_info = model_collection.find_one({"user_id": user_id})
-        if model_info and "version" in model_info:
-            current_version = float(model_info["version"])
-        
-        new_version = current_version + 1.0
-        
-        model_collection.update_one(
-            {"user_id": user_id},
-            {
-                "$set": {
-                    "last_updated": datetime.now().isoformat(),
-                    "training_samples": len(history),
-                    "full_retrain": True,
-                    "version": str(new_version)
-                }
-            },
-            upsert=True
-        )
-        
-        return jsonify({
-            "success": True,
-            "message": f"Model fully updated with {len(history)} interactions",
-            "new_version": str(new_version)
-        })
-    except Exception as e:
-        logger.error(f"Error forcing model update: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@chat_bp.route("/train", methods=["POST"])
-@jwt_required()
-def train_model_endpoint():
-    """Endpoint to trigger specific training for a user's model"""
-    data = request.json
-    training_request = ModelTrainingRequest(**data)
-    user_id = get_jwt_identity()
+        # Local inference as fallback
+        else:
+            logger.info("Using local inference")
+            local_model_path = f"/tmp/{user_id}_model.pt"
+            
+            try:
+                # Ensure temp directory exists
+                os.makedirs(os.path.dirname(local_model_path), exist_ok=True)
+                
+                # Download the model
+                logger.info(f"Downloading model from {user_model_path} to {local_model_path}")
+                download_model_from_s3(user_model_path, local_model_path)
+                
+                # Load the model
+                logger.info("Loading model into memory")
+                model = BertForSequenceClassification.from_pretrained(
+                    "bert-base-uncased", 
+                    num_labels=28
+                )
+                model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
+                model.eval()
+                
+                # Generate prediction
+                logger.info("Running inference")
+                start_time = time.time()
+                output = predict_emotions(message)
+                inference_time = time.time() - start_time
+                
+                logger.info(f"Local inference result: {output}")
+                return output, inference_time
+                
+            except Exception as local_error:
+                logger.error(f"Local inference error: {str(local_error)}", exc_info=True)
+                return f"Error processing your request locally. Technical details: {str(local_error)}", 0.0
     
-    try:
-        # Get current model path or initialize if needed
-        model_path = get_user_model_path(user_id)
-        
-        # Prepare SageMaker training job
-        job_name = f"train-user-model-{user_id}-{int(time.time())}"
-        
-        # Save the training data to S3
-        training_data_key = f"training-data/{user_id}/training_data_{int(time.time())}.json"
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=training_data_key,
-            Body=json.dumps(training_request.training_data),
-            ContentType="application/json"
-        )
-        
-        # Configure and create SageMaker training job
-        training_params = {
-            "TrainingJobName": job_name,
-            "AlgorithmSpecification": {
-                "TrainingImage": "your-training-container-image",
-                "TrainingInputMode": "File"
-            },
-            "RoleArn": "your-sagemaker-role-arn",
-            "InputDataConfig": [
-                {
-                    "ChannelName": "training",
-                    "DataSource": {
-                        "S3DataSource": {
-                            "S3DataType": "S3Prefix",
-                            "S3Uri": f"s3://{S3_BUCKET}/training-data/{user_id}/",
-                            "S3DataDistributionType": "FullyReplicated"
-                        }
-                    },
-                    "ContentType": "application/json"
-                },
-                {
-                    "ChannelName": "model",
-                    "DataSource": {
-                        "S3DataSource": {
-                            "S3DataType": "S3Prefix",
-                            "S3Uri": f"s3://{S3_BUCKET}/{model_path}",
-                            "S3DataDistributionType": "FullyReplicated"
-                        }
-                    }
-                }
-            ],
-            "OutputDataConfig": {
-                "S3OutputPath": f"s3://{S3_BUCKET}/training-output/{user_id}/"
-            },
-            "ResourceConfig": {
-                "InstanceType": "ml.c5.xlarge",
-                "InstanceCount": 1,
-                "VolumeSizeInGB": 10
-            },
-            "StoppingCondition": {
-                "MaxRuntimeInSeconds": 3600
-            },
-            "HyperParameters": training_request.hyperparameters or {}
-        }
-        
-        response = sagemaker_client.create_training_job(**training_params)
-        
-        # Update training job info in database
-        training_job = {
-            "job_id": job_name,
-            "status": "InProgress",
-            "started_at": datetime.now().isoformat()
-        }
-        
-        model_collection.update_one(
-            {"user_id": user_id},
-            {"$push": {"training_jobs": training_job}},
-            upsert=True
-        )
-        
-        response = ModelTrainingResponse(
-            job_id=job_name,
-            status="InProgress",
-            estimated_completion_time=(datetime.now().isoformat() + timedelta(hours=1)).isoformat()
-        )
-        
-        return jsonify(response.dict())
     except Exception as e:
-        logger.error(f"Error starting training job: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Unexpected error in invoke_user_model: {str(e)}", exc_info=True)
+        return "I'm sorry, an unexpected error occurred while processing your request.", 0.0
 
-@chat_bp.route("/health", methods=["GET"])
-def health_check():
-    """Health check endpoint"""
-    try:
-        # Check AWS services
-        s3_client.list_buckets()
-        
-        # Check MongoDB connection
-        db.command("ping")
-        
-        return jsonify({
-            "status": "healthy", 
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return jsonify({
-            "status": "unhealthy", 
-            "error": str(e)
-        }), 500
 
-# Helper Functions
+
+# ------------------------------------------------------------------------ Helper Functions ------------------------------------------------------------------------
 def get_user_model_path(user_id: str) -> str:
     """Get the path to the user's model, or initialize if needed"""
     user_model_key = f"models/{user_id}/model.pt"
@@ -611,6 +538,7 @@ def create_user_model(user_id):
     except Exception as e:
         print(f"Error copying base model: {e}")
 
+# ------------------------------------------------------------------------ Helper Functions ------------------------------------------------------------------------
 
 def predict_emotions(text, threshold=0.3):
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -637,70 +565,7 @@ def predict_emotions(text, threshold=0.3):
 
     return json.dumps(response, indent=4)  # Standardized JSON output
 
-
-
-def invoke_user_model(user_id: str, message: str, context: Dict = None):
-    """Invoke the user's personalized model from S3."""
-    try:
-        print("SAGAMAKER operational, invoking SAGAMAKER model ...")
-
-        user_model_path = f"models/{user_id}/model.pt"
-
-        # If user model does not exist, initialize from base model
-        if not check_s3_object_exists(S3_BUCKET, user_model_path):
-            copy_s3_object(S3_BUCKET, "models/model.pt", S3_BUCKET, user_model_path)
-
-        # Use SageMaker for production inference
-        # if SAGEMAKER_ENDPOINT:s
-        if SAGEMAKER_ENDPOINT:
-            payload = {
-                "user_id": user_id,
-                "model_path": user_model_path,
-                "message": message,
-                "context": context or {}
-            }
-
-            logger.info(f"Invoking user model at {SAGEMAKER_ENDPOINT} for user {user_id}")
-            start_time = time.time()
-            try:
-                response = sagemaker_runtime.invoke_endpoint(
-                    EndpointName=SAGEMAKER_ENDPOINT,
-                    ContentType='application/json',
-                    Body=json.dumps(payload),
-                )
-                logger.info(f"Response received: {response}")
-            except Exception as e:
-                logger.error(f"Error invoking endpoint: {e}")
-
-            inference_time = time.time() - start_time
-
-        # Local inference (development mode)
-        else:
-            print("SAGAMAKER not operational, invoking USER model ...")
-            local_model_path = f"/tmp/{user_id}_model.pt"
-            print("Downloading model may take time ...")
-
-            download_model_from_s3(user_model_path, local_model_path)
-            model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=28)
-            model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
-            # model.to(DEVICE)
-            model.eval()
-
-            # Generate response
-            print("USER - prediction generation")
-            start_time = time.time()
-            output = predict_emotions(message)
-            inference_time = time.time() - start_time
-            # output
-            print("USER - prediction outout : " , output)
-            return output, inference_time
-
-
-    except Exception as e:
-        logger.error(f"Error invoking user model: {e}")
-        return f"I'm sorry, I encountered an error: {str(e)}", 0.0
-
-
+    
 def update_user_model(user_id: str, chat_data: Dict):
     """Update the user's model based on chat interaction (stored in S3)."""
     try:
