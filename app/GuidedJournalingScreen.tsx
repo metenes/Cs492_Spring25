@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,11 @@ import {
   TouchableWithoutFeedback,
   Image,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { saveJournalEntry } from "./services/ApiService";
+import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import BottomNavigation from "./BottomNavigation";
 
 const MAX_CHAR_COUNT = 10000;
@@ -21,9 +22,52 @@ const GuidedJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { prompt } = route.params;
+
+  // Load draft when component mounts
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        setIsLoading(true);
+        const draft = await getDraft();
+        if (draft) {
+          console.log("Loaded guided journaling draft:", draft);
+          setContent(draft.content || "");
+          setImageUris(draft.images || []);
+        }
+      } catch (error) {
+        console.error("Error loading guided journaling draft:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadDraft();
+  }, []);
+
+  // Save draft when content or images change
+  useEffect(() => {
+    if (isLoading) return; // Skip saving during initial load
+    
+    const timeoutId = setTimeout(() => {
+      console.log("Auto-saving guided journaling draft");
+      saveDraft(content, imageUris);
+    }, 1000); // Save draft 1 second after last change
+
+    return () => clearTimeout(timeoutId);
+  }, [content, imageUris, isLoading]);
+
+  // Also save when leaving the screen
+  useEffect(() => {
+    return () => {
+      if (content || imageUris.length > 0) {
+        console.log("Saving draft on exit");
+        saveDraft(content, imageUris);
+      }
+    };
+  }, [content, imageUris]);
 
   const handleSaveEntry = async () => {
     const token = await AsyncStorage.getItem("userToken");
@@ -32,15 +76,26 @@ const GuidedJournalingScreen = () => {
       return;
     }
 
-    const response = await saveJournalEntry(content, imageUris ,"guided", prompt); // need to save the prompt for guided category
+    const response = await saveJournalEntry(content, imageUris, "guided", prompt);
 
     if (response.error) {
       alert("Failed to save journal entry.");
     } else {
+      // Clear draft after successful save
+      await clearDraft();
       alert("Journal entry saved successfully!");
       navigation.navigate("Home");
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#FFF" }}>
+        <ActivityIndicator size="large" color="black" />
+        <Text style={{ marginTop: 20 }}>Loading your journal...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -60,7 +115,7 @@ const GuidedJournalingScreen = () => {
               backgroundColor: "#f9f9f9",
               borderRadius: 10,
             }}>
-              “{prompt}”
+              "{prompt}"
             </Text>
           </View>
 

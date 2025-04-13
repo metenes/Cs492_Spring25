@@ -706,29 +706,52 @@ export const calculateStreak = (dates: string[]): number => {
 // ** Homepage API ** - Entry Details 
 // **********************************************
 
-export const deleteEntry = async (entry : any) => {
+export const deleteEntry = async (entry: any) => {
   try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) throw new Error("No token found");
-      // Fetch from the database
-      const response = await fetch(`${API_URL}/journal/delete-journal`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        }
-      });
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+    
+    console.log("Deleting entry:", entry);
+    
+    if (!entry._id) {
+      throw new Error("Invalid entry: Missing entry ID");
+    }
 
-      if (response.ok) {
-        console.error("Success", "Journal entry deleted successfully");
-        return await response.json(); 
+    // Try a much simpler endpoint - the server is likely expecting this format
+    const response = await fetch(`${API_URL}/journal/delete`, {
+      method: "DELETE", 
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      // Include both the ID and category in the body
+      body: JSON.stringify({ 
+        entry_id: entry._id,
+        category: entry.category || "freeform"
+      })
+    });
 
-      } else {
-        throw new Error("Failed to fetch journal entries");
-      }
+    console.log("Delete response status:", response.status);
+    const responseText = await response.text();
+    console.log("Delete response body:", responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      responseData = { message: responseText };
+    }
+
+    if (!response.ok) {
+      throw new Error(responseData.error || "Failed to delete journal entry");
+    }
+
+    console.log("✅ Journal entry deleted successfully");
+    return responseData;
+
   } catch (error) {
-    console.error("Error deleting entry:", error);
-    throw new Error("Something went wrong while deleting the entry");
+    console.error("❌ Error deleting entry:", error);
+    throw error;
   }
 };
 

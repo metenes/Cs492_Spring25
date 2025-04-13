@@ -6,7 +6,7 @@ import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
-import { deleteEntry } from "./services/ApiService";
+import { API_URL, deleteEntry } from "./services/ApiService";
 
 import { Feather } from "@expo/vector-icons"; // for emotion and reason icons
 
@@ -96,7 +96,7 @@ const EntryDetail = () => {
   };
   
   // Handle deleting entry
-  const handleDeleteEntry = async () => {
+  const handleDeleteEntry = () => {
     Alert.alert(
       "Confirm Delete",
       "Are you sure you want to delete this journal entry? This action cannot be undone.",
@@ -105,12 +105,24 @@ const EntryDetail = () => {
         { 
           text: "Delete", 
           style: "destructive",
-          onPress: deleteEntry(entry)
+          onPress: async () => {
+            try {
+              console.log("Attempting to delete entry with ID:", entry._id);
+              
+              // Use the deleteEntry function from ApiService
+              await deleteEntry(entry);
+              
+              // If successful, show success message and navigate back
+              Alert.alert("Success", "Entry deleted successfully");
+              navigation.navigate("Home"); // Remove the refresh param to fix type error
+            } catch (error) {
+              console.error("Delete error:", error);
+              Alert.alert("Error", error.message || "Failed to delete entry");
+            }
+          }
         }
       ]
     );
-    // Navigate back and refresh the home screen
-    navigation.navigate("Home");
   };
   
   return (
