@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 
 import { Platform } from "react-native";
+import { saveNotificationToken } from "./services/ApiService";
 
 export interface PushNotificationState {
     notification?: Notifications.Notification | null;
@@ -74,6 +75,13 @@ export const usePushNotifications = (): PushNotificationState => {
                 console.log("Android notification channel set up");
             }
 
+            saveNotificationToken(token.data).then((response) => {
+                console.log("Notification token saved successfully:", response);
+            }
+            ).catch((error) => {
+                console.error("Error saving notification token:", error);
+            });
+
             return token.data;
         }
         else {
@@ -93,7 +101,7 @@ export const usePushNotifications = (): PushNotificationState => {
         });
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-            console.log(response);
+            console.log("response:", response);
         });
 
         return () => {

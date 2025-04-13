@@ -27,21 +27,39 @@ const categories = ["All", "Anxiety", "Gratitude", "Productivity", "Personal Gro
 const PromptSelectionScreen = () => {
   const navigation = useNavigation<PromptSelectionScreenNavigationProp>();
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
 
   const filteredPrompts =
     selectedCategory === "All"
       ? promptList
       : promptList.filter((p) => p.category === selectedCategory);
 
-  const renderPrompt = ({ item }: { item: typeof promptList[0] }) => (
-    <TouchableOpacity
-      style={styles.promptCard}
-      onPress={() => navigation.navigate("GuidedJournaling", { prompt: item.text })}
-    >
-      <Text style={styles.promptTitle}>Prompt {item.id}</Text>{/* : {item.text} */}
-      <Text style={styles.promptCategory}>{item.category}</Text>
-    </TouchableOpacity>
-  );
+  const toggleExpand = (id: number) => {
+    setExpandedPromptId(prev => (prev === id ? null : id));
+  };
+
+  const renderPrompt = ({ item }: { item: typeof promptList[0] }) => {
+    const isExpanded = expandedPromptId === item.id;
+
+    return (
+      <TouchableOpacity onPress={() => toggleExpand(item.id)} style={styles.promptCard}>
+        <Text style={styles.promptTitle}>Prompt {item.id}</Text>
+        <Text style={styles.promptCategory}>{item.category}</Text>
+
+        {isExpanded && (
+          <>
+            <Text style={styles.promptText}>{item.text}</Text>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={() => navigation.navigate("GuidedJournaling", { prompt: item.text })}
+            >
+              <Text style={styles.startButtonText}>Start Writing</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -53,7 +71,10 @@ const PromptSelectionScreen = () => {
               styles.filterButton,
               selectedCategory === cat && styles.activeFilter,
             ]}
-            onPress={() => setSelectedCategory(cat)}
+            onPress={() => {
+              setExpandedPromptId(null);
+              setSelectedCategory(cat);
+            }}
           >
             <Text>{cat}</Text>
           </TouchableOpacity>
@@ -93,6 +114,22 @@ const styles = StyleSheet.create({
   },
   promptTitle: { fontWeight: "bold", fontSize: 16 },
   promptCategory: { color: "#666", marginTop: 4 },
+  promptText: {
+    marginTop: 10,
+    fontSize: 15,
+    color: "#333",
+  },
+  startButton: {
+    marginTop: 10,
+    backgroundColor: "#000",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  startButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+  },
 });
 
 export default PromptSelectionScreen;

@@ -10,11 +10,13 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import BottomNavigation from "./BottomNavigation";
+//import { saveGuidedJournalEntry } from "./services/ApiService";
 
 const MAX_CHAR_COUNT = 10000;
 
@@ -70,23 +72,40 @@ const GuidedJournalingScreen = () => {
   }, [content, imageUris]);
 
   const handleSaveEntry = async () => {
-    const token = await AsyncStorage.getItem("userToken");
-    if (!token) {
-      alert("Authentication error. Please log in again.");
+    if (!content.trim()) {
+      Alert.alert("Empty Entry", "Please write something before saving.");
       return;
     }
-
-    const response = await saveJournalEntry(content, imageUris, "guided", prompt);
-
-    if (response.error) {
-      alert("Failed to save journal entry.");
-    } else {
-      // Clear draft after successful save
+  
+    try {
+      // Check if user is authenticated
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "User not authenticated.");
+        return;
+      }
+  
+      // Save the journal entry, including images
+      const response = await saveJournalEntry(content, imageUris, "guided", prompt);
+  
+      if (response.error) {
+        Alert.alert("Error", "Failed to save entry.");
+        return;
+      }
+  
+      // Clear the draft if everything is successful
       await clearDraft();
-      alert("Journal entry saved successfully!");
+  
+      Alert.alert("Saved", "Your guided entry has been saved.");
       navigation.navigate("Home");
+      
+    } catch (error) {
+      console.error("Error saving guided entry:", error);
+      Alert.alert("Error", "Something went wrong.");
     }
   };
+  
+  
 
   if (isLoading) {
     return (

@@ -263,7 +263,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </Text>
         </View>
         <View style={styles.entryContent}>
-          <Text style={styles.entryDate}>{formattedDate}</Text>
+          <Text style={[styles.entryDate, { fontWeight: 'bold' }]}>{formattedDate}</Text>
           <Text style={styles.entrySubtitle} numberOfLines={2}>
             {item.entryContent || "No content"}
           </Text>
