@@ -3,6 +3,60 @@ import { Dimensions, Text, View, StyleSheet, Animated } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { fetchSentimentAnalysis } from "../services/ApiService";
 
+// Replace the styles object with static styles
+const styles = StyleSheet.create({
+  skeletonContainer: {
+    width: Dimensions.get("window").width - 32,
+    borderRadius: 12,
+    marginVertical: 8,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    height: 350,
+  },
+  skeletonShimmer: {
+    position: "absolute",
+    width: "100%",
+    height: 350,
+  },
+  skeletonText: {
+    fontSize: 16,
+  },
+  placeholderContainer: {
+    padding: 16,
+    height: 370,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontSize: 18,
+    textAlign: "center",
+  },
+  emptyTableHeader: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  table: {
+    width: "100%",
+    borderRadius: 8,
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 4,
+    borderTopWidth: 1,
+  },
+  tableCell: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: "center",
+  },
+  tableHeaderCell: {
+    fontWeight: "bold",
+  },
+});
+
 // Props for SentimentChart component
 interface SentimentChartProps {
   selectedEmotions: string[];
@@ -432,66 +486,3 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  skeletonContainer: {
-    width: Dimensions.get("window").width - 32,
-    backgroundColor: (props) => props.darkMode ? '#2C2C2C' : '#f0f0f0',
-    borderRadius: 12,
-    marginVertical: 8,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-    height: 350,
-  },
-  skeletonShimmer: {
-    position: "absolute",
-    width: "100%",
-    height: 350,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  skeletonText: {
-    fontSize: 16,
-    color: (props) => props.darkMode ? '#B0B0B0' : '#666',
-  },
-  placeholderContainer: {
-    padding: 16,
-    height: 370,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: (props) => props.darkMode ? '#121212' : '#fff',
-  },
-  placeholderText: {
-    fontSize: 18,
-    color: (props) => props.darkMode ? '#B0B0B0' : '#888',
-    textAlign: "center",
-  },
-  emptyTableHeader: {
-    fontSize: 16,
-    color: (props) => props.darkMode ? '#B0B0B0' : '#666',
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  table: {
-    width: "100%",
-    backgroundColor: (props) => props.darkMode ? '#2C2C2C' : '#fff',
-    borderRadius: 8,
-  },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderColor: (props) => props.darkMode ? '#404040' : '#EEEEEE',
-  },
-  tableCell: {
-    fontSize: 14,
-    color: (props) => props.darkMode ? '#B0B0B0' : '#666',
-    flex: 1,
-    textAlign: "center",
-  },
-  tableHeaderCell: {
-    fontWeight: "bold",
-    color: (props) => props.darkMode ? '#FFFFFF' : '#000',
-  },
-});
