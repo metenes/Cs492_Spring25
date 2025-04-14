@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
 import { Platform } from "react-native";
@@ -55,6 +55,7 @@ export const usePushNotifications = (): PushNotificationState => {
                 token = await Notifications.getExpoPushTokenAsync({
                     projectId: projectId,
                 });
+                await AsyncStorage.setItem("expoPushToken", token.data);
             }
             catch (error) {
                 console.error("Error getting Expo push token:", error);

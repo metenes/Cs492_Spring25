@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_URL = "http://172.20.10.2:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-// const API_URL = "http://192.168.1.40:5000"; kgn
+// const API_URL = "http://192.168.0.28:5000"; //kgn
 // Define the emotions array to match the backend
 const EMOTIONS = [
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -18,7 +18,7 @@ const EMOTIONS = [
 export const analyzeSentiment = async (text: string) => {
   try {
     console.log("🚀 Starting analyzeSentiment with text:", text.substring(0, 50) + "...");
-    
+
     const response = await fetch(`${API_URL}/sentiment/analyze`, {
       method: "POST",
       headers: {
@@ -115,7 +115,7 @@ export const fetchSentimentAnalysis = async (
       console.error("API response not OK:", response.statusText);
       throw new Error(`Error: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("API sentiment analysis data:", data);
     return data;
@@ -146,7 +146,7 @@ export const fetchJournalEntriesWithDate = async (
         "Authorization": `Bearer ${token}`,
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
     }
@@ -178,7 +178,7 @@ export const sendMessage = async (message: string) => {
     }
 
     const data = await response.json();
-    console.log("Data recived from test : " , data)
+    console.log("Data recived from test : ", data)
     if (!data.reply) {
       throw new Error("Invalid response format");
     }
@@ -224,10 +224,27 @@ export const loginUser = async (email: string, password: string) => {
     await AsyncStorage.setItem("userToken", responseData.access_token);
     console.log("🔹 Token successfully saved to AsyncStorage!");
 
-    return responseData; 
+    const expoPushToken = await AsyncStorage.getItem("expoPushToken");
+    if (!expoPushToken) {
+      console.warn("No Expo push token saved locally.");
+    } else {
+      const pushTokenResponse = await fetch(`${API_URL}/notification/update-push-token-user`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${responseData.access_token}`
+        },
+        body: JSON.stringify({ token: expoPushToken })
+      });
+
+      const pushResponseData = await pushTokenResponse.json();
+      console.log("Push token update response:", pushResponseData);
+    }
+
+    return responseData;
   } catch (error) {
     console.error("Login error:", error);
-    throw error; 
+    throw error;
   }
 };
 
@@ -305,7 +322,7 @@ export const fetchProfile = async (token: string) => {
   const userData = await userResponse.json();
   const userId = userData._id;
 
-  if(userId == -1){
+  if (userId == -1) {
     throw new Error(`Failed to userId -1`);
   }
 
@@ -332,7 +349,7 @@ export const fetchProfile = async (token: string) => {
     phone: profileData.phone || '',
     location: profileData.location || '',
     profileImageUrl: profileData.profileImageUrl || null,
-    
+
     // Including the previously existing fields for backward compatibility
     profile_picture: profileData.profileImageUrl || null,
     preferences: profileData.preferences || {},
@@ -360,7 +377,7 @@ export const updateProfile = async (token: string, profileData: any) => {
   const userData = await userResponse.json();
   const userId = userData._id;
 
-  if(userId == -1){
+  if (userId == -1) {
     throw new Error(`Failed to userId -1`);
   }
 
@@ -384,26 +401,26 @@ export const updateProfile = async (token: string, profileData: any) => {
 // Upload profile image
 export const uploadProfileImage = async (token: string, imageFile: File) => {
 
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-  
-    const userData = await userResponse.json();
-    const userId = userData._id;
-  
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if (userId == -1) {
+    throw new Error(`Failed to userId -1`);
+  }
+
+
   const formData = new FormData();
   formData.append('profileImage', imageFile);
 
@@ -449,24 +466,24 @@ export const logActivity = async (token: string, activity: string) => {
 // Delete user account
 export const deleteAccount = async (token: string) => {
 
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-  
-    const userData = await userResponse.json();
-    const userId = userData._id;
-  
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if (userId == -1) {
+    throw new Error(`Failed to userId -1`);
+  }
 
   const response = await fetch(`${API_URL}/user/${userId}/delete-user`, {
     method: "DELETE",
@@ -579,7 +596,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
     }));
 
     console.log("Final mapped sentiments:", mappedSentiments);
-    console.log("CATEGORY : " , category)
+    console.log("CATEGORY : ", category)
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
@@ -710,22 +727,22 @@ export const deleteEntry = async (entry: any) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
-    
+
     console.log("Deleting entry:", entry);
-    
+
     if (!entry._id) {
       throw new Error("Invalid entry: Missing entry ID");
     }
 
     // Try a much simpler endpoint - the server is likely expecting this format
     const response = await fetch(`${API_URL}/journal/delete`, {
-      method: "DELETE", 
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
       // Include both the ID and category in the body
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         entry_id: entry._id,
         category: entry.category || "freeform"
       })
@@ -734,7 +751,7 @@ export const deleteEntry = async (entry: any) => {
     console.log("Delete response status:", response.status);
     const responseText = await response.text();
     console.log("Delete response body:", responseText);
-    
+
     let responseData;
     try {
       responseData = JSON.parse(responseText);
@@ -881,7 +898,7 @@ export const submitCheckIn = async (token: string, sentiments: string[], causes:
     const userData = await userResponse.json();
     const userId = userData._id;
 
-    if(userId == -1){
+    if (userId == -1) {
       throw new Error(`Failed to userId -1`);
     }
 
@@ -903,7 +920,7 @@ export const submitCheckIn = async (token: string, sentiments: string[], causes:
     });
 
     console.log("Response status:", response.status);
-    
+
     // Read response as text first to handle cases where it's not JSON
     const rawText = await response.text();
     console.log("Raw response:", rawText);
@@ -963,11 +980,11 @@ export const getCheckInHistory = async (token: string) => {
 export const deleteCheckIn = async (checkInId: string) => {
   try {
     const token = await AsyncStorage.getItem('userToken');
-    
+
     if (!token) {
       throw new Error('Authentication required');
     }
-    
+
     const response = await fetch(`${API_URL}/checkin/${checkInId}`, {
       method: 'DELETE',
       headers: {
