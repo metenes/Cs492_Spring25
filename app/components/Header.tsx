@@ -154,7 +154,7 @@ export function Header(props: HeaderProps) {
     backgroundColor = colors.background,
     LeftActionComponent,
     leftIcon,
-    leftIconColor,
+    leftIconColor = colors.text,
     leftText,
     leftTx,
     leftTxOptions,
@@ -162,7 +162,7 @@ export function Header(props: HeaderProps) {
     onRightPress,
     RightActionComponent,
     rightIcon,
-    rightIconColor,
+    rightIconColor = colors.text,
     rightText,
     rightTx,
     rightTxOptions,
@@ -208,7 +208,7 @@ export function Header(props: HeaderProps) {
               weight="medium"
               size="md"
               text={titleContent}
-              style={[$title, $titleStyleOverride]}
+              style={[themed($title), $titleStyleOverride]}
             />
           </View>
         )}
@@ -279,9 +279,10 @@ const $container: ViewStyle = {
   width: "100%",
 }
 
-const $title: TextStyle = {
+const $title: ThemedStyle<TextStyle> = ({ colors }) => ({
   textAlign: "center",
-}
+  color: colors.text,
+})
 
 const $actionTextContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 0,

@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, SafeAreaView, Image, Modal } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
-import { API_URL, deleteEntry } from "./services/ApiService";
+import { API_URL, deleteEntry, uploadJournalImage, deleteJournalImage } from "./services/ApiService";
+import * as ImagePicker from 'expo-image-picker';
 
 import { Feather } from "@expo/vector-icons"; // for emotion and reason icons
 
@@ -48,9 +49,12 @@ const EntryDetail = () => {
   const route = useRoute<EntryDetailRouteProp>();
   const { entry } = route.params;
   
-  // State for editing mode
+  // State for editing mode and image selection
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(entry.entryContent);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [images, setImages] = useState(entry.images || []);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Format the date
   let formattedDate = "Invalid date";
@@ -72,26 +76,30 @@ const EntryDetail = () => {
         return;
       }
       
-      const response = await fetch(`YOUR_API_ENDPOINT/journal/${entry._id}`, {
+      const response = await fetch(`${API_URL}/journal/${entry._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ entryContent: editedContent })
+        body: JSON.stringify({ 
+          entryContent: editedContent,
+          images: images // Include the updated images array
+        })
       });
       
-      if (response.ok) {
-        Alert.alert("Success", "Journal entry updated successfully");
-        setIsEditing(false);
-        // Navigate back and refresh the home screen
-        navigation.navigate("Home");
-      } else {
-        Alert.alert("Error", "Failed to update journal entry");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update journal entry");
       }
+      
+      Alert.alert("Success", "Journal entry updated successfully");
+      setIsEditing(false);
+      // Navigate back and refresh the home screen
+      navigation.navigate("Home");
     } catch (error) {
       console.error("Error updating entry:", error);
-      Alert.alert("Error", "Something went wrong while updating the entry");
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update journal entry");
     }
   };
   
@@ -124,7 +132,60 @@ const EntryDetail = () => {
       ]
     );
   };
-  
+
+  // Handle adding new image
+  const handleAddImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Please grant camera roll permissions to add images.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!pickerResult.canceled && pickerResult.assets[0]) {
+        setIsUploading(true);
+        try {
+          const signedUrl = await uploadJournalImage(pickerResult.assets[0].uri);
+          const newImage = {
+            fileName: `uploads/${pickerResult.assets[0].uri.split('/').pop()}`,
+            signedUrl: signedUrl
+          };
+          setImages([...images, newImage]);
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          Alert.alert('Error', 'Failed to upload image. Please try again.');
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  // Handle deleting image
+  const handleDeleteImage = async (image: { signedUrl: string }) => {
+    try {
+      await deleteJournalImage(image.signedUrl);
+      setImages(images.filter((img: { signedUrl: string }) => img.signedUrl !== image.signedUrl));
+      if (selectedImage === image.signedUrl) {
+        setSelectedImage(null);
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      Alert.alert('Error', 'Failed to delete image. Please try again.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -202,9 +263,9 @@ const EntryDetail = () => {
             )}
           </>
         ) : (
-
-            <>
-              {isEditing ? (
+          <>
+            {isEditing ? (
+              <>
                 <TextInput
                   style={styles.editor}
                   multiline
@@ -212,24 +273,104 @@ const EntryDetail = () => {
                   onChangeText={setEditedContent}
                   autoFocus
                 />
-              ) : (
-                <Text style={styles.entryContent}>{entry.entryContent}</Text>
-              )}
+                
+                {/* Image Management Section - Only for free journaling entries */}
+                {entry.category === "freeform" && (
+                  <View style={styles.imagesContainer}>
+                    <View style={styles.imagesHeader}>
+                      <Text style={styles.sectionTitle}>Images</Text>
+                      <TouchableOpacity 
+                        style={styles.addImageButton}
+                        onPress={handleAddImage}
+                        disabled={isUploading}
+                      >
+                        <Icon name="plus" size={24} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <ScrollView horizontal style={styles.imagesScrollView}>
+                      {images.map((image: { signedUrl: string }, index: number) => (
+                        <View key={index} style={styles.imageWrapper}>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedImage(image.signedUrl)}
+                          >
+                            <Image
+                              source={{ uri: image.signedUrl }}
+                              style={styles.entryImage}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.deleteImageButton}
+                            onPress={() => handleDeleteImage(image)}
+                          >
+                            <Icon name="trash-2" size={20} color="#FF0000" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </>
+            ) : (
+              <Text style={styles.entryContent}>{entry.entryContent}</Text>
+            )}
 
-              {entry.journalSentiments && entry.journalSentiments.length > 0 && (
-                <View style={styles.sentimentsContainer}>
-                  <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
-                  {entry.journalSentiments.map((sentiment: { type: string; score: string }, index) => (
-                    <Text key={index} style={styles.sentimentItem}>
-                      {sentiment.type}: {sentiment.score}
-                    </Text>
+            {/* Display images for free journaling entries */}
+            {entry.category === "freeform" && images.length > 0 && (
+              <View style={styles.imagesContainer}>
+                <Text style={styles.sectionTitle}>Images</Text>
+                <ScrollView horizontal style={styles.imagesScrollView}>
+                  {images.map((image: { signedUrl: string }, index: number) => (
+                    <TouchableOpacity 
+                      key={index} 
+                      onPress={() => setSelectedImage(image.signedUrl)}
+                      style={styles.imageWrapper}
+                    >
+                      <Image
+                        source={{ uri: image.signedUrl }}
+                        style={styles.entryImage}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
                   ))}
-                </View>
-              )}
-            </>
-          )}
+                </ScrollView>
+              </View>
+            )}
+
+            {entry.journalSentiments && entry.journalSentiments.length > 0 && (
+              <View style={styles.sentimentsContainer}>
+                <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
+                {entry.journalSentiments.map((sentiment: { type: string; score: string }, index: number) => (
+                  <Text key={index} style={styles.sentimentItem}>
+                    {sentiment.type}: {sentiment.score}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </>
+        )}
 
       </ScrollView>
+
+      {/* Image Preview Modal */}
+      <Modal visible={!!selectedImage} transparent={true} animationType="fade">
+        <View style={styles.modalContainer}>
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          )}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -354,7 +495,62 @@ const styles = StyleSheet.create({
     color: "#444",
   },
   
-  
+  imagesContainer: {
+    marginTop: 20,
+  },
+  imagesScrollView: {
+    marginTop: 10,
+  },
+  imageWrapper: {
+    marginRight: 10,
+    position: 'relative',
+  },
+  entryImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '90%',
+    height: '70%',
+    borderRadius: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    bottom: 20,
+    backgroundColor: '#FFF',
+    padding: 10,
+    borderRadius: 5,
+  },
+  closeButtonText: {
+    color: '#000',
+    fontSize: 16,
+  },
+  imagesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  addImageButton: {
+    padding: 8,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+  },
+  deleteImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 5,
+    borderRadius: 15,
+  },
 });
 
 export default EntryDetail;

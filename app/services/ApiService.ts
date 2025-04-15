@@ -559,7 +559,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 // ** Homepage API ** - FreeJournal & Guided Journal
 // **********************************************
 
-export const saveJournalEntry = async (content: string, images?: string[], category?: string, promt?: string) => {
+export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -600,10 +600,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
-      images: images?.map(image => ({
-        fileName: `uploads/${image}`,
-        signedUrl: image
-      })) || [],
+      images: images || [],
       journalSentiments: mappedSentiments,
       category: category,
       prompt: promt
@@ -1068,3 +1065,107 @@ export const saveNotificationToken = async (token: string) => {
     throw error;
   }
 }
+
+// **********************************************
+// ** Journal Image Upload API **
+// **********************************************
+
+export const uploadJournalImage = async (imageUri: string): Promise<string> => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Extract the original filename from the URI
+    const originalFileName = imageUri.split('/').pop();
+    if (!originalFileName) {
+      throw new Error('Invalid image URI');
+    }
+
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    } as any);
+
+    console.log('Uploading image with FormData:', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    });
+
+    const uploadResponse = await fetch(`${API_URL}/journal/upload-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      console.error('Upload failed:', errorData);
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+
+    const data = await uploadResponse.json();
+    console.log('Upload successful:', data);
+    return data.signedUrl; // Return the signed URL from the response
+  } catch (error) {
+    console.error('Error uploading journal image:', error);
+    throw error;
+  }
+};
+
+export const deleteJournalImage = async (imageUrl: string): Promise<void> => {
+  try {
+    console.log('🗑️ Starting image deletion for URL:', imageUrl);
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Extract the S3 key from the signed URL
+    const url = new URL(imageUrl);
+    // Get the pathname and remove the leading slash
+    const pathname = url.pathname;
+    // Remove any query parameters and get the key
+    const key = pathname.substring(1).split('?')[0];
+    console.log('🗑️ Extracted S3 key:', key);
+
+    const requestBody = { s3Key: key };
+    console.log('🗑️ Request body:', JSON.stringify(requestBody));
+
+    const response = await fetch(`${API_URL}/journal/delete-image`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('🗑️ Response status:', response.status);
+    const responseText = await response.text();
+    console.log('🗑️ Response body:', responseText);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch (e) {
+        errorData = { error: responseText };
+      }
+      console.error('❌ Delete failed:', errorData);
+      throw new Error(errorData.error || 'Failed to delete image');
+    }
+
+    console.log('✅ Image deleted successfully');
+  } catch (error) {
+    console.error('❌ Error deleting journal image:', error);
+    throw error;
+  }
+};
