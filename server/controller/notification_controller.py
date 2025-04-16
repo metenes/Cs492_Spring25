@@ -63,13 +63,17 @@ def update_push_token_user():
 
 
 def send_daily_reminders():
-    print("📅 Running daily reminder job...")
+    print("Running daily reminder job...")
 
     user_tokens = get_all_user_push_tokens()
     for user_id in user_tokens:
+        has_user_written_today = has_written_journal_today(user_id)
+        if has_user_written_today:
+            continue
+        
         result = send_push_to_user_id(
             user_id,
             "🌞 Daily Reminder",
-            "Don't forget to check in and stay productive today!"
+            "Don't forget to write your journal for today!"
         )
-        print(f"🔔 Sent to {user_id}: {result}")
+        print(f" Notification Sent to {user_id}: {result}")
