@@ -17,6 +17,7 @@ from transformers import pipeline
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, JWTManager, create_access_token
 from flask_bcrypt import Bcrypt
+from flask_apscheduler import APScheduler
 # import bcrypt
 from flask_mail import Mail, Message
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
@@ -34,7 +35,8 @@ from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
 from controller.check_in_controller import check_bp
-from controller.notification_controller import notification_bp
+from controller.notification_controller import notification_bp, send_daily_reminders
+
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
@@ -284,6 +286,24 @@ def predict():
         input="{}"
     )
     return response """
+
+class Config:
+    SCHEDULER_API_ENABLED = True
+
+app.config.from_object(Config())
+
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+
+# send daily reminders at 7:30 PM
+scheduler.add_job(
+    id='daily_reminder_job',
+    func=send_daily_reminders,
+    trigger='cron',
+    hour=19,
+    minute=30
+)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

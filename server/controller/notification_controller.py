@@ -2,6 +2,9 @@ from flask import Blueprint, request, jsonify
 from utils.database import notification_tokens_collection
 from datetime import datetime
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import requests
+from bson import ObjectId
+from utils.notification_helper import *
 
 notification_bp = Blueprint("notification_bp", __name__)
 
@@ -46,7 +49,7 @@ def update_push_token_user():
 
         result = notification_tokens_collection.update_one(
             {"token": token},
-            {"$set": {"user_id": user_id, "updated_at": datetime.utcnow()}}
+            {"$set": {"user_id": ObjectId(user_id), "updated_at": datetime.utcnow()}}
         )
 
         if result.matched_count == 0:
@@ -57,3 +60,16 @@ def update_push_token_user():
     except Exception as e:
         print(f"❌ Error in update_push_token_user: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+def send_daily_reminders():
+    print("📅 Running daily reminder job...")
+
+    user_tokens = get_all_user_push_tokens()
+    for user_id in user_tokens:
+        result = send_push_to_user_id(
+            user_id,
+            "🌞 Daily Reminder",
+            "Don't forget to check in and stay productive today!"
+        )
+        print(f"🔔 Sent to {user_id}: {result}")
