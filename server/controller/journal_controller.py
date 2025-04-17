@@ -15,13 +15,6 @@ def save_journal_entry():
         user_id = get_jwt_identity()
         print(f"🔹 User ID: {user_id}")
         
-        # Validate user_id format
-        try:
-            user_object_id = ObjectId(user_id)
-        except:
-            print("❌ Invalid user ID format")
-            return jsonify({"error": "Invalid user ID format"}), 400
-        
         data = request.get_json()
         print(f"🔹 Received data: {data}")
         
@@ -141,9 +134,7 @@ def get_journal_entries():
         else:
             if not journal_data:
                 print("⚠️ No journal data found for this user at all.")
-                # This might be because the user hasn't created any journal entries yet
                 print("⚠️ Creating empty journal entries document for user")
-                # Optionally, you could initialize an empty document here
             elif "journalEntries" not in journal_data:
                 print("⚠️ Document exists but has no journalEntries field.")
                 print(f"⚠️ Document keys: {journal_data.keys()}")
@@ -370,62 +361,66 @@ def sentiment_analysis():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# TODO
 @journal_bp.route("/update-journal-entry/<entry_id>", methods=["PUT"])
 @jwt_required()
 def update_journal_entry(entry_id):
     try:
-        data = request.json
-        user_id  = get_jwt_identity()  # Get the user ID
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        print(f"🔄 Updating entry: {entry_id} for user: {user_id}")
+        print(f"📦 Data: {data}")
 
-        if not user_id:
-            return jsonify({"error": "Unauthorized"}), 401
+        if not ObjectId.is_valid(entry_id):
+            return jsonify({"error": "Invalid entry ID"}), 400
 
         update_data = {
-            "_id": data["_id"],
-            "entryContent": data["entryContent"],
-            "images": data.get("images", []),
-            "journalSentiments": data.get("journal_sentiments"),
-            "createdAt": datetime.now().isoformat(),
-            "category" : data.get("category"),
-            "prompt" : data.get("prompt")
+            "journalEntries.$.entryContent": data["entryContent"],
+            "journalEntries.$.images": data.get("images", []),
+            "journalEntries.$.journalSentiments": data.get("journalSentiments", []),
+            "journalEntries.$.category": data.get("category"),
+            "journalEntries.$.prompt": data.get("prompt"),
+            "journalEntries.$.createdAt": datetime.now().isoformat()
         }
 
-        # Update the current journal 
         result = journal_entries_collection.update_one(
-                {"_id": ObjectId(user_id)},
-                {
-                    "$set": {
-                        "journalEntries": update_data
-                    }
-                }
-            )
+            {
+                "_id": ObjectId(user_id),
+                "journalEntries._id": ObjectId(entry_id)
+            },
+            {
+                "$set": update_data
+            }
+        )
 
         if result.matched_count == 0:
             return jsonify({"error": "Entry not found or unauthorized"}), 404
 
-        return jsonify({"message": "Journal entry updated successfully!"})
+        return jsonify({"message": "Journal entry updated successfully"}), 200
 
     except Exception as e:
+        print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
 
 @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_journal_entry(entry_id):
     try:
-        user_id = get_jwt_identity()  # Get the user ID
+        user_id = get_jwt_identity()
 
         if not ObjectId.is_valid(entry_id):
             return jsonify({"error": "Invalid journal entry ID"}), 400
 
-        # Find and delete the journal entry
-        result = journal_entries_collection.delete_one({"_id": ObjectId(entry_id), "user_id": ObjectId(user_id)})
+        result = journal_entries_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
+        )
 
-        if result.deleted_count == 0:
+        if result.modified_count == 0:
             return jsonify({"error": "Journal entry not found or unauthorized"}), 404
 
         return jsonify({"message": "Journal entry deleted successfully"}), 200
 
     except Exception as e:
+        print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-

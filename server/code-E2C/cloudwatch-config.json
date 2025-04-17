@@ -1,0 +1,26 @@
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/home/ubuntu/inference.log",
+            "log_group_name": "SentioInference",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/home/ubuntu/trainer.log",
+            "log_group_name": "SentioTrainer",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/home/ubuntu/federated.log",
+            "log_group_name": "SentioFederated",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+
