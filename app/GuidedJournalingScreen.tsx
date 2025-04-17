@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,12 @@ import {
   TouchableWithoutFeedback,
   Image,
   Modal,
+  ActivityIndicator,
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { saveJournalEntry } from "./services/ApiService";
+import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import BottomNavigation from "./BottomNavigation";
 //import { saveGuidedJournalEntry } from "./services/ApiService";
 
@@ -23,9 +24,52 @@ const GuidedJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { prompt } = route.params;
+
+  // Load draft when component mounts
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        setIsLoading(true);
+        const draft = await getDraft();
+        if (draft) {
+          console.log("Loaded guided journaling draft:", draft);
+          setContent(draft.content || "");
+          setImageUris(draft.images || []);
+        }
+      } catch (error) {
+        console.error("Error loading guided journaling draft:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadDraft();
+  }, []);
+
+  // Save draft when content or images change
+  useEffect(() => {
+    if (isLoading) return; // Skip saving during initial load
+    
+    const timeoutId = setTimeout(() => {
+      console.log("Auto-saving guided journaling draft");
+      saveDraft(content, imageUris);
+    }, 1000); // Save draft 1 second after last change
+
+    return () => clearTimeout(timeoutId);
+  }, [content, imageUris, isLoading]);
+
+  // Also save when leaving the screen
+  useEffect(() => {
+    return () => {
+      if (content || imageUris.length > 0) {
+        console.log("Saving draft on exit");
+        saveDraft(content, imageUris);
+      }
+    };
+  }, [content, imageUris]);
 
   const handleSaveEntry = async () => {
     if (!content.trim()) {
@@ -34,22 +78,27 @@ const GuidedJournalingScreen = () => {
     }
   
     try {
+      // Check if user is authenticated
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
         Alert.alert("Error", "User not authenticated.");
         return;
       }
   
-      // Reuse the same function used for freeform journals
-      const response = await saveJournalEntry(content, [], "guided", prompt);
+      // Save the journal entry, including images
+      const response = await saveJournalEntry(content, imageUris, "guided", prompt);
   
       if (response.error) {
         Alert.alert("Error", "Failed to save entry.");
         return;
       }
   
+      // Clear the draft if everything is successful
+      await clearDraft();
+  
       Alert.alert("Saved", "Your guided entry has been saved.");
       navigation.navigate("Home");
+      
     } catch (error) {
       console.error("Error saving guided entry:", error);
       Alert.alert("Error", "Something went wrong.");
@@ -57,6 +106,15 @@ const GuidedJournalingScreen = () => {
   };
   
   
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#FFF" }}>
+        <ActivityIndicator size="large" color="black" />
+        <Text style={{ marginTop: 20 }}>Loading your journal...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -76,7 +134,7 @@ const GuidedJournalingScreen = () => {
               backgroundColor: "#f9f9f9",
               borderRadius: 10,
             }}>
-              “{prompt}”
+              "{prompt}"
             </Text>
           </View>
 

@@ -14,6 +14,7 @@ import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if need
 import { fetchJournalEntriesWithDate,fetchSentimentAnalysis } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from '../context/ThemeContext';
 
 // Emotions array and code→name map
 const emotions = [
@@ -42,6 +43,9 @@ const toLocalDateString = (date: Date) => {
 };
 
 const SentimentAnalysisPage: React.FC = () => {
+  // Add theme context near the top of the component
+  const { theme, darkMode } = useTheme();
+
   // Default: start = today - 7, end = today.
   const today = new Date();
   const defaultStartDate = new Date(today);
@@ -196,17 +200,30 @@ const SentimentAnalysisPage: React.FC = () => {
   const renderJournalCards = () => {
     return journalEntries.map((entry, index) => {
       const { entryDate, journalSentiments = [] } = entry;
-      // Format the date using UTC formatting
       const formattedDate = entryDate
         ? new Date(entryDate).toLocaleDateString("en-US", { timeZone: "UTC" })
         : "Unknown Date";
 
       if (!journalSentiments || journalSentiments.length === 0) {
         return (
-          <Pressable key={index} style={styles.entryCard}>
-            <Text style={styles.entryDate}>{formattedDate}</Text>
-            <Text style={styles.entryEmotion}>No sentiment data</Text>
-            <Text style={styles.entryDetails}></Text>
+          <Pressable 
+            key={index} 
+            style={[
+              styles.entryCard,
+              {
+                backgroundColor: darkMode ? '#2C2C2C' : '#fff',
+                borderColor: darkMode ? '#404040' : '#e0e0e0',
+              }
+            ]}
+          >
+            <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+              {formattedDate}
+            </Text>
+            <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
+              No sentiment data
+            </Text>
+            <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+            </Text>
           </Pressable>
         );
       }
@@ -228,12 +245,25 @@ const SentimentAnalysisPage: React.FC = () => {
       }
 
       return (
-        <Pressable key={index} style={styles.entryCard}>
-          <Text style={styles.entryDate}>{formattedDate}</Text>
-          <Text style={styles.entryEmotion}>
+        <Pressable 
+          key={index} 
+          style={[
+            styles.entryCard,
+            {
+              backgroundColor: darkMode ? '#2C2C2C' : '#fff',
+              borderColor: darkMode ? '#404040' : '#e0e0e0',
+            }
+          ]}
+        >
+          <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+            {formattedDate}
+          </Text>
+          <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
             {emotionMap[dominant.emotion] || dominant.emotion} 
           </Text>
-          <Text style={styles.entryDetails}>{subLabel}</Text>
+          <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+            {subLabel}
+          </Text>
         </Pressable>
       );
     });
@@ -241,7 +271,7 @@ const SentimentAnalysisPage: React.FC = () => {
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
         {/* Weekly Date Range */}
         <View style={styles.dateRangeContainer}>
           <DateTimePicker
@@ -249,12 +279,14 @@ const SentimentAnalysisPage: React.FC = () => {
             mode="date"
             display="default"
             onChange={(event, date) => handleStartDateChange(event, true, date)}
+            themeVariant={darkMode ? "dark" : "light"}
           />
           <DateTimePicker
             value={selectedEndDate}
             mode="date"
             display="default"
             onChange={(event, date) => handleEndDateChange(event, true, date)}
+            themeVariant={darkMode ? "dark" : "light"}
           />
         </View>
 
@@ -292,10 +324,24 @@ const SentimentAnalysisPage: React.FC = () => {
               return (
                 <Pressable
                   key={index}
-                  style={[styles.chip, isSelected ? styles.chipSelected : styles.chipUnselected]}
+                  style={[
+                    styles.chip,
+                    isSelected 
+                      ? { 
+                          backgroundColor: darkMode ? '#999999' : 'black',
+                          borderColor: darkMode ? '#FFFFFF' : 'transparent',
+                          borderWidth: darkMode ? 1 : 0
+                        }
+                      : { backgroundColor: darkMode ? '#404040' : '#e0e0e0' }
+                  ]}
                   onPress={() => toggleEmotion(emotion)}
                 >
-                  <Text style={[styles.chipText, !isSelected && styles.chipTextUnselected]}>
+                  <Text style={[
+                    styles.chipText,
+                    !isSelected 
+                      ? { color: darkMode ? '#FFFFFF' : 'black' }
+                      : { color: 'white' }
+                  ]}>
                     {emotion}
                   </Text>
                 </Pressable>
@@ -305,18 +351,18 @@ const SentimentAnalysisPage: React.FC = () => {
         </View>
 
         {/* Chart */}
-        <View style={{  alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
-          {/* Compute the chart interval based on the selected chart date range */}
+        <View style={{ alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
           <SentimentChart
             selectedEmotions={selectedEmotions}
             interval={computeChartInterval()}
             startDate={toLocalDateString(selectedStartDateForChart)}
             endDate={toLocalDateString(selectedEndDateForChart)}
+            darkMode={darkMode}
           />
         </View>
       </View>
 
-      <BottomNavigation activeScreen="Dashboard" />
+      <BottomNavigation activeScreen="Dashboard" darkMode={darkMode} />
     </>
   );
 };

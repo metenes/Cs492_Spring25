@@ -4,8 +4,24 @@ from models.journal_entry import JournalEntry  # Import the JournalEntry model
 from utils.database import journal_entries_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
+import boto3
+from botocore.exceptions import ClientError
+import os
+from werkzeug.utils import secure_filename
+import time
+import random
+import string
 
 journal_bp = Blueprint("journal_bp", __name__)
+
+# AWS S3 configuration
+S3_BUCKET = "sentiobucket"
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id='AKIAXGZAMH3HUVQSPNED',
+    aws_secret_access_key='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',
+    region_name='eu-north-1'
+)
 
 @journal_bp.route("/save-journal-entry", methods=["POST"])
 @jwt_required()
@@ -26,6 +42,8 @@ def save_journal_entry():
         category = data.get('category')
         prompt = data.get('prompt') 
 
+        print(f"📝 Extracted data: content={entry_content[:50]}..., images={len(images)}, sentiments={len(journal_sentiments)}")
+
         # Validate required fields
         if not entry_content:
             print("❌ No entry content provided")
@@ -42,6 +60,8 @@ def save_journal_entry():
             "category" : category,
             "prompt" : prompt
         }
+        
+        print(f"📦 New entry data: {new_entry}")
         
         # Update the document using $push to add to the journalEntries array
         print(f"🔹 Attempting to save to MongoDB for user {user_id}")
@@ -60,12 +80,14 @@ def save_journal_entry():
                     }
                 }
             )
+            print(f"✅ Updated existing document. Modified count: {result.modified_count}")
         else:
             # Create new document with proper structure
             result = journal_entries_collection.insert_one({
                 "_id": ObjectId(user_id),
                 "journalEntries": [new_entry]
             })
+            print(f"✅ Created new document. Inserted ID: {result.inserted_id}")
         
         print(f"✅ MongoDB operation successful")
         
@@ -424,3 +446,121 @@ def delete_journal_entry(entry_id):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@journal_bp.route("/upload-image", methods=["POST"])
+@jwt_required()
+def upload_journal_image():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Uploading journal image for user: {user_id}")
+        
+        # Debug: log request headers and parts
+        print("📝 Request Content-Type:", request.content_type)
+        print("📝 Request Form Data:", request.form)
+        print("📝 Request Files:", request.files)
+        
+        if 'image' not in request.files:
+            print("❌ No image file found in request")
+            return jsonify({"error": "No image provided"}), 400
+        
+        file = request.files['image']
+        if not file:
+            print("❌ No file data found")
+            return jsonify({"error": "No image provided"}), 400
+
+        print(f"📁 File received: filename={file.filename}, content_type={file.content_type}")
+
+        # Generate a unique filename with timestamp, random string, and original filename
+        timestamp = int(time.time())
+        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        original_filename = secure_filename(file.filename)
+        # Use the original filename in the S3 key
+        filename = f"journal-images/{user_id}/{timestamp}_{random_string}_{original_filename}"
+
+        print(f"📝 Generated S3 filename: {filename}")
+        
+        # Upload to S3
+        try:
+            print(f"📤 Attempting to upload to S3: bucket={S3_BUCKET}, filename={filename}")
+            s3_client.upload_fileobj(
+                file.stream,
+                S3_BUCKET,
+                filename,
+                ExtraArgs={
+                    'ContentType': file.content_type or 'image/jpeg'
+                }
+            )
+            print("✅ S3 upload successful")
+
+            # Generate the signed URL for the uploaded image
+            signed_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': S3_BUCKET,
+                    'Key': filename
+                },
+                ExpiresIn=3600  # URL expires in 1 hour
+            )
+            print(f"🔗 Generated signed URL: {signed_url}")
+            
+            return jsonify({
+                "message": "Journal image uploaded successfully",
+                "signedUrl": signed_url
+            }), 200
+
+        except ClientError as e:
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            print(f"❌ Error uploading to S3: {error_message}")
+            print(f"❌ Error code: {e.response.get('Error', {}).get('Code', 'Unknown')}")
+            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
+            return jsonify({"error": f"Failed to upload image: {error_message}"}), 500
+
+    except Exception as e:
+        import traceback
+        print(f"❌ Error in upload_journal_image: {str(e)}")
+        traceback.print_exc()  # Print the full stack trace
+        return jsonify({"error": "Server error"}), 500
+
+@journal_bp.route("/delete-image", methods=["DELETE"])
+@jwt_required()
+def delete_journal_image():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Deleting journal image for user: {user_id}")
+        
+        data = request.get_json()
+        if not data or 's3Key' not in data:
+            print("❌ Missing s3Key in request data")
+            return jsonify({"error": "S3 key is required"}), 400
+            
+        key = data['s3Key']
+        print(f"🗑️ Deleting S3 object with key: {key}")
+        
+        # Delete from S3
+        try:
+            s3_client.delete_object(
+                Bucket=S3_BUCKET,
+                Key=key
+            )
+            print(f"✅ Successfully deleted image from S3: {key}")
+            
+            return jsonify({
+                "message": "Image deleted successfully"
+            }), 200
+            
+        except ClientError as e:
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            print(f"❌ Error deleting image from S3: {error_message}")
+            print(f"❌ Error code: {error_code}")
+            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
+            print(f"❌ S3 Key: {key}")
+            print(f"❌ Bucket: {S3_BUCKET}")
+            return jsonify({"error": f"Failed to delete image: {error_message}"}), 500
+            
+    except Exception as e:
+        print(f"❌ Error in delete_journal_image: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Server error"}), 500
+

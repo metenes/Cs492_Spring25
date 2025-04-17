@@ -17,7 +17,7 @@ const EMOTIONS = [
 export const analyzeSentiment = async (text: string) => {
   try {
     console.log("🚀 Starting analyzeSentiment with text:", text.substring(0, 50) + "...");
-    
+
     const response = await fetch(`${API_URL}/sentiment/analyze`, {
       method: "POST",
       headers: {
@@ -114,7 +114,7 @@ export const fetchSentimentAnalysis = async (
       console.error("API response not OK:", response.statusText);
       throw new Error(`Error: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("API sentiment analysis data:", data);
     return data;
@@ -146,7 +146,7 @@ export const sendMessage = async (message: string) => {
     }
 
     const data = await response.json();
-    console.log("Data recived from test : " , data)
+    console.log("Data recived from test : ", data)
     if (!data.reply) {
       throw new Error("Invalid response format");
     }
@@ -192,10 +192,27 @@ export const loginUser = async (email: string, password: string) => {
     await AsyncStorage.setItem("userToken", responseData.access_token);
     console.log("🔹 Token successfully saved to AsyncStorage!");
 
-    return responseData; 
+    const expoPushToken = await AsyncStorage.getItem("expoPushToken");
+    if (!expoPushToken) {
+      console.warn("No Expo push token saved locally.");
+    } else {
+      const pushTokenResponse = await fetch(`${API_URL}/notification/update-push-token-user`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${responseData.access_token}`
+        },
+        body: JSON.stringify({ token: expoPushToken })
+      });
+
+      const pushResponseData = await pushTokenResponse.json();
+      console.log("Push token update response:", pushResponseData);
+    }
+
+    return responseData;
   } catch (error) {
     console.error("Login error:", error);
-    throw error; 
+    throw error;
   }
 };
 
@@ -273,7 +290,7 @@ export const fetchProfile = async (token: string) => {
   const userData = await userResponse.json();
   const userId = userData._id;
 
-  if(userId == -1){
+  if (userId == -1) {
     throw new Error(`Failed to userId -1`);
   }
 
@@ -300,7 +317,7 @@ export const fetchProfile = async (token: string) => {
     phone: profileData.phone || '',
     location: profileData.location || '',
     profileImageUrl: profileData.profileImageUrl || null,
-    
+
     // Including the previously existing fields for backward compatibility
     profile_picture: profileData.profileImageUrl || null,
     preferences: profileData.preferences || {},
@@ -328,7 +345,7 @@ export const updateProfile = async (token: string, profileData: any) => {
   const userData = await userResponse.json();
   const userId = userData._id;
 
-  if(userId == -1){
+  if (userId == -1) {
     throw new Error(`Failed to userId -1`);
   }
 
@@ -352,26 +369,26 @@ export const updateProfile = async (token: string, profileData: any) => {
 // Upload profile image
 export const uploadProfileImage = async (token: string, imageFile: File) => {
 
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-  
-    const userData = await userResponse.json();
-    const userId = userData._id;
-  
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if (userId == -1) {
+    throw new Error(`Failed to userId -1`);
+  }
+
+
   const formData = new FormData();
   formData.append('profileImage', imageFile);
 
@@ -417,24 +434,24 @@ export const logActivity = async (token: string, activity: string) => {
 // Delete user account
 export const deleteAccount = async (token: string) => {
 
-    // First get the user ID from the token (if not stored separately)
-    const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  
-    if (!userResponse.ok) {
-      throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
-    }
-  
-    const userData = await userResponse.json();
-    const userId = userData._id;
-  
-    if(userId == -1){
-      throw new Error(`Failed to userId -1`);
-    }
+  // First get the user ID from the token (if not stored separately)
+  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+  }
+
+  const userData = await userResponse.json();
+  const userId = userData._id;
+
+  if (userId == -1) {
+    throw new Error(`Failed to userId -1`);
+  }
 
   const response = await fetch(`${API_URL}/user/${userId}/delete-user`, {
     method: "DELETE",
@@ -510,7 +527,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 // ** Homepage API ** - FreeJournal & Guided Journal
 // **********************************************
 
-export const saveJournalEntry = async (content: string, images?: string[], category?: string, promt?: string) => {
+export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -552,10 +569,7 @@ export const saveJournalEntry = async (content: string, images?: string[], categ
     const entryData = {
       entryContent: content,
       entryDate: new Date().toISOString(),
-      images: images?.map(image => ({
-        fileName: `uploads/${image}`,
-        signedUrl: image
-      })) || [],
+      images: images || [],
       journalSentiments: mappedSentiments,
       category: category,
       prompt: promt
@@ -744,8 +758,6 @@ export const calculateStreak = (dates: string[]): number => {
 };
 
 
-
-
 export const fetchJournalEntriesWithDate = async (
   token: string,
   start_date: string,
@@ -786,9 +798,16 @@ export const deleteJournalEntry = async (entryId: string) => {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
+    if (!entryId) {
+      throw new Error("Invalid entry: Missing entry ID");
+    }
+    
+    console.log("Deleting entry id:", entryId);
+
     const response = await fetch(`${API_URL}/journal/delete-journal-entry/${entryId}`, {
       method: "DELETE",
       headers: {
+        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
     });
@@ -938,7 +957,7 @@ export const saveCheckIn = async (token: string, sentiments: string[], causes: s
     const userData = await userResponse.json();
     const userId = userData._id;
 
-    if(userId == -1){
+    if (userId == -1) {
       throw new Error(`Failed to userId -1`);
     }
 
@@ -960,7 +979,7 @@ export const saveCheckIn = async (token: string, sentiments: string[], causes: s
     });
 
     console.log("Response status:", response.status);
-    
+
     // Read response as text first to handle cases where it's not JSON
     const rawText = await response.text();
     console.log("Raw response:", rawText);
@@ -1054,7 +1073,7 @@ export const editCheckIn = async (entryId: string, sentiments: string[], causes:
 export const deleteCheckIn = async (entry : any) => {
   try {
     const token = await AsyncStorage.getItem('userToken');
-    
+
     if (!token) {
       throw new Error('Authentication required');
     }
@@ -1142,3 +1161,107 @@ export const saveNotificationToken = async (token: string) => {
     throw error;
   }
 }
+
+// **********************************************
+// ** Journal Image Upload API **
+// **********************************************
+
+export const uploadJournalImage = async (imageUri: string): Promise<string> => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Extract the original filename from the URI
+    const originalFileName = imageUri.split('/').pop();
+    if (!originalFileName) {
+      throw new Error('Invalid image URI');
+    }
+
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    } as any);
+
+    console.log('Uploading image with FormData:', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    });
+
+    const uploadResponse = await fetch(`${API_URL}/journal/upload-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      console.error('Upload failed:', errorData);
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+
+    const data = await uploadResponse.json();
+    console.log('Upload successful:', data);
+    return data.signedUrl; // Return the signed URL from the response
+  } catch (error) {
+    console.error('Error uploading journal image:', error);
+    throw error;
+  }
+};
+
+export const deleteJournalImage = async (imageUrl: string): Promise<void> => {
+  try {
+    console.log('🗑️ Starting image deletion for URL:', imageUrl);
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Extract the S3 key from the signed URL
+    const url = new URL(imageUrl);
+    // Get the pathname and remove the leading slash
+    const pathname = url.pathname;
+    // Remove any query parameters and get the key
+    const key = pathname.substring(1).split('?')[0];
+    console.log('🗑️ Extracted S3 key:', key);
+
+    const requestBody = { s3Key: key };
+    console.log('🗑️ Request body:', JSON.stringify(requestBody));
+
+    const response = await fetch(`${API_URL}/journal/delete-image`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('🗑️ Response status:', response.status);
+    const responseText = await response.text();
+    console.log('🗑️ Response body:', responseText);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch (e) {
+        errorData = { error: responseText };
+      }
+      console.error('❌ Delete failed:', errorData);
+      throw new Error(errorData.error || 'Failed to delete image');
+    }
+
+    console.log('✅ Image deleted successfully');
+  } catch (error) {
+    console.error('❌ Error deleting journal image:', error);
+    throw error;
+  }
+};

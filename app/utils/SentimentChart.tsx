@@ -3,12 +3,67 @@ import { Dimensions, Text, View, StyleSheet, Animated } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { fetchSentimentAnalysis } from "../services/ApiService";
 
+// Replace the styles object with static styles
+const styles = StyleSheet.create({
+  skeletonContainer: {
+    width: Dimensions.get("window").width - 32,
+    borderRadius: 12,
+    marginVertical: 8,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    height: 350,
+  },
+  skeletonShimmer: {
+    position: "absolute",
+    width: "100%",
+    height: 350,
+  },
+  skeletonText: {
+    fontSize: 16,
+  },
+  placeholderContainer: {
+    padding: 16,
+    height: 370,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontSize: 18,
+    textAlign: "center",
+  },
+  emptyTableHeader: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  table: {
+    width: "100%",
+    borderRadius: 8,
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 4,
+    borderTopWidth: 1,
+  },
+  tableCell: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: "center",
+  },
+  tableHeaderCell: {
+    fontWeight: "bold",
+  },
+});
+
 // Props for SentimentChart component
 interface SentimentChartProps {
   selectedEmotions: string[];
   interval: string;    // "daily", "weekly", "monthly", or "yearly"
   startDate: string;   // Format: "YYYY-MM-DD"
   endDate: string;     // Format: "YYYY-MM-DD"
+  darkMode?: boolean;
 }
 
 // Structure for raw sentiment data from API.
@@ -202,7 +257,7 @@ const processData = (rawData: RawSentiment[], selectedEmotions: string[]): Proce
 /**
  * A modern Skeleton Loader with a shimmer effect.
  */
-const ModernSkeletonLoader: React.FC = () => {
+const ModernSkeletonLoader: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -221,9 +276,17 @@ const ModernSkeletonLoader: React.FC = () => {
   });
 
   return (
-    <View style={styles.skeletonContainer}>
-      <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }] }]} />
-      <Text style={styles.skeletonText}>Loading chart...</Text>
+    <View style={[styles.skeletonContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#f0f0f0' }]}>
+      <Animated.View style={[
+        styles.skeletonShimmer, 
+        { 
+          transform: [{ translateX }],
+          backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)'
+        }
+      ]} />
+      <Text style={[styles.skeletonText, { color: darkMode ? '#B0B0B0' : '#666' }]}>
+        Loading chart...
+      </Text>
     </View>
   );
 };
@@ -232,13 +295,19 @@ const ModernSkeletonLoader: React.FC = () => {
  * Renders a fallback table when no sentiment data is available.
  * This table displays headers (Date + selected emotions) and rows with zeros.
  */
-const renderEmptyTable = (selectedEmotions: string[], startDate: string, endDate: string, labels: string[]): JSX.Element => {
+const renderEmptyTable = (
+  selectedEmotions: string[], 
+  startDate: string, 
+  endDate: string, 
+  labels: string[],
+  darkMode: boolean
+): JSX.Element => {
   return (
-    <View style={styles.placeholderContainer}>
-      <Text style={styles.emptyTableHeader}>
+    <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+      <Text style={[styles.emptyTableHeader, { color: darkMode ? '#B0B0B0' : '#666' }]}>
         Looks like this emotion hasn't appeared in your entries yet! Keep journaling, and we'll track it for you! ✨
       </Text>
-      <View style={styles.table}>
+      <View style={[styles.table, { backgroundColor: darkMode ? '#2C2C2C' : '#fff' }]}>
         <View style={styles.tableRow}>
           <Text style={[styles.tableCell, styles.tableHeaderCell]}>Date</Text>
           {selectedEmotions.map((emotion, index) => (
@@ -262,7 +331,13 @@ const renderEmptyTable = (selectedEmotions: string[], startDate: string, endDate
   );
 };
 
-const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, interval, startDate, endDate }) => {
+export const SentimentChart: React.FC<SentimentChartProps> = ({ 
+  selectedEmotions, 
+  interval, 
+  startDate, 
+  endDate,
+  darkMode = false // Default to light mode
+}) => {
   const [chartData, setChartData] = useState<ProcessedChartData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -336,40 +411,47 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, inter
   }
 
   if (loading) {
-    return <ModernSkeletonLoader />;
+    return <ModernSkeletonLoader darkMode={darkMode} />;
   }
   if (error && error !== "empty") {
     return (
-      <View style={styles.placeholderContainer}>
-        <Text style={styles.placeholderText}>Error: {error}</Text>
+      <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+        <Text style={[styles.placeholderText, { color: darkMode ? '#B0B0B0' : '#888' }]}>
+          Error: {error}
+        </Text>
       </View>
     );
   }
   if (error === "empty" || !chartData) {
     return (
-      <View style={styles.placeholderContainer}>
-        {renderEmptyTable(selectedEmotions, startDate, endDate, labels)}
+      <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+        {renderEmptyTable(selectedEmotions, startDate, endDate, labels, darkMode)}
       </View>
     );
   }
 
   const chartConfig = {
-    backgroundColor: "#ffffff",
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
+    backgroundColor: darkMode ? "#121212" : "#FFFFFF",
+    backgroundGradientFrom: darkMode ? "#121212" : "#FFFFFF",
+    backgroundGradientTo: darkMode ? "#121212" : "#FFFFFF",
     decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    color: (opacity = 1) => darkMode ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`,
+    labelColor: (opacity = 1) => darkMode ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`,
     style: {
       borderRadius: 16,
     },
     propsForLabels: {
       fontSize: 12,
+      fill: darkMode ? "#FFFFFF" : "#000000",
     },
-    // Add y-axis configuration
+    propsForDots: {
+      r: "4",
+      stroke: darkMode ? "#FFFFFF" : "#000000",
+      strokeWidth: "2",
+    },
     yAxisLabel: "%",
     yAxisSuffix: "%",
-    yAxisInterval: 20, // Interval between y-axis labels
+    yAxisInterval: 20,
   };
 
   return (
@@ -385,32 +467,7 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, inter
   }}
   width={Dimensions.get("window").width - 32}
   height={CHART_HEIGHT}
-  chartConfig={{
-    backgroundColor: "#FFFFFF",
-    backgroundGradientFrom: "#FFFFFF",
-    backgroundGradientTo: "#FFFFFF",
-    decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(68, 68, 68, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(68, 68, 68, ${opacity})`,
-    style: { borderRadius: 12 },
-
-    // 🚀 **Make the area under the line completely transparent**
-    fillShadowGradientFromOpacity: 0, 
-    fillShadowGradientToOpacity: 0, 
-
-    // ✅ Ensures dots are styled properly
-    propsForDots: {
-      r: "4",
-      strokeWidth: "2",
-      stroke: "#FFFFFF", // White stroke for better contrast
-    },
-
-    // ✅ Softer background grid lines
-    propsForBackgroundLines: {
-      stroke: "rgba(200, 200, 200, 0.3)",
-      strokeDasharray: "5 5",
-    },
-  }}
+  chartConfig={chartConfig}
   bezier
   withShadow
   withInnerLines
@@ -429,73 +486,3 @@ const SentimentChart: React.FC<SentimentChartProps> = ({ selectedEmotions, inter
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  skeletonContainer: {
-    width: Dimensions.get("window").width - 32,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 12,
-    marginVertical: 8,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-    height: 350,
-  },
-  skeletonShimmer: {
-    position: "absolute",
-    width: "100%",
-    height: 350,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-  },
-  skeletonText: {
-    fontSize: 16,
-    color: "#666",
-  },
-  placeholderContainer: {
-    padding: 16,
-    height: 370, // fixed height for consistency
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  placeholderText: {
-    fontSize: 18,
-    color: "#888",
-    textAlign: "center",
-  },
-  emptyTableContainer: {
-    width: "100%",
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#CCCCCC",
-    borderRadius: 4,
-    backgroundColor: "#FFFFFF",
-    marginTop: 8,
-  },
-  emptyTableHeader: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  table: {
-    width: "100%",
-  },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderColor: "#EEEEEE",
-  },
-  tableCell: {
-    fontSize: 14,
-    color: "#666",
-    flex: 1,
-    textAlign: "center",
-  },
-  tableHeaderCell: {
-    fontWeight: "bold",
-  },
-});
-
-export { SentimentChart };

@@ -15,6 +15,7 @@ import {
   Dimensions,
   Platform,
   PermissionsAndroid,
+  Animated,
 } from "react-native";
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from "expo-media-library";
@@ -27,7 +28,8 @@ import { useNavigation } from '@react-navigation/native';
 import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
-const API_URL = 'http://192.168.1.33:5000';
+import { useTheme } from './context/ThemeContext';
+const API_URL = 'http://172.20.10.2:5000';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
@@ -50,12 +52,13 @@ const ProfileScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   
   // App preferences
-  const [darkMode, setDarkMode] = useState(false);
+  const { darkMode, theme, toggleDarkMode } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   
-  // Determine current theme
-  const theme = darkMode ? darkTheme : lightTheme;
+  // New states for skeleton animation
+  const [imageLoading, setImageLoading] = useState(true);
+  const pulseAnim = new Animated.Value(0);
 
   useEffect(() => {
     const initializeProfile = async () => {
@@ -182,23 +185,13 @@ const ProfileScreen = () => {
     try {
       const storedDarkMode = await AsyncStorage.getItem('darkMode');
       if (storedDarkMode !== null) {
-        setDarkMode(storedDarkMode === 'true');
+        toggleDarkMode();
       } else {
         // Use system default if no preference saved
-        setDarkMode(systemColorScheme === 'dark');
+        toggleDarkMode();
       }
     } catch (error) {
       console.error('Error loading app preferences:', error);
-    }
-  };
-
-  // Save app preferences to AsyncStorage
-  const saveAppPreferences = async (isDarkMode: boolean | ((prevState: boolean) => boolean)) => {
-    try {
-      await AsyncStorage.setItem('darkMode', isDarkMode.toString());
-      setDarkMode(isDarkMode);
-    } catch (error) {
-      console.error('Error saving app preferences:', error);
     }
   };
 
@@ -493,6 +486,31 @@ const ProfileScreen = () => {
     }
   };
 
+  // Add this effect for the skeleton animation
+  useEffect(() => {
+    const pulsate = () => {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => pulsate());
+    };
+
+    pulsate();
+  }, []);
+
+  // Replace saveAppPreferences with toggleDarkMode
+  const handleThemeToggle = () => {
+    toggleDarkMode();
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundColor }]}>
@@ -506,21 +524,38 @@ const ProfileScreen = () => {
     <ScrollView style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       {/* Profile Display Section */}
       <View style={[styles.profileContainer, { backgroundColor: theme.cardBackground }]}>
-        <TouchableOpacity onPress={() => setModalVisible(true)}>
-          <View style={styles.avatarWrapper}>
-            <Image
-              source={
-                profileImage
-                  ? { uri: profileImage }
-                  : require("../assets/default-avatar.jpeg")
-              }
-              style={styles.avatar}
-            />
-            <View style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}>
-              <Ionicons name="camera-outline" size={18} color={theme.text} />
-            </View>
+        <View style={styles.avatarWrapper}>
+          <View style={styles.avatarContainer}>
+            {imageLoading && !profileImage && (
+              <Animated.View
+                style={[
+                  styles.skeletonLoader,
+                  {
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.3, 0.7],
+                    }),
+                  },
+                ]}
+              />
+            )}
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={[styles.avatar, { backgroundColor: 'transparent' }]}
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+              />
+            ) : (
+              <View style={[styles.skeletonAvatar, { backgroundColor: theme.cardBackground }]}>
+                <Ionicons name="person" size={40} color={theme.textSecondary} />
+              </View>
+            )}
           </View>
-        </TouchableOpacity>
+          <View style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}>
+            <Ionicons name="camera-outline" size={18} color={theme.text} />
+          </View>
+        </View>
         <Text style={[styles.username, { color: theme.text }]}>{name}</Text>
         <Text style={[styles.bio, { color: theme.textSecondary }]}>{bio}</Text>
 
@@ -542,7 +577,7 @@ const ProfileScreen = () => {
           <Text style={[styles.infoText, { color: theme.text }]}>Dark Mode</Text>
           <Switch 
             value={darkMode} 
-            onValueChange={(value) => saveAppPreferences(value)} 
+            onValueChange={handleThemeToggle} 
             trackColor={{ false: "#767577", true: "#81b0ff" }}
             thumbColor={darkMode ? "#f5dd4b" : "#f4f3f4"}
           />
@@ -680,33 +715,6 @@ const ProfileScreen = () => {
   );
 };
 
-// Theme configurations
-const lightTheme = {
-  backgroundColor: '#FFFFFF',
-  cardBackground: '#F9F9F9',
-  inputBackground: '#FFFFFF',
-  text: '#000000',
-  textSecondary: '#666666',
-  border: '#CCCCCC',
-  primary: '#3498DB',
-  danger: '#E74C3C',
-  icon: '#555555',
-  placeholder: '#AAAAAA'
-};
-
-const darkTheme = {
-  backgroundColor: '#121212',
-  cardBackground: '#1E1E1E',
-  inputBackground: '#2C2C2C',
-  text: '#FFFFFF',
-  textSecondary: '#AAAAAA',
-  border: '#444444',
-  primary: '#3498DB',
-  danger: '#E74C3C',
-  icon: '#BBBBBB',
-  placeholder: '#777777'
-};
-
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375;
 
@@ -732,10 +740,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10
   },
+  avatarContainer: {
+    position: 'relative',
+    width: isSmallDevice ? 100 : 120,
+    height: isSmallDevice ? 100 : 120,
+    borderRadius: isSmallDevice ? 50 : 60,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
   avatar: { 
-    width: isSmallDevice ? 100 : 120, 
-    height: isSmallDevice ? 100 : 120, 
-    borderRadius: isSmallDevice ? 50 : 60 
+    width: '100%',
+    height: '100%',
+    borderRadius: isSmallDevice ? 50 : 60,
+    backgroundColor: 'transparent',
   },
   editIcon: {
     position: "absolute",
@@ -885,6 +902,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
     zIndex: 1000,
+  },
+  skeletonLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#E1E9EE',
+    zIndex: 1,
+  },
+  skeletonAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: isSmallDevice ? 50 : 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E1E9EE',
   },
 });
 

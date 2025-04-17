@@ -3,6 +3,7 @@ import os
 import pymongo
 import certifi
 import torch
+import boto3
 import json
 import logging
 import time
@@ -11,31 +12,20 @@ import uuid
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional, Any, Union
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Blueprint
 from transformers import pipeline
 from flask_cors import CORS
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, JWTManager, create_access_token
 from flask_bcrypt import Bcrypt
+from flask_apscheduler import APScheduler
 # import bcrypt
 from flask_mail import Mail, Message
-from bson.objectid import ObjectId
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
-import os
 
-import torch
-from flask import Flask, jsonify, request, Blueprint
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime, timedelta
-from datetime import timedelta
-# Face Analysis
-import cv2
-import numpy as np
-import base64
-from deepface import DeepFace
 # User token 
-from flask import request
 import jwt
 
 # importing the controller blueprints
@@ -45,13 +35,12 @@ from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp, model_bp
 from controller.check_in_controller import check_bp
-from controller.notification_controller import notification_bp
+from controller.notification_controller import notification_bp, send_daily_reminders
+
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
 from utils.mail_config import mail
 from utils.jwt_config import jwt_manager
-from datetime import datetime
-from bson import ObjectId
 from botocore.exceptions import ClientError
 # Chat API from chat.py
 # from chat import Chat
@@ -215,24 +204,6 @@ def fetch_check_ins():
         print("❌ Error fetching check-ins:", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
-
-# ---------------------------------------
-# Function to create a JWT token
-# ---------------------------------------
-
-#def create_access_token(user_id):
-#    payload = {
-#        'user_id': user_id,
-#        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time (1 hour)
-#    }
-#    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-#    return token
-
-
-# 1. First define the route
-
-
-# 2. THEN register all blueprints
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
@@ -242,28 +213,6 @@ app.register_blueprint(check_bp, url_prefix="/check-in")
 app.register_blueprint(model_bp, url_prefix="/models") # metadata for S3 models 
 
 app.register_blueprint(notification_bp, url_prefix="/notification")
-
-# ---------------------------------------
-#  **Protected Route**
-# this is a protected route that requires a valid JWT token to access
-# ---------------------------------------
-@app.route("/protected", methods=["GET"])
-@jwt_required()
-def protected():
-    token = request.headers.get('Authorization')
-    if not token:
-        return jsonify({"error": "Token is missing"}), 401
-    
-    try:
-        # Decode the token
-        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-        user_id = payload['user_id']
-        return jsonify({"message": f"Welcome user {user_id}!"}), 200
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token has expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

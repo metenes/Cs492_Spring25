@@ -10,15 +10,17 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker";
+import { MediaType } from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import { Audio } from "expo-av"; // 👈 For microphone permission
 import BottomNavigation from "./BottomNavigation"; // ✅ Import BottomNavigation
 
-import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
+import { saveJournalEntry, saveDraft, getDraft, clearDraft, uploadJournalImage, deleteJournalImage } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
@@ -34,9 +36,12 @@ const MAX_CHAR_COUNT = 10000; // ✅ Hard limit enforced
 const FreeJournalingScreen = () => {
   const [content, setContent] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
+  const [localImageUris, setLocalImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imagePickerWarning, setImagePickerWarning] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
 
   const navigation = useNavigation<NavigationProp>();
 
@@ -59,31 +64,93 @@ const FreeJournalingScreen = () => {
 
   // Pick multiple images from the gallery with a limit of 5 images in total
   const pickImage = async () => {
-    if (imageUris.length >= 5) {
-      setImagePickerWarning("You can only upload up to 5 images");
-      return;
-    }
-    const remaining = 5 - imageUris.length;
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining, // Limit the number of images the user can select
-      allowsEditing: false,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    try {
+      if (imageUris.length >= 5) {
+        setImagePickerWarning("You can only upload up to 5 images");
+        return;
+      }
+      const remaining = 5 - imageUris.length;
+      console.log('📸 Picking images. Remaining slots:', remaining);
+      
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        allowsEditing: false,
+        aspect: [4, 3],
+        quality: 1,
+      });
 
-    if (!result.canceled) {
-      const selectedUris = result.assets.map((asset) => asset.uri);
-      setImageUris([...imageUris, ...selectedUris]); // Append new images
-      setImagePickerWarning(""); // Clear warning if images are selected
+      if (!result.canceled) {
+        console.log('📸 Images selected:', result.assets);
+        const newLocalUris = result.assets.map(asset => asset.uri);
+        
+        // Initialize progress for new uploads
+        const newProgress = {...uploadProgress};
+        newLocalUris.forEach(uri => {
+          newProgress[uri] = 0;
+        });
+        setUploadProgress(newProgress);
+        
+        // Upload each image immediately and get signed URLs
+        const uploadedImages = await Promise.all(
+          newLocalUris.map(async (uri) => {
+            console.log('📤 Uploading image:', uri);
+            try {
+              const signedUrl = await uploadJournalImage(uri);
+              console.log('✅ Image uploaded. Signed URL:', signedUrl);
+              return {
+                uri: uri,
+                signedUrl: signedUrl
+              };
+            } catch (error) {
+              console.error('❌ Error uploading image:', uri, error);
+              throw error;
+            }
+          })
+        );
+        
+        console.log('📦 All images uploaded successfully:', uploadedImages);
+        
+        // Update both local and remote image states
+        setLocalImageUris([...localImageUris, ...uploadedImages.map(img => img.uri)]);
+        setImageUris([...imageUris, ...uploadedImages.map(img => img.signedUrl)]);
+        setImagePickerWarning("");
+        
+        // Clear progress after successful upload
+        setUploadProgress({});
+      }
+    } catch (error) {
+      console.error('❌ Error in pickImage:', error);
+      alert('Failed to upload images. Please try again.');
+      setUploadProgress({});
     }
   };
 
-  // Remove an image from the selection
-  const removeImage = (uri: string) => {
-    setImageUris(imageUris.filter((image) => image !== uri));
-    setSelectedImage(null); // Close modal after deletion
+  // Remove an image from the selection and S3
+  const removeImage = async (uri: string) => {
+    try {
+      console.log('🗑️ Removing image:', uri);
+      
+      // Find the corresponding signed URL
+      const index = localImageUris.indexOf(uri);
+      if (index !== -1) {
+        const signedUrl = imageUris[index];
+        console.log('🗑️ Deleting from S3:', signedUrl);
+        
+        // Delete from S3
+        await deleteJournalImage(signedUrl);
+        console.log('✅ Image deleted from S3');
+        
+        // Remove from both local and remote states
+        setLocalImageUris(localImageUris.filter(image => image !== uri));
+        setImageUris(imageUris.filter(image => image !== signedUrl));
+        setSelectedImage(null); // Close modal after deletion
+      }
+    } catch (error) {
+      console.error('❌ Error deleting image:', error);
+      alert('Failed to delete image. Please try again.');
+    }
   };
 
   // Load draft when screen mounts
@@ -109,20 +176,31 @@ const FreeJournalingScreen = () => {
 
   const handleSaveEntry = async () => {
     try {
+      console.log('🔄 Starting handleSaveEntry...');
       setIsSaving(true);
       
-      const response = await saveJournalEntry(content, imageUris, "freeform" ); // saveJournalEntry(content, imageUris ); is same too
+      // Since images are already uploaded, we just need to prepare the data
+      const imageData = localImageUris.map((uri, index) => ({
+        fileName: `uploads/${uri.split('/').pop()}`,
+        signedUrl: imageUris[index]
+      }));
+      
+      console.log('📦 Prepared image data:', imageData);
+      
+      const response = await saveJournalEntry(content, imageData, "freeform");
       
       if (response.error) {
+        console.error('❌ Failed to save journal entry:', response.error);
         alert("Failed to save journal entry.");
         return;
       }
 
-      await clearDraft(); // Clear draft after successful save
+      console.log('✅ Journal entry saved successfully');
+      await clearDraft();
       alert("Journal entry saved successfully!");
       navigation.navigate("Home");
     } catch (error) {
-      console.error("Error in handleSaveEntry:", error);
+      console.error("❌ Error in handleSaveEntry:", error);
       alert("An error occurred while saving the journal entry.");
     } finally {
       setIsSaving(false);
@@ -213,22 +291,41 @@ const FreeJournalingScreen = () => {
             </Text>
           )}
         </View>
-        {/* Display Selected Images */}
-        {imageUris.length > 0 && (
+        {/* Display Selected Images with Progress */}
+        {localImageUris.length > 0 && (
           <ScrollView horizontal style={{ marginTop: 10 }}>
-            {imageUris.map((uri, index) => (
-              <TouchableOpacity key={index} onPress={() => setSelectedImage(uri)}>
-                <Image
-                  source={{ uri }}
-                  style={{
-                    width: 100,
-                    height: 100,
+            {localImageUris.map((uri, index) => (
+              <View key={index} style={{ marginRight: 10 }}>
+                <TouchableOpacity onPress={() => setSelectedImage(uri)}>
+                  <Image
+                    source={{ uri }}
+                    style={{
+                      width: 100,
+                      height: 100,
+                      borderRadius: 10,
+                    }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+                {uploadProgress[uri] !== undefined && uploadProgress[uri] < 100 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
                     borderRadius: 10,
-                    marginRight: 10,
-                  }}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
+                  }}>
+                    <ActivityIndicator color="white" />
+                    <Text style={{ color: 'white', marginTop: 5 }}>
+                      {Math.round(uploadProgress[uri])}%
+                    </Text>
+                  </View>
+                )}
+              </View>
             ))}
           </ScrollView>
         )}
