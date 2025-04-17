@@ -1,11 +1,14 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 export default function App() {
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing, setFacing] = useState<CameraType>('front');
   const [permission, requestPermission] = useCameraPermissions();
-
+  const [cameraRef, setCameraRef] = useState(null);
+  const [emotion, setEmotion] = useState(null);
+  const [loading, setLoading] = useState(false);
   if (!permission) {
     // Camera permissions are still loading.
     return <View />;
@@ -25,6 +28,35 @@ export default function App() {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   }
 
+
+  const captureAndSend = async () => {
+    if (!cameraRef){
+      console.log("camera ref is not initialized...")
+      return;
+    }
+    if (!cameraRef) return;
+  
+    setLoading(true);
+    const photo = await cameraRef.takePictureAsync({ base64: true });
+    const uri = photo.uri;
+  
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  
+    try {
+      const response = await axios.post('http://<YOUR_FLASK_SERVER_IP>:<PORT>/predict_emotion', {
+        image: base64,
+      });
+      setEmotion(response.data.emotion);
+    } catch (error) {
+      console.error(error);
+      setEmotion("Error analyzing emotion");
+    }
+  
+    setLoading(false);
+  };
+
   return (
     <View style={styles.container}>
       <CameraView style={styles.camera} facing={facing}>
@@ -37,6 +69,8 @@ export default function App() {
     </View>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {
