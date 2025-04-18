@@ -218,77 +218,12 @@ const SentimentAnalysisPage: React.FC = () => {
   // Render horizontal list of journal entry cards
   const renderJournalCards = () => {
     return journalEntries.map((entry, index) => {
-      const { entryDate, journalSentiments = [], sentiments = [], type } = entry;
+      const { entryDate, journalSentiments = [], category } = entry;
       const formattedDate = entryDate
         ? new Date(entryDate).toLocaleDateString("en-US", { timeZone: "UTC" })
         : "Unknown Date";
 
-      // Handle check-in entries differently
-      if (type === "checkin") {
-        if (!sentiments || sentiments.length === 0) {
-          return (
-            <Pressable 
-              key={index} 
-              style={[
-                styles.entryCard,
-                {
-                  backgroundColor: darkMode ? '#2C2C2C' : '#fff',
-                  borderColor: darkMode ? '#404040' : '#e0e0e0',
-                }
-              ]}
-            >
-              <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
-                {formattedDate}
-              </Text>
-              <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
-                No sentiment data
-              </Text>
-              <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
-              </Text>
-            </Pressable>
-          );
-        }
-
-        // For check-in entries, use the sentiments array directly
-        const dominant = sentiments[0];
-        const others = sentiments.slice(1);
-
-        let subLabel = "";
-        if (others.length === 0) {
-          subLabel = "No other emotions";
-        } else if (others.length === 1) {
-          subLabel = others[0];
-        } else {
-          const firstTwo = others.slice(0, 2).join(", ");
-          const remaining = others.length - 2;
-          subLabel = remaining > 0 ? `${firstTwo} and ${remaining} more` : firstTwo;
-        }
-
-        return (
-          <Pressable 
-            key={index} 
-            style={[
-              styles.entryCard,
-              {
-                backgroundColor: darkMode ? '#2C2C2C' : '#fff',
-                borderColor: darkMode ? '#404040' : '#e0e0e0',
-              }
-            ]}
-          >
-            <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
-              {formattedDate}
-            </Text>
-            <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
-              {dominant}
-            </Text>
-            <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
-              {subLabel}
-            </Text>
-          </Pressable>
-        );
-      }
-
-      // Handle journal entries (existing code)
+      // Handle entries with no sentiments
       if (!journalSentiments || journalSentiments.length === 0) {
         return (
           <Pressable 
@@ -322,9 +257,16 @@ const SentimentAnalysisPage: React.FC = () => {
       if (others.length === 0) {
         subLabel = "No other emotions";
       } else if (others.length === 1) {
-        subLabel = `${emotionMap[others[0].emotion]}`;
+        // For check-in entries, the emotion might be a string (lowercase)
+        const emotion = typeof others[0].emotion === 'string' 
+          ? others[0].emotion 
+          : emotionMap[others[0].emotion];
+        subLabel = emotion;
       } else {
-        const firstTwo = others.slice(0, 2).map((s: any) => emotionMap[s.emotion]).join(", ");
+        const firstTwo = others.slice(0, 2).map((s: any) => {
+          // For check-in entries, the emotion might be a string (lowercase)
+          return typeof s.emotion === 'string' ? s.emotion : emotionMap[s.emotion];
+        }).join(", ");
         const remaining = others.length - 2;
         subLabel = remaining > 0 ? `${firstTwo} and ${remaining} more` : firstTwo;
       }
@@ -347,7 +289,7 @@ const SentimentAnalysisPage: React.FC = () => {
             style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}
             numberOfLines={2}
           >
-            {emotionMap[dominant.emotion] || dominant.emotion}
+            {typeof dominant.emotion === 'string' ? dominant.emotion : emotionMap[dominant.emotion]}
           </Text>
           <Text 
             style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}

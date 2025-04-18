@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 import time
 import random
 import string
+from transformers import pipeline
 
 # Define emotions array to match client-side
 EMOTIONS = [
@@ -20,6 +21,9 @@ EMOTIONS = [
     "nervousness", "optimism", "pride", "realization", "relief", "remorse",
     "sadness", "surprise", "neutral"
 ]
+
+# Initialize sentiment analysis pipeline
+sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertweet-base-sentiment-analysis")
 
 journal_bp = Blueprint("journal_bp", __name__)
 
@@ -65,6 +69,22 @@ def save_journal_entry():
             print("❌ No entry content provided")
             return jsonify({"error": "Entry content is required"}), 400
         
+        # Analyze sentiment if not provided
+        if not journal_sentiments and entry_content:
+            print("🔍 Analyzing sentiment for journal entry")
+            try:
+                # Get sentiment analysis results
+                sentiment_results = sentiment_analyzer(entry_content)
+                # Convert to our format
+                journal_sentiments = [{
+                    "emotion": result["label"].lower(),
+                    "percentage": result["score"]
+                } for result in sentiment_results]
+                print(f"✅ Analyzed sentiments: {journal_sentiments}")
+            except Exception as e:
+                print(f"❌ Error analyzing sentiment: {str(e)}")
+                journal_sentiments = []
+        
         # Create new journal entry with its own ObjectId
         new_entry = {
             "_id": ObjectId(),  # Give each entry its own ID
@@ -73,8 +93,8 @@ def save_journal_entry():
             "images": images,
             "journalSentiments": journal_sentiments,
             "createdAt": datetime.now(),
-            "category" : category,
-            "prompt" : prompt
+            "category": category,
+            "prompt": prompt
         }
         
         print(f"📦 New entry data: {new_entry}")
@@ -386,14 +406,14 @@ def sentiment_analysis():
                     "$let": {
                         "vars": {
                             "emotionIndex": {
-                                "$indexOfArray": [EMOTIONS, {"$toLower": "$sentiments"}]  # Convert to lowercase and find index
+                                "$indexOfArray": [EMOTIONS, {"$toLower": "$sentiments"}]
                             }
                         },
                         "in": {
                             "$cond": {
                                 "if": {"$ne": ["$$emotionIndex", -1]},
-                                "then": "$$emotionIndex",  # Use the index if found
-                                "else": 27  # Default to "neutral" if not found
+                                "then": "$$emotionIndex",
+                                "else": {"$toLower": "$sentiments"}
                             }
                         }
                     }
@@ -621,4 +641,3 @@ def delete_journal_image():
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
-
