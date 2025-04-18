@@ -176,6 +176,20 @@ export const fetchJournalEntriesWithDate = async (
   }
 };
 
+export const getEmotionalTrendInsight = async (token: string) => {
+  const response = await fetch(`${API_URL}/sentiment/insights`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch emotional trend insight");
+  }
+
+  return response.json();
+};
+
 // **********************************************
 // ** Chat API** - Send message
 // **********************************************
