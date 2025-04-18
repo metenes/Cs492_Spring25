@@ -2,17 +2,24 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://172.20.10.2:5000";
+const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
 // Define the emotions array to match the backend
 const EMOTIONS = [
+  // Free Journaling Emotions (28)
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
   "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
   "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
   "nervousness", "optimism", "pride", "realization", "relief", "remorse",
-  "sadness", "surprise", "neutral"
+  "sadness", "surprise", "neutral",
+  
+  // Guided Journaling Emotions (5)
+  "reflection", "insight", "clarity", "growth", "acceptance",
+  
+  // Check-in Emotions (5)
+  "energy", "focus", "motivation", "stress", "balance"
 ];
 
 export const analyzeSentiment = async (text: string) => {
@@ -80,10 +87,10 @@ export const logoutDB = async () => {
 // **********************************************
 
 export const fetchSentimentAnalysis = async (
-  start_date: string,   // Format: "YYYY-MM-DD"
-  end_date: string,     // Format: "YYYY-MM-DD"
-  interval: string = "monthly",  // "daily", "weekly", "monthly", or "yearly"
-  emotions?: string     // Optional: comma-separated list of emotion codes
+  start_date: string,
+  end_date: string,
+  interval: string = "monthly",
+  emotions?: string
 ) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -99,7 +106,6 @@ export const fetchSentimentAnalysis = async (
       params.append("emotions", emotions);
     }
 
-    // Updated endpoint to match new data structure
     const url = `${API_URL}/journal/api/sentiment-analysis?${params.toString()}`;
     console.log("Fetching sentiment analysis from URL:", url);
 
@@ -118,7 +124,14 @@ export const fetchSentimentAnalysis = async (
 
     const data = await response.json();
     console.log("API sentiment analysis data:", data);
-    return data;
+    
+    // The response now includes start_date, end_date, interval, and emotion_analysis
+    return {
+      start_date: data.start_date,
+      end_date: data.end_date,
+      interval: data.interval,
+      emotion_analysis: data.emotion_analysis || []
+    };
   } catch (error) {
     console.error("Error fetching sentiment analysis:", error);
     return { error: "Failed to fetch sentiment analysis." };
@@ -138,7 +151,6 @@ export const fetchJournalEntriesWithDate = async (
     params.append("start_date", start_date);
     params.append("end_date", end_date);
 
-    // Updated endpoint to match new data structure
     const response = await fetch(`${API_URL}/journal/api/journal-entries?${params.toString()}`, {
       method: "GET",
       headers: {
@@ -152,8 +164,12 @@ export const fetchJournalEntriesWithDate = async (
     }
 
     const data = await response.json();
-    // Assuming the response now directly contains the journalEntries array
-    return data;
+    // The response now includes start_date, end_date, and entries
+    return {
+      start_date: data.start_date,
+      end_date: data.end_date,
+      entries: data.entries || []
+    };
   } catch (error) {
     console.error("Error fetching journal entries:", error);
     return { error: "Failed to fetch journal entries." };

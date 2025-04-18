@@ -87,13 +87,18 @@ interface ProcessedChartData {
   }[];
 }
 
-// Emotions array and mapping (code → emotion name)
+// Define the emotions array to match the backend
 const emotions = [
-  "Amusement", "Admiration", "Approval", "Caring", "Excitement", "Gratitude",
-  "Joy", "Love", "Optimism", "Pride", "Relief", "Anger", "Annoyance",
-  "Disappointment", "Disapproval", "Disgust", "Embarrassment", "Fear", "Grief",
-  "Jealousy", "Sadness", "Confusion", "Curiosity", "Desire", "Neutral",
-  "Remorse", "Surprise", "Realization"
+  // Free Journaling Emotions (28)
+  "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+  "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+  "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+  "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+  "sadness", "surprise", "neutral",
+  
+  // Guided Journaling Emotions (5)
+
+
 ];
 
 export const emotionMap: Record<number, string> = emotions.reduce(
@@ -108,6 +113,10 @@ export const emotionMap: Record<number, string> = emotions.reduce(
 const reverseEmotionMap: Record<string, number> = Object.fromEntries(
   Object.entries(emotionMap).map(([code, name]) => [name, parseInt(code)])
 );
+
+// Add debug logging for emotion mapping
+console.log("Emotion mapping:", emotionMap);
+console.log("Reverse emotion mapping:", reverseEmotionMap);
 
 // Define a pastel color palette for the chart lines.
 const pastelColors = [
@@ -181,17 +190,20 @@ const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment
 const processData = (rawData: RawSentiment[], selectedEmotions: string[]): ProcessedChartData => {
   console.log("Raw sentiment data for chart:", rawData);
   console.log("Selected emotions:", selectedEmotions);
+  console.log("Emotion mapping:", emotionMap);
+  console.log("Reverse emotion mapping:", reverseEmotionMap);
   
   // First, aggregate counts by date and emotion
   const aggregatedData = rawData.reduce((acc: { [key: string]: { [key: number]: number } }, item) => {
     if (!acc[item.time_period]) {
       acc[item.time_period] = {};
     }
-    // Use count from the API response
-    const count = item.count || 0;  // Changed from entry_count to count
-    acc[item.time_period][item.emotion] = (acc[item.time_period][item.emotion] || 0) + count;
+    // Use both count and percentage for debugging
+    const count = item.count || 0;
+    const percentage = item.percentage || 0;
+    acc[item.time_period][item.emotion] = count;
     
-    console.log(`Aggregating - Date: ${item.time_period}, Emotion: ${item.emotion}, Count: ${count}, Total: ${acc[item.time_period][item.emotion]}`);
+    console.log(`Aggregating - Date: ${item.time_period}, Emotion: ${emotionMap[item.emotion]} (code: ${item.emotion}), Count: ${count}, Percentage: ${percentage}`);
     return acc;
   }, {});
 
@@ -202,11 +214,15 @@ const processData = (rawData: RawSentiment[], selectedEmotions: string[]): Proce
   console.log("Time periods (labels):", labels);
 
   const datasets = selectedEmotions.map(emotionName => {
-    const emotionCode = reverseEmotionMap[emotionName];
+    const emotionCode = reverseEmotionMap[emotionName.toLowerCase()];
     console.log(`Processing emotion: ${emotionName}, code: ${emotionCode}`);
     
+    if (emotionCode === undefined) {
+      console.warn(`Warning: No code found for emotion: ${emotionName}`);
+    }
+    
     const dataArray = labels.map(label => {
-      const count = aggregatedData[label]?.[emotionCode] || 0;
+      const count = emotionCode !== undefined ? (aggregatedData[label]?.[emotionCode] || 0) : 0;
       console.log(`Date: ${label}, Emotion: ${emotionName} (code: ${emotionCode}), Count: ${count}`);
       return count;
     });
@@ -303,24 +319,74 @@ const renderEmptyTable = (
   darkMode: boolean
 ): JSX.Element => {
   return (
-    <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
-      <Text style={[styles.emptyTableHeader, { color: darkMode ? '#B0B0B0' : '#666' }]}>
+    <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#1E1E1E' : '#fff' }]}>
+      <Text style={[
+        styles.emptyTableHeader, 
+        { 
+          color: darkMode ? '#FFB347' : '#666',
+          fontWeight: '600',
+          marginBottom: 16
+        }
+      ]}>
         Looks like this emotion hasn't appeared in your entries yet! Keep journaling, and we'll track it for you! ✨
       </Text>
-      <View style={[styles.table, { backgroundColor: darkMode ? '#2C2C2C' : '#fff' }]}>
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, styles.tableHeaderCell]}>Date</Text>
+      <View style={[
+        styles.table, 
+        { 
+          backgroundColor: darkMode ? '#2C2C2C' : '#fff',
+          borderWidth: 1,
+          borderColor: darkMode ? '#404040' : '#e0e0e0'
+        }
+      ]}>
+        <View style={[
+          styles.tableRow,
+          {
+            backgroundColor: darkMode ? '#363636' : '#f5f5f5',
+            borderColor: darkMode ? '#404040' : '#e0e0e0'
+          }
+        ]}>
+          <Text style={[
+            styles.tableCell, 
+            styles.tableHeaderCell,
+            { color: darkMode ? '#FFFFFF' : '#000000' }
+          ]}>
+            Date
+          </Text>
           {selectedEmotions.map((emotion, index) => (
-            <Text key={`header-${emotion}-${index}`} style={[styles.tableCell, styles.tableHeaderCell]}>
+            <Text 
+              key={`header-${emotion}-${index}`} 
+              style={[
+                styles.tableCell, 
+                styles.tableHeaderCell,
+                { color: darkMode ? '#FFFFFF' : '#000000' }
+              ]}
+            >
               {emotion}
             </Text>
           ))}
         </View>
         {labels.map((label, labelIndex) => (
-          <View key={`row-${label}-${labelIndex}`} style={styles.tableRow}>
-            <Text style={styles.tableCell}>{label}</Text>
+          <View 
+            key={`row-${label}-${labelIndex}`} 
+            style={[
+              styles.tableRow,
+              { borderColor: darkMode ? '#404040' : '#e0e0e0' }
+            ]}
+          >
+            <Text style={[
+              styles.tableCell,
+              { color: darkMode ? '#B0B0B0' : '#666666' }
+            ]}>
+              {label}
+            </Text>
             {selectedEmotions.map((emotion, emotionIndex) => (
-              <Text key={`cell-${emotion}-${labelIndex}-${emotionIndex}`} style={styles.tableCell}>
+              <Text 
+                key={`cell-${emotion}-${labelIndex}-${emotionIndex}`} 
+                style={[
+                  styles.tableCell,
+                  { color: darkMode ? '#B0B0B0' : '#666666' }
+                ]}
+              >
                 0
               </Text>
             ))}
@@ -336,22 +402,12 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   interval, 
   startDate, 
   endDate,
-  darkMode = false // Default to light mode
+  darkMode = false
 }) => {
   const [chartData, setChartData] = useState<ProcessedChartData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [labels, setLabels] = useState<string[]>([]);
-
-  // Fix: Only create emotionColors if selectedEmotions is not empty
-  const emotionColors: Record<string, string> = selectedEmotions.length > 0 
-    ? Object.fromEntries(
-        selectedEmotions.map((emotion, index) => [
-          emotion, 
-          pastelColors[index % pastelColors.length]
-        ])
-      )
-    : {};
 
   useEffect(() => {
     const fetchData = async () => {
@@ -368,6 +424,10 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       try {
         const response = await fetchSentimentAnalysis(startDate, endDate, interval);
         console.log("API response in SentimentChart:", response);
+        
+        if (response.error) {
+          throw new Error(response.error);
+        }
         
         const rawData: RawSentiment[] = response.emotion_analysis || [];
         
@@ -401,11 +461,27 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   // If no emotion is selected, show a placeholder with fixed height.
   if (selectedEmotions.length === 0) {
     return (
-      <View style={styles.placeholderContainer}>
-        <Text style={styles.placeholderText}>
-  Pick an emotion to track your journey! Your feelings shape your story ✨
-</Text>
-
+      <View style={[
+        styles.placeholderContainer,
+        { 
+          backgroundColor: darkMode ? '#1E1E1E' : '#fff',
+          borderWidth: darkMode ? 1 : 0,
+          borderColor: darkMode ? '#404040' : 'transparent',
+          borderRadius: 8
+        }
+      ]}>
+        <Text style={[
+          styles.placeholderText,
+          { 
+            color: darkMode ? '#E0E0E0' : '#666',
+            fontWeight: '500',
+            fontSize: 20,
+            textAlign: 'center',
+            lineHeight: 28
+          }
+        ]}>
+          Pick an emotion to track your journey! Your feelings shape your story ✨
+        </Text>
       </View>
     );
   }
@@ -415,8 +491,22 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   }
   if (error && error !== "empty") {
     return (
-      <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
-        <Text style={[styles.placeholderText, { color: darkMode ? '#B0B0B0' : '#888' }]}>
+      <View style={[
+        styles.placeholderContainer, 
+        { 
+          backgroundColor: darkMode ? '#1E1E1E' : '#fff',
+          borderWidth: darkMode ? 1 : 0,
+          borderColor: darkMode ? '#FF6B6B' : 'transparent',
+          borderRadius: 8
+        }
+      ]}>
+        <Text style={[
+          styles.placeholderText, 
+          { 
+            color: darkMode ? '#FF6B6B' : '#FF4444',
+            fontWeight: '600'
+          }
+        ]}>
           Error: {error}
         </Text>
       </View>
@@ -424,7 +514,15 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   }
   if (error === "empty" || !chartData) {
     return (
-      <View style={[styles.placeholderContainer, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+      <View style={[
+        styles.placeholderContainer, 
+        { 
+          backgroundColor: darkMode ? '#1E1E1E' : '#fff',
+          borderWidth: darkMode ? 1 : 0,
+          borderColor: darkMode ? '#FFB347' : 'transparent',
+          borderRadius: 8
+        }
+      ]}>
         {renderEmptyTable(selectedEmotions, startDate, endDate, labels, darkMode)}
       </View>
     );
