@@ -28,6 +28,8 @@ const emotions = [
   "sadness", "surprise", "neutral"
 ];
 
+
+
 export const emotionMap: Record<number, string> = emotions.reduce(
   (acc, emotion, index) => {
     acc[index] = emotion;
@@ -320,10 +322,16 @@ const SentimentAnalysisPage: React.FC = () => {
           <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
             {formattedDate}
           </Text>
-          <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
+          <Text 
+            style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}
+            numberOfLines={2}
+          >
             {emotionMap[dominant.emotion] || dominant.emotion}
           </Text>
-          <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+          <Text 
+            style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}
+            numberOfLines={1}
+          >
             {subLabel}
           </Text>
         </Pressable>
@@ -448,7 +456,7 @@ const styles = StyleSheet.create({
     // Ensure it doesn't push elements below
   },
   entryCard: {
-    width: 200,
+    width: 220,
     height: 120,
     padding: 16,
     borderWidth: 1,
@@ -456,20 +464,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#fff",
     marginRight: 12,
+    justifyContent: 'space-between',
   },
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
     color: "#828282",
+    marginBottom: 8,
   },
   entryEmotion: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#000",
+    lineHeight: 32,
+    flexShrink: 1,
   },
   entryDetails: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#828282",
+    marginTop: 8,
   },
   container2: {
     paddingVertical: 10,
