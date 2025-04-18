@@ -140,6 +140,39 @@ const GuidedJournalingScreen = () => {
 
           {/* Entry Input */}
           <View style={{ backgroundColor: "#F5F5F5", padding: 20, borderRadius: 12 }}>
+            {/* Clear Draft Icon */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                zIndex: 1,
+                padding: 8,
+              }}
+              onPress={() => {
+                if (content.trim()) {
+                  Alert.alert(
+                    "Clear Entry",
+                    "Are you sure you want to clear your current entry?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Clear",
+                        style: "destructive",
+                        onPress: async () => {
+                          await clearDraft();
+                          setContent("");
+                          setImageUris([]);
+                        }
+                      }
+                    ]
+                  );
+                }
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>❌</Text>
+            </TouchableOpacity>
+
             <TextInput
               style={{
                 minHeight: 200,
@@ -159,19 +192,22 @@ const GuidedJournalingScreen = () => {
             <Text style={{ textAlign: "right", color: "#999" }}>{content.length} / {MAX_CHAR_COUNT}</Text>
           </View>
 
-          {/* Save Button */}
-          <TouchableOpacity
-            style={{
-              backgroundColor: "#111",
-              padding: 14,
-              borderRadius: 10,
-              alignItems: "center",
-              marginTop: 20,
-            }}
-            onPress={handleSaveEntry}
-          >
-            <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
-          </TouchableOpacity>
+          {/* Button Container */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
+            {/* Save Entry Button */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#111",
+                padding: 14,
+                borderRadius: 10,
+                alignItems: "center",
+                flex: 1,
+              }}
+              onPress={handleSaveEntry}
+            >
+              <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
 
         {/* Bottom Navigation */}

@@ -175,6 +175,41 @@ const CheckInScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Clear Draft Icon */}
+      {(selectedEmotions.length > 0 || selectedReasons.length > 0 || comment.trim()) && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            zIndex: 10,
+            padding: 8,
+          }}
+          onPress={() => {
+            Alert.alert(
+              "Clear Check-in",
+              "Are you sure you want to clear your current check-in?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear",
+                  style: "destructive",
+                  onPress: async () => {
+                    await clearCheckInDraft();
+                    setSelectedEmotions([]);
+                    setSelectedReasons([]);
+                    setComment("");
+                    setStep(1);
+                  }
+                }
+              ]
+            );
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>❌</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Emotions Screen (Step 1) */}
       {step === 1 && (
         <>
@@ -270,18 +305,21 @@ const CheckInScreen = () => {
                 />
               </View>
 
-              {/* Complete Check-in Button */}
-              <TouchableOpacity 
-                style={styles.completeButton} 
-                onPress={handleSubmitCheckIn}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.completeButtonText}>Complete Check-in</Text>
-                )}
-              </TouchableOpacity>
+              {/* Button Container */}
+              <View style={styles.buttonContainer}>
+                {/* Complete Check-in Button */}
+                <TouchableOpacity 
+                  style={styles.completeButton} 
+                  onPress={handleSubmitCheckIn}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.completeButtonText}>Complete Check-in</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </>
@@ -400,12 +438,12 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   completeButton: {
-    marginTop: 30,
     paddingVertical: 15,
     paddingHorizontal: 40,
     backgroundColor: "black",
     borderRadius: 30,
     width: "80%",
+    alignSelf: "center",
   },
   completeButtonText: {
     color: "white",
@@ -413,6 +451,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     fontFamily: "Poppins",
+  },
+  buttonContainer: {
+    width: "100%",
+    marginTop: 30,
   },
 });
 
