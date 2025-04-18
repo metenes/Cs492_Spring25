@@ -2,10 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://172.20.10.2:5000";
+// const API_URL = "http://172.20.10.2:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
+const API_URL = "http://192.168.1.29:5000";
 // Define the emotions array to match the backend
 const EMOTIONS = [
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -158,6 +159,20 @@ export const fetchJournalEntriesWithDate = async (
     console.error("Error fetching journal entries:", error);
     return { error: "Failed to fetch journal entries." };
   }
+};
+
+export const getEmotionalTrendInsight = async (token: string) => {
+  const response = await fetch(`${API_URL}/sentiment/insights`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch emotional trend insight");
+  }
+
+  return response.json();
 };
 
 // **********************************************

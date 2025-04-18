@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from models.sentiment import Sentiment  # Import the Sentiment model
-from utils.database import sentiments_collection
+from utils.database import sentiments_collection, journal_entries_collection, check_in_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from utils.load_model import model, tokenizer
@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import numpy as np
 import json
 from pathlib import Path
+from collections import Counter
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
@@ -222,3 +223,85 @@ def get_current_mood():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+#sentiment trends and insights
+@sentiments_bp.route("/insights", methods=["GET"])
+@jwt_required()
+def get_emotional_insights():
+    try:
+        user_id = get_jwt_identity()
+        print("🔐 JWT user ID:", user_id)
+
+        if not ObjectId.is_valid(user_id):
+            return jsonify({"error": "Invalid user ID"}), 400
+        user_object_id = ObjectId(user_id)
+
+        # Fetch the user’s journal document
+        journal_data = journal_entries_collection.find_one({"_id": user_object_id})
+        print(f"📓 Journal document: {journal_data.keys() if journal_data else 'None'}")
+
+        all_emotions = []
+
+        # If the document exists and has journal entries
+        if journal_data and "journalEntries" in journal_data:
+            journal_entries = journal_data["journalEntries"]
+            print(f"📖 Found {len(journal_entries)} journal entries")
+
+            for entry in journal_entries:
+                sentiments = entry.get("journalSentiments", [])
+                for sentiment in sentiments:
+                    if isinstance(sentiment, dict):
+                        all_emotions.append(sentiment.get("emotion"))
+                    elif isinstance(sentiment, str):
+                        all_emotions.append(sentiment)
+
+        # Fetch check-in sentiments
+        check_ins = list(check_in_collection.find({
+            "userId": user_object_id,
+            "sentiments": {"$exists": True, "$ne": []}
+        }))
+        print(f"📥 Found {len(check_ins)} check-ins")
+
+        for checkin in check_ins:
+            all_emotions.extend(checkin.get("sentiments", []))
+
+        print(f"🎯 All emotions extracted: {all_emotions}")
+
+        if not all_emotions:
+            return jsonify({
+                "insight": "No emotional data found. Start journaling or check in to build your insights!",
+                "top_emotions": []
+            }), 200
+
+        # Count top emotions
+        emotion_counts = Counter(all_emotions)
+        top_emotions = emotion_counts.most_common(3)
+        print("📈 Top emotions:", top_emotions)
+
+        # Convert emotion codes to labels
+        emotion_labels = []
+        for code, _ in top_emotions:
+            try:
+                if isinstance(code, int) and 0 <= code < len(EMOTIONS):
+                    emotion_labels.append(EMOTIONS[code].lower())
+                elif isinstance(code, str):
+                    emotion_labels.append(code.lower())
+                else:
+                    emotion_labels.append("unknown")
+            except:
+                emotion_labels.append("unknown")
+
+        insight = f"You’ve been feeling {', '.join(emotion_labels)} more often lately. Keep an eye on your emotional patterns!"
+
+        return jsonify({
+            "top_emotions": [{"label": label, "count": count} for label, (_, count) in zip(emotion_labels, top_emotions)],
+            "insight": insight
+        })
+
+
+    except Exception as e:
+        print("❌ Error generating insights:", str(e))
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to generate emotional insights."}), 500

@@ -11,10 +11,11 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
-import { fetchJournalEntriesWithDate,fetchSentimentAnalysis } from "../services/ApiService"; // Our new function
+import { fetchJournalEntriesWithDate, fetchSentimentAnalysis, getEmotionalTrendInsight } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '../context/ThemeContext';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Emotions array and code→name map
 const emotions = [
@@ -67,6 +68,10 @@ const SentimentAnalysisPage: React.FC = () => {
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // emotional trends
+  const [trendInsight, setTrendInsight] = useState<string | null>(null);
+
 
   // Toggle emotion chip
   const toggleEmotion = (emotion: string) => {
@@ -153,6 +158,23 @@ const SentimentAnalysisPage: React.FC = () => {
       }
     }
   };
+
+  // for emotion trends
+  useEffect(() => {
+    const fetchTrendInsight = async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) return;
+        const res = await getEmotionalTrendInsight(token);
+        setTrendInsight(res.insight);
+      } catch (err) {
+        console.error("❌ Error fetching trend insight:", err);
+      }
+    };
+  
+    fetchTrendInsight();
+  }, []);
+  
 
   const handleEndDateChange = (event: any, isWeekly: boolean, date?: Date) => {
     if (!date) return;
@@ -263,96 +285,104 @@ const SentimentAnalysisPage: React.FC = () => {
 
   return (
     <>
-      <View style={[styles.container, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
-        {/* Weekly Date Range */}
-        <View style={styles.dateRangeContainer}>
-          <DateTimePicker
-            value={selectedStartDate}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleStartDateChange(event, true, date)}
-            themeVariant={darkMode ? "dark" : "light"}
-          />
-          <DateTimePicker
-            value={selectedEndDate}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleEndDateChange(event, true, date)}
-            themeVariant={darkMode ? "dark" : "light"}
-          />
-        </View>
+      <ScrollView>
+        <View style={[styles.container, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+          {/* Weekly Date Range */}
+          <View style={styles.dateRangeContainer}>
+            <DateTimePicker
+              value={selectedStartDate}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleStartDateChange(event, true, date)}
+              themeVariant={darkMode ? "dark" : "light"}
+            />
+            <DateTimePicker
+              value={selectedEndDate}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleEndDateChange(event, true, date)}
+              themeVariant={darkMode ? "dark" : "light"}
+            />
+          </View>
 
-        {/* Horizontal Cards */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.entriesScroll}
-          contentContainerStyle={{ flexGrow: 0 }}
-        >
-          {renderJournalCards()}
-        </ScrollView>
-
-        {/* Chart Date Range */}
-        <View style={styles.dateRangeContainer2}>
-          <DateTimePicker
-            value={selectedStartDateForChart}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleStartDateChange(event, false, date)}
-          />
-          <DateTimePicker
-            value={selectedEndDateForChart}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleEndDateChange(event, false, date)}
-          />
-        </View>
-
-        {/* Emotion Chips */}
-        <View style={styles.container2}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
-            {emotions.map((emotion, index) => {
-              const isSelected = selectedEmotions.includes(emotion);
-              return (
-                <Pressable
-                  key={index}
-                  style={[
-                    styles.chip,
-                    isSelected 
-                      ? { 
-                          backgroundColor: darkMode ? '#999999' : 'black',
-                          borderColor: darkMode ? '#FFFFFF' : 'transparent',
-                          borderWidth: darkMode ? 1 : 0
-                        }
-                      : { backgroundColor: darkMode ? '#404040' : '#e0e0e0' }
-                  ]}
-                  onPress={() => toggleEmotion(emotion)}
-                >
-                  <Text style={[
-                    styles.chipText,
-                    !isSelected 
-                      ? { color: darkMode ? '#FFFFFF' : 'black' }
-                      : { color: 'white' }
-                  ]}>
-                    {emotion}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          {/* Horizontal Cards */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.entriesScroll}
+            contentContainerStyle={{ flexGrow: 0 }}
+          >
+            {renderJournalCards()}
           </ScrollView>
-        </View>
 
-        {/* Chart */}
-        <View style={{ alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
-          <SentimentChart
-            selectedEmotions={selectedEmotions}
-            interval={computeChartInterval()}
-            startDate={toLocalDateString(selectedStartDateForChart)}
-            endDate={toLocalDateString(selectedEndDateForChart)}
-            darkMode={darkMode}
-          />
+          {/* Chart Date Range */}
+          <View style={styles.dateRangeContainer2}>
+            <DateTimePicker
+              value={selectedStartDateForChart}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleStartDateChange(event, false, date)}
+            />
+            <DateTimePicker
+              value={selectedEndDateForChart}
+              mode="date"
+              display="default"
+              onChange={(event, date) => handleEndDateChange(event, false, date)}
+            />
+          </View>
+
+          {/* Emotion Chips */}
+          <View style={styles.container2}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
+              {emotions.map((emotion, index) => {
+                const isSelected = selectedEmotions.includes(emotion);
+                return (
+                  <Pressable
+                    key={index}
+                    style={[
+                      styles.chip,
+                      isSelected 
+                        ? { 
+                            backgroundColor: darkMode ? '#999999' : 'black',
+                            borderColor: darkMode ? '#FFFFFF' : 'transparent',
+                            borderWidth: darkMode ? 1 : 0
+                          }
+                        : { backgroundColor: darkMode ? '#404040' : '#e0e0e0' }
+                    ]}
+                    onPress={() => toggleEmotion(emotion)}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      !isSelected 
+                        ? { color: darkMode ? '#FFFFFF' : 'black' }
+                        : { color: 'white' }
+                    ]}>
+                      {emotion}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Chart */}
+          <View style={{ alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
+            <SentimentChart
+              selectedEmotions={selectedEmotions}
+              interval={computeChartInterval()}
+              startDate={toLocalDateString(selectedStartDateForChart)}
+              endDate={toLocalDateString(selectedEndDateForChart)}
+              darkMode={darkMode}
+            />
+          </View>
+          {trendInsight && (
+            <View style={styles.trendInsightBox}>
+              <Text style={styles.trendInsightText}>{trendInsight}</Text>
+            </View>
+          )}
+
         </View>
-      </View>
+      </ScrollView>  
 
       <BottomNavigation activeScreen="Dashboard" darkMode={darkMode} />
     </>
@@ -427,6 +457,20 @@ const styles = StyleSheet.create({
   chipTextUnselected: {
     color: "black",
   },
+  trendInsightBox: {
+    backgroundColor: "#FFF8EC",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderColor: "#FFE8B0",
+    borderWidth: 1,
+  },
+  trendInsightText: {
+    fontSize: 16,
+    color: "#444",
+    fontStyle: "italic",
+  }
+  
 });
 
 export default SentimentAnalysisPage;
