@@ -61,6 +61,13 @@ const emotionIcons: { [key: string]: string } = {
   surprise: "send",
   neutral: "meh"
 };
+
+// Helper function to get the correct icon name for check-in emotions
+const getCheckInEmotionIcon = (emotion: string): string => {
+  const lowerEmotion = emotion.toLowerCase();
+  return emotionIcons[lowerEmotion] || "help-circle";
+};
+
 const reasonIcons: { [key: string]: string } = {
   Work: "briefcase", School: "book", Friends: "users", Family: "home", Travel: "map", Relationship: "heart",
   Health: "activity", Exercise: "barbell", Food: "coffee", Hobbies: "music", News: "tv", Weather: "cloud",
@@ -272,7 +279,7 @@ const EntryDetail = () => {
                 <View style={styles.gridContainer}>
                   {entry.sentiments.map((emotion: string, index: number) => (
                     <View key={index} style={styles.gridItem}>
-                      <Feather name={emotionIcons[emotion] || "help-circle"} size={20} color="#444" />
+                      <Feather name={getCheckInEmotionIcon(emotion)} size={20} color="#444" />
                       <Text style={styles.gridLabel}>{emotion}</Text>
                     </View>
                   ))}
