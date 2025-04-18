@@ -15,7 +15,9 @@ import { fetchJournalEntriesWithDate, fetchSentimentAnalysis, getEmotionalTrendI
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '../context/ThemeContext';
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../types/types';
 
 // Emotions array and code→name map
 const emotions = [
@@ -25,6 +27,8 @@ const emotions = [
   "nervousness", "optimism", "pride", "realization", "relief", "remorse",
   "sadness", "surprise", "neutral"
 ];
+
+
 
 export const emotionMap: Record<number, string> = emotions.reduce(
   (acc, emotion, index) => {
@@ -46,6 +50,7 @@ const toLocalDateString = (date: Date) => {
 const SentimentAnalysisPage: React.FC = () => {
   // Add theme context near the top of the component
   const { theme, darkMode } = useTheme();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   // Default: start = today - 7, end = today.
   const today = new Date();
@@ -61,7 +66,7 @@ const SentimentAnalysisPage: React.FC = () => {
   const [selectedEndDateForChart, setSelectedEndDateForChart] = useState(today);
 
   // Emotions selected for the chart
-  const [selectedEmotions, setSelectedEmotions] = useState<string[]>(["Amusement"]);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   // Fetched journal entries state (each entry = one card)
   const [journalEntries, setJournalEntries] = useState<any[]>([]);
@@ -213,11 +218,77 @@ const SentimentAnalysisPage: React.FC = () => {
   // Render horizontal list of journal entry cards
   const renderJournalCards = () => {
     return journalEntries.map((entry, index) => {
-      const { entryDate, journalSentiments = [] } = entry;
+      const { entryDate, journalSentiments = [], sentiments = [], type } = entry;
       const formattedDate = entryDate
         ? new Date(entryDate).toLocaleDateString("en-US", { timeZone: "UTC" })
         : "Unknown Date";
 
+      // Handle check-in entries differently
+      if (type === "checkin") {
+        if (!sentiments || sentiments.length === 0) {
+          return (
+            <Pressable 
+              key={index} 
+              style={[
+                styles.entryCard,
+                {
+                  backgroundColor: darkMode ? '#2C2C2C' : '#fff',
+                  borderColor: darkMode ? '#404040' : '#e0e0e0',
+                }
+              ]}
+            >
+              <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+                {formattedDate}
+              </Text>
+              <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
+                No sentiment data
+              </Text>
+              <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+              </Text>
+            </Pressable>
+          );
+        }
+
+        // For check-in entries, use the sentiments array directly
+        const dominant = sentiments[0];
+        const others = sentiments.slice(1);
+
+        let subLabel = "";
+        if (others.length === 0) {
+          subLabel = "No other emotions";
+        } else if (others.length === 1) {
+          subLabel = others[0];
+        } else {
+          const firstTwo = others.slice(0, 2).join(", ");
+          const remaining = others.length - 2;
+          subLabel = remaining > 0 ? `${firstTwo} and ${remaining} more` : firstTwo;
+        }
+
+        return (
+          <Pressable 
+            key={index} 
+            style={[
+              styles.entryCard,
+              {
+                backgroundColor: darkMode ? '#2C2C2C' : '#fff',
+                borderColor: darkMode ? '#404040' : '#e0e0e0',
+              }
+            ]}
+          >
+            <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+              {formattedDate}
+            </Text>
+            <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
+              {dominant}
+            </Text>
+            <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+              {subLabel}
+            </Text>
+          </Pressable>
+        );
+      }
+
+      // Handle journal entries (existing code)
       if (!journalSentiments || journalSentiments.length === 0) {
         return (
           <Pressable 
@@ -272,10 +343,16 @@ const SentimentAnalysisPage: React.FC = () => {
           <Text style={[styles.entryDate, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
             {formattedDate}
           </Text>
-          <Text style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}>
-            {emotionMap[dominant.emotion] || dominant.emotion} 
+          <Text 
+            style={[styles.entryEmotion, { color: darkMode ? '#FFFFFF' : '#000' }]}
+            numberOfLines={2}
+          >
+            {emotionMap[dominant.emotion] || dominant.emotion}
           </Text>
-          <Text style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}>
+          <Text 
+            style={[styles.entryDetails, { color: darkMode ? '#B0B0B0' : '#828282' }]}
+            numberOfLines={1}
+          >
             {subLabel}
           </Text>
         </Pressable>
@@ -408,7 +485,7 @@ const styles = StyleSheet.create({
     // Ensure it doesn't push elements below
   },
   entryCard: {
-    width: 200,
+    width: 220,
     height: 120,
     padding: 16,
     borderWidth: 1,
@@ -416,20 +493,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#fff",
     marginRight: 12,
+    justifyContent: 'space-between',
   },
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
     color: "#828282",
+    marginBottom: 8,
   },
   entryEmotion: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#000",
+    lineHeight: 32,
+    flexShrink: 1,
   },
   entryDetails: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#828282",
+    marginTop: 8,
   },
   container2: {
     paddingVertical: 10,

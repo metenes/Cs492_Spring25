@@ -245,6 +245,40 @@ const FreeJournalingScreen = () => {
             borderColor: "#DDD",
           }}
         >
+          {/* Clear Draft Icon */}
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              zIndex: 1,
+              padding: 8,
+            }}
+            onPress={() => {
+              if (content.trim() || imageUris.length > 0) {
+                Alert.alert(
+                  "Clear Entry",
+                  "Are you sure you want to clear your current entry?",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Clear",
+                      style: "destructive",
+                      onPress: async () => {
+                        await clearDraft();
+                        setContent("");
+                        setImageUris([]);
+                        setLocalImageUris([]);
+                      }
+                    }
+                  ]
+                );
+              }
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>❌</Text>
+          </TouchableOpacity>
+
           <TextInput
             style={{
               flex: 1,
