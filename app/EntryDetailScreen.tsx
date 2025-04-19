@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, SafeAreaView, Image, Modal } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, SafeAreaView, Image, Modal, FlatList } from "react-native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Feather } from "@expo/vector-icons";
 import { RootStackParamList } from "./types/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
-import { API_URL, deleteEntry, uploadJournalImage, deleteJournalImage } from "./services/ApiService";
+import { API_URL, deleteEntry, uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory } from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';
 
 import { Feather as FeatherIcon } from "@expo/vector-icons"; // for emotion and reason icons
@@ -74,8 +74,7 @@ const reasonIcons: { [key: string]: string } = {
   Sleep: "moon", Music: "headphones", Technology: "cpu"
 };
 
-
-type Entry = {
+export type Entry = {
   _id: string;
   entryContent: string;
   entryDate: string;
@@ -92,10 +91,62 @@ type Entry = {
 type EntryDetailRouteProp = RouteProp<RootStackParamList, "EntryDetail">;
 type EntryDetailNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
+// Define emotions and reasons arrays (same as CheckInScreen)
+const emotions = [
+  { name: "Admiration", icon: "star" }, { name: "Amusement", icon: "smile" }, { name: "Anger", icon: "frown" },
+  { name: "Annoyance", icon: "meh" }, { name: "Approval", icon: "thumbs-up" }, { name: "Caring", icon: "heart" },
+  { name: "Confusion", icon: "help-circle" }, { name: "Curiosity", icon: "search" }, { name: "Desire", icon: "target" },
+  { name: "Disappointment", icon: "frown" }, { name: "Disapproval", icon: "thumbs-down" }, { name: "Disgust", icon: "x-circle" },
+  { name: "Embarrassment", icon: "alert-circle" }, { name: "Excitement", icon: "zap" }, { name: "Fear", icon: "alert-triangle" },
+  { name: "Gratitude", icon: "gift" }, { name: "Grief", icon: "cloud-drizzle" }, { name: "Joy", icon: "sun" },
+  { name: "Love", icon: "heart" }, { name: "Nervousness", icon: "corner-up-right" }, { name: "Optimism", icon: "trending-up" },
+  { name: "Pride", icon: "award" }, { name: "Realization", icon: "eye" }, { name: "Relief", icon: "check-circle" },
+  { name: "Remorse", icon: "corner-down-left" }, { name: "Sadness", icon: "cloud-rain" }, { name: "Surprise", icon: "send" }
+];
+
+const reasons = [
+  { name: "Work", icon: "briefcase" }, { name: "School", icon: "book" }, { name: "Friends", icon: "users" },
+  { name: "Family", icon: "home" }, { name: "Travel", icon: "map" }, { name: "Relationship", icon: "heart" },
+  { name: "Health", icon: "activity" }, { name: "Exercise", icon: "barbell" }, { name: "Food", icon: "coffee" },
+  { name: "Hobbies", icon: "music" }, { name: "News", icon: "tv" }, { name: "Weather", icon: "cloud" },
+  { name: "Sleep", icon: "moon" }, { name: "Music", icon: "headphones" }, { name: "Technology", icon: "cpu" }
+];
+
 const EntryDetail = () => {
   const navigation = useNavigation<EntryDetailNavigationProp>();
   const route = useRoute<EntryDetailRouteProp>();
-  const { entry } = route.params;
+  const [entry, setEntry] = useState(route.params.entry);
+  
+  // Add useFocusEffect to refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchUpdatedEntry = async () => {
+        try {
+          const token = await AsyncStorage.getItem("userToken");
+          if (!token) {
+            Alert.alert("Error", "Authentication token not found");
+            return;
+          }
+
+          const data = await getCheckInHistory(token);
+          const updatedEntry = data.history.find((e: any) => e.entry_id === entry._id);
+          
+          if (updatedEntry) {
+            setEntry({
+              ...entry,
+              sentiments: updatedEntry.sentiments,
+              causes: updatedEntry.causes,
+              comments: updatedEntry.comments,
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching updated entry:", error);
+        }
+      };
+
+      fetchUpdatedEntry();
+    }, [entry._id])
+  );
   
   // State for editing mode and image selection
   const [isEditing, setIsEditing] = useState(false);
@@ -104,6 +155,33 @@ const EntryDetail = () => {
   const [images, setImages] = useState(entry.images || []);
   const [isUploading, setIsUploading] = useState(false);
   
+  // State for check-in editing
+  const [step, setStep] = useState(1);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>(entry.sentiments || []);
+  const [selectedReasons, setSelectedReasons] = useState<string[]>(entry.causes || []);
+  const [comment, setComment] = useState(entry.comments?.[0] || "");
+
+  const toggleSelection = (item: any, state: string[], setState: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setState((prev) =>
+      prev.includes(item.name)
+        ? prev.filter((i) => i !== item.name)
+        : [...prev, item.name]
+    );
+  };
+
+  const renderItem = ({ item }: any, state: string[], setState: React.Dispatch<React.SetStateAction<string[]>>) => (
+    <TouchableOpacity
+      style={[
+        styles.option,
+        state.includes(item.name) && styles.selectedOption,
+      ]}
+      onPress={() => toggleSelection(item, state, setState)}
+    >
+      <Feather name={item.icon} size={24} color="#000" />
+      <Text>{item.name}</Text>
+    </TouchableOpacity>
+  );
+
   // Format the date
   let formattedDate = "Invalid date";
   try {
@@ -206,6 +284,10 @@ const EntryDetail = () => {
     );
   }; */
 
+  // Handle editing check-in
+  const handleEditCheckIn = () => {
+    navigation.navigate("EditCheckIn", { entry });
+  };
 
   // Handle adding new image
   const handleAddImage = async () => {
@@ -274,11 +356,12 @@ const EntryDetail = () => {
             </TouchableOpacity>
           ) : (
             <>
-              {entry.category !== "checkin" && (
-                <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.actionButton}>
-                  <Feather name="edit" size={24} color="#000" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                onPress={entry.category === "checkin" ? handleEditCheckIn : () => setIsEditing(true)} 
+                style={styles.actionButton}
+              >
+                <Feather name="edit" size={24} color="#000" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={handleDeleteEntry} style={styles.actionButton}>
                 <Feather name="trash-2" size={24} color="#FF0000" />
               </TouchableOpacity>
@@ -637,6 +720,78 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+    color: "#000",
+    textAlign: "center",
+    fontFamily: "Poppins",
+  },
+  nextButton: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "black",
+    borderRadius: 10,
+    width: "50%",
+    alignSelf: "center",
+  },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  summaryContainer: {
+    flex: 1,
+    width: "100%",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: "#f8f8f8",
+  },
+  summaryTitle: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 20,
+    color: "#000",
+    textAlign: "center",
+    fontFamily: "Poppins",
+  },
+  section: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  tag: {
+    backgroundColor: "lavender",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  tagText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "black",
+  },
+  commentInput: {
+    width: "100%",
+    height: 100,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    textAlignVertical: "top",
+    backgroundColor: "white",
   },
 });
 

@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-//const API_URL = "http://172.20.10.3:5000";
+const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
-const API_URL = "http://192.168.1.29:5000";
+//const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -1237,6 +1237,39 @@ export const deleteJournalImage = async (imageUrl: string): Promise<void> => {
     console.log('✅ Image deleted successfully');
   } catch (error) {
     console.error('❌ Error deleting journal image:', error);
+    throw error;
+  }
+};
+
+// Function to update a check-in entry
+export const updateCheckIn = async (entryId: string, sentiments: string[], causes: string[], comments: string[] = []) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/check-in/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sentiments,
+        causes,
+        comments
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update check-in');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Check-in update error:', error);
     throw error;
   }
 };

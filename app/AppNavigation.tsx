@@ -31,6 +31,7 @@ import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
 import ActivityLogScreen from "./ActivityLogScreen";
 import EntryDetailScreen from "./EntryDetailScreen";
+import EditCheckInScreen from "./EditCheckInScreen";
 // Bottom Menu
 import BottomNavigation from "./BottomNavigation";
 
@@ -116,6 +117,7 @@ const AppNavigation = () => {
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
         <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
         <Stack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ headerShown: false }}/>
+        <Stack.Screen name="EditCheckIn" component={EditCheckInScreen} options={{ headerShown: false }}/>
 
         {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
         {/* Fix the Header Title for DiaryMain */}

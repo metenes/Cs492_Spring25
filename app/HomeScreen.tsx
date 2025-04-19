@@ -82,103 +82,62 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   console.log("STARTING FROM HERE")
 
-  useEffect(() => {
-    const checkStoredToken = async () => {
-        const token = await AsyncStorage.getItem("userToken");
-        if (token) {
-            console.log("🔹 Found Token:", token);
-            storeToken(token); // ✅ Save token in state
+  // Load entries and streak data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        try {
+          const token = await AsyncStorage.getItem("userToken");
+          if (!token) return;
+
+          // Load entries
+          const fetchedEntries = await fetchJournalEntries(token);
+          const checkInResponse = await getCheckInHistory(token);
+          
+          let fetchedCheckIns = [];
+          if (Array.isArray(checkInResponse.history)) {
+            fetchedCheckIns = checkInResponse.history;
+          }
+
+          const formattedCheckIns = fetchedCheckIns.map((checkIn: { entry_id: any; comments: string | any[]; created_at: any; sentiments: any; }) => ({
+            _id: checkIn.entry_id,
+            entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments",
+            entryDate: checkIn.date || new Date().toISOString(),
+            createdAt: checkIn.created_at,
+            category: "checkin",
+            images: [],
+            sentiments: checkIn.sentiments || [],
+            causes: checkIn.causes || [],
+            comments: checkIn.comments || [],
+            prompt: "",
+          }));
+
+          let allEntries = [...fetchedEntries, ...formattedCheckIns];
+          allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+          allEntries = allEntries.slice(0, 30);
+
+          setEntries(allEntries);
+          
+          // Reapply the current filter
+          if (activeFilter === "all") {
+            setFilteredEntries(allEntries);
+          } else {
+            const filtered = allEntries.filter(entry => entry.category === filterMap[activeFilter]);
+            setFilteredEntries(filtered);
+          }
+
+          // Load streak
+          const dates = await fetchJournalDates(token);
+          const calculatedStreak = calculateStreak(dates);
+          setStreak(calculatedStreak);
+        } catch (error) {
+          console.error("❌ Error loading data:", error);
         }
-        else{
-          return; 
-        }
-    };
-    checkStoredToken();
+      };
 
-    const loadEntries = async () => {
-      try {
-        const token = await AsyncStorage.getItem("userToken");
-        if (!token) return;
-    
-        console.log("🔹 Fetching journal entries and check-ins using token:", token);
-    
-        // Fetch journal entries
-        const fetchedEntries = await fetchJournalEntries(token);
-        console.log("📖 Journal entries:", fetchedEntries);
-    
-        // Fetch check-ins
-        const checkInResponse = await getCheckInHistory(token);
-    
-        let fetchedCheckIns = [];
-        if (Array.isArray(checkInResponse.history)) {
-          fetchedCheckIns = checkInResponse.history;
-          console.log("✅ Check-in entries:", fetchedCheckIns);
-        } else {
-          console.warn("⚠️ No check-ins found.");
-}
-
-    
-        //const fetchedCheckIns = checkInResponse.history;
-        //console.log("✅ Check-in entries:", fetchedCheckIns);
-    
-        // Convert check-ins to match journal entry structure
-        const formattedCheckIns = fetchedCheckIns.map((checkIn: { entry_id: any; comments: string | any[]; created_at: any; sentiments: any; }) => ({
-          _id: checkIn.entry_id, // Match ID structure
-          entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments", // Use first comment as content
-          entryDate: checkIn.date || new Date().toISOString(), // Ensure valid date
-          createdAt: checkIn.created_at,
-          category: "checkin", // Mark as check-in
-          images: [], // Check-ins likely have no images
-          sentiments: checkIn.sentiments || [], // Keep sentiments
-          causes: checkIn.causes || [],
-          comments: checkIn.comments || [],
-          prompt: "", // No prompt for check-ins
-        }));
-
-        console.log("HERE ARE THE CHECKIN ENTRIESSSSSS")
-        console.log("✅ Fetched raw check-ins:", fetchedCheckIns);
-        console.log("✅ Formatted check-ins:", formattedCheckIns);
-    
-        // Merge journals and check-ins
-        let allEntries = [...fetchedEntries, ...formattedCheckIns];
-    
-        // Sort all entries by date (newest first)
-        allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-        // Limit to last 30 entries
-        allEntries = allEntries.slice(0, 30);
-
-        //console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
-    
-        setEntries(allEntries);
-        setFilteredEntries(allEntries); // Initially show all entries
-      } catch (error) {
-        console.error("❌ Error loading journal entries and check-ins:", error);
-      }
-    };
-    
-  
-    loadEntries();
-  }, []);
-  
-
-  //calculate streak
-  useEffect(() => {
-    const loadStreak = async () => {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
-  
-      try {
-        const dates = await fetchJournalDates(token);
-        const calculatedStreak = calculateStreak(dates);
-        setStreak(calculatedStreak);
-      } catch (err) {
-        console.error('❌ Error fetching streak:', err);
-      }
-    };
-  
-    loadStreak();
-  }, []);
-  
+      loadData();
+    }, [activeFilter]) // Add activeFilter as a dependency
+  );
 
   const toggleMenu = () => {
     if (isMenuOpen) {
