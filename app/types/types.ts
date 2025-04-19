@@ -1,4 +1,6 @@
 // types.ts
+import { Entry } from '../EntryDetailScreen';
+
 export type RootStackParamList = {
     Login: undefined;
     Register: undefined;
@@ -22,6 +24,6 @@ export type RootStackParamList = {
     ResetPassword: { token: string }; 
     GuidedJournaling : { prompt: string };
     PromptSelection : undefined;
-    EntryDetail: { entry: any };
+    EntryDetail: { entry: Entry };
   };
   

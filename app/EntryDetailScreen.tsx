@@ -1,26 +1,74 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   View, Text, StyleSheet, TouchableOpacity, Alert, 
   TextInput, ScrollView, SafeAreaView, Image, Modal 
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import Icon from "react-native-vector-icons/Feather";
+import { Feather } from "@expo/vector-icons";
 import { RootStackParamList } from "./types/types";
 import { deleteJournalEntry, editJournalEntry, editCheckIn, deleteCheckIn } from "./services/ApiService"; // ✅ Import both delete & update functions
 import { format } from "date-fns";
 import { uploadJournalImage, deleteJournalImage } from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';
 
-import { Feather } from "@expo/vector-icons"; // for emotion and reason icons
+import { Feather as FeatherIcon } from "@expo/vector-icons"; // for emotion and reason icons
+
+// Define types for emotions and reasons
+type EmotionIconType = "star" | "smile" | "frown" | "meh" | "thumbs-up" | "heart" | "help-circle" | "search" | "target" | "thumbs-down" | "x-circle" | "alert-circle" | "zap" | "alert-triangle" | "gift";
+
+const EMOTIONS = [
+    "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+    "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+    "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+    "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+    "sadness", "surprise", "neutral"
+]
+
+// Map emotion codes to emotion names
+const emotionMap: Record<number, string> = EMOTIONS.reduce(
+  (acc, emotion, index) => {
+    acc[index] = emotion;
+    return acc;
+  },
+  {} as Record<number, string>
+);
 
 const emotionIcons: { [key: string]: string } = {
-  Admiration: "star", Amusement: "smile", Anger: "frown", Annoyance: "meh", Approval: "thumbs-up", Caring: "heart",
-  Confusion: "help-circle", Curiosity: "search", Desire: "target", Disappointment: "frown", Disapproval: "thumbs-down",
-  Disgust: "x-circle", Embarrassment: "alert-circle", Excitement: "zap", Fear: "alert-triangle", Gratitude: "gift",
-  Grief: "cloud-drizzle", Joy: "sun", Love: "heart", Nervousness: "corner-up-right", Optimism: "trending-up",
-  Pride: "award", Realization: "eye", Relief: "check-circle", Remorse: "corner-down-left", Sadness: "cloud-rain",
-  Surprise: "send"
+  admiration: "star",
+  amusement: "smile",
+  anger: "frown",
+  annoyance: "meh",
+  approval: "thumbs-up",
+  caring: "heart",
+  confusion: "help-circle",
+  curiosity: "search",
+  desire: "target",
+  disappointment: "frown",
+  disapproval: "thumbs-down",
+  disgust: "x-circle",
+  embarrassment: "alert-circle",
+  excitement: "zap",
+  fear: "alert-triangle",
+  gratitude: "gift",
+  grief: "cloud-drizzle",
+  joy: "sun",
+  love: "heart",
+  nervousness: "corner-up-right",
+  optimism: "trending-up",
+  pride: "award",
+  realization: "eye",
+  relief: "check-circle",
+  remorse: "corner-down-left",
+  sadness: "cloud-rain",
+  surprise: "send",
+  neutral: "meh"
+};
+
+// Helper function to get the correct icon name for check-in emotions
+const getCheckInEmotionIcon = (emotion: string): string => {
+  const lowerEmotion = emotion.toLowerCase();
+  return emotionIcons[lowerEmotion] || "help-circle";
 };
 
 const reasonIcons: { [key: string]: string } = {
@@ -167,23 +215,23 @@ const EntryDetail = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{entry.category === "checkin" ? "Check-in Entry" : "Journal Entry"}</Text>
         <View style={styles.actionButtons}>
           {isEditing ? (
             <TouchableOpacity onPress={handleSaveEntry} style={styles.actionButton}>
-              <Icon name="check" size={24} color="#000" />
+              <Feather name="check" size={24} color="#000" />
             </TouchableOpacity>
           ) : (
             <>
               {entry.category !== "checkin" && (
                 <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.actionButton}>
-                  <Icon name="edit" size={24} color="#000" />
+                  <Feather name="edit" size={24} color="#000" />
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={handleDeleteEntry} style={styles.actionButton}>
-                <Icon name="trash-2" size={24} color="#FF0000" />
+                <Feather name="trash-2" size={24} color="#FF0000" />
               </TouchableOpacity>
             </>
           )}
@@ -208,7 +256,7 @@ const EntryDetail = () => {
                 <View style={styles.gridContainer}>
                   {entry.sentiments.map((emotion: string, index: number) => (
                     <View key={index} style={styles.gridItem}>
-                      <Feather name={emotionIcons[emotion] || "help-circle"} size={20} color="#444" />
+                      <Feather name={getCheckInEmotionIcon(emotion)} size={20} color="#444" />
                       <Text style={styles.gridLabel}>{emotion}</Text>
                     </View>
                   ))}
@@ -241,8 +289,9 @@ const EntryDetail = () => {
           </>
         ) : (
           <>
-            {isEditing ? (
-              <>
+            {/* Content Section */}
+            <View style={styles.contentSection}>
+              {isEditing ? (
                 <TextInput
                   style={styles.editor}
                   multiline
@@ -250,79 +299,66 @@ const EntryDetail = () => {
                   onChangeText={setEditedContent}
                   autoFocus
                 />
-                
-                {/* Image Management Section - Only for free journaling entries */}
-                {entry.category === "freeform" && (
-                  <View style={styles.imagesContainer}>
-                    <View style={styles.imagesHeader}>
-                      <Text style={styles.sectionTitle}>Images</Text>
-                      <TouchableOpacity 
-                        style={styles.addImageButton}
-                        onPress={handleAddImage}
-                        disabled={isUploading}
-                      >
-                        <Icon name="plus" size={24} color="#000" />
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <ScrollView horizontal style={styles.imagesScrollView}>
-                      {images.map((image: { signedUrl: string }, index: number) => (
-                        <View key={index} style={styles.imageWrapper}>
-                          <TouchableOpacity 
-                            onPress={() => setSelectedImage(image.signedUrl)}
-                          >
-                            <Image
-                              source={{ uri: image.signedUrl }}
-                              style={styles.entryImage}
-                              resizeMode="cover"
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={styles.deleteImageButton}
-                            onPress={() => handleDeleteImage(image)}
-                          >
-                            <Icon name="trash-2" size={20} color="#FF0000" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.entryContent}>{entry.entryContent}</Text>
-            )}
+              ) : (
+                <Text style={styles.entryContent}>{entry.entryContent}</Text>
+              )}
+            </View>
 
-            {/* Display images for free journaling entries */}
-            {entry.category === "freeform" && images.length > 0 && (
-              <View style={styles.imagesContainer}>
-                <Text style={styles.sectionTitle}>Images</Text>
-                <ScrollView horizontal style={styles.imagesScrollView}>
-                  {images.map((image: { signedUrl: string }, index: number) => (
-                    <TouchableOpacity 
-                      key={index} 
-                      onPress={() => setSelectedImage(image.signedUrl)}
-                      style={styles.imageWrapper}
-                    >
-                      <Image
-                        source={{ uri: image.signedUrl }}
-                        style={styles.entryImage}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
+            {/* Sentiment Analysis Section - For both guided and freeform */}
             {entry.journalSentiments && entry.journalSentiments.length > 0 && (
               <View style={styles.sentimentsContainer}>
                 <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
-                {entry.journalSentiments.map((sentiment: { type: string; score: string }, index: number) => (
-                  <Text key={index} style={styles.sentimentItem}>
-                    {sentiment.type}: {sentiment.score}
-                  </Text>
-                ))}
+                <View style={styles.gridContainer}>
+                  {entry.journalSentiments.map((sentiment: { emotion: number; percentage: number }, index: number) => (
+                    <View key={index} style={styles.sentimentItem}>
+                      <Feather name={emotionIcons[emotionMap[sentiment.emotion]] || "help-circle"} size={20} color="#444" />
+                      <Text style={styles.sentimentText}>
+                        {emotionMap[sentiment.emotion]}: {Math.round(sentiment.percentage * 100)}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Images Section - Only for freeform */}
+            {entry.category === "freeform" && (
+              <View style={styles.imagesContainer}>
+                <Text style={styles.sectionTitle}>Images</Text>
+                {isEditing ? (
+                  <View style={styles.imagesHeader}>
+                    <TouchableOpacity 
+                      style={styles.addImageButton}
+                      onPress={handleAddImage}
+                      disabled={isUploading}
+                    >
+                      <Feather name="plus" size={24} color="#000" />
+                      <Text style={styles.addImageText}>Add Image</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                
+                <ScrollView horizontal style={styles.imagesScrollView}>
+                  {images.map((image: { signedUrl: string }, index: number) => (
+                    <View key={index} style={styles.imageWrapper}>
+                      <TouchableOpacity onPress={() => setSelectedImage(image.signedUrl)}>
+                        <Image
+                          source={{ uri: image.signedUrl }}
+                          style={styles.entryImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                      {isEditing && (
+                        <TouchableOpacity 
+                          style={styles.deleteImageButton}
+                          onPress={() => handleDeleteImage(image)}
+                        >
+                          <Feather name="trash-2" size={20} color="#FF0000" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             )}
           </>
@@ -421,17 +457,39 @@ const styles = StyleSheet.create({
   sentimentsContainer: {
     marginTop: 20,
     padding: 16,
-    backgroundColor: "#F0F0F0",
-    borderRadius: 8,
+    backgroundColor: "#F9F9F9",
+    borderRadius: 12,
+    marginBottom: 20,
   },
   sentimentsTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 12,
+    color: "#333",
   },
   sentimentItem: {
-    fontSize: 14,
-    marginBottom: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sentimentText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: "#333",
+  },
+  addImageText: {
+    marginLeft: 8,
+    color: "#000",
+    fontSize: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -528,6 +586,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     padding: 5,
     borderRadius: 15,
+  },
+  contentSection: {
+    marginBottom: 20,
   },
 });
 

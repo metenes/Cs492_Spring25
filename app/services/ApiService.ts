@@ -7,12 +7,20 @@ const API_URL = "http://192.168.1.104:5000";
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
+  // Free Journaling Emotions (28)
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
   "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
   "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
   "nervousness", "optimism", "pride", "realization", "relief", "remorse",
-  "sadness", "surprise", "neutral"
+  "sadness", "surprise", "neutral",
+  
+  // Guided Journaling Emotions (5)
+  "reflection", "insight", "clarity", "growth", "acceptance",
+  
+  // Check-in Emotions (5)
+  "energy", "focus", "motivation", "stress", "balance"
 ];
+
 
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -79,10 +87,10 @@ export const logoutDB = async () => {
 // **********************************************
 
 export const fetchSentimentAnalysis = async (
-  start_date: string,   // Format: "YYYY-MM-DD"
-  end_date: string,     // Format: "YYYY-MM-DD"
-  interval: string = "monthly",  // "daily", "weekly", "monthly", or "yearly"
-  emotions?: string     // Optional: comma-separated list of emotion codes
+  start_date: string,
+  end_date: string,
+  interval: string = "monthly",
+  emotions?: string
 ) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -117,7 +125,14 @@ export const fetchSentimentAnalysis = async (
 
     const data = await response.json();
     console.log("API sentiment analysis data:", data);
-    return data;
+    // The response now includes start_date, end_date, interval, and emotion_analysis
+    return {
+      start_date: data.start_date,
+      end_date: data.end_date,
+      interval: data.interval,
+      emotion_analysis: data.emotion_analysis || []
+    };
+
   } catch (error) {
     console.error("Error fetching sentiment analysis:", error);
     return { error: "Failed to fetch sentiment analysis." };
@@ -221,7 +236,6 @@ export const getHistoryAllChat = async()  => {
     return "Sorry, something went wrong.";
   }
 }
-
 
 export const startNewChat = async() => {
   try {
@@ -342,6 +356,27 @@ export const getHistoryChat = async(conversationId: string) => {
     throw error; // Better to throw the error for handling upstream
   }
 }
+
+
+
+// **********************************************
+// ** Emotinal Trends Insight API** - Login
+// **********************************************
+export const getEmotionalTrendInsight = async (token: string) => {
+  const response = await fetch(`${API_URL}/sentiment/insights`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch emotional trend insight");
+  }
+
+  return response.json();
+};
+
+
 
 // **********************************************
 // **Login&Register API** - Login

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from models.journal_entry import JournalEntry  # Import the JournalEntry model
-from utils.database import journal_entries_collection
+from utils.database import journal_entries_collection, check_in_collection, db
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 import boto3
@@ -11,6 +11,19 @@ from werkzeug.utils import secure_filename
 import time
 import random
 import string
+from transformers import pipeline
+
+# Define emotions array to match client-side
+EMOTIONS = [
+    "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+    "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+    "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+    "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+    "sadness", "surprise", "neutral"
+]
+
+# Initialize sentiment analysis pipeline
+sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertweet-base-sentiment-analysis")
 
 journal_bp = Blueprint("journal_bp", __name__)
 
@@ -49,6 +62,22 @@ def save_journal_entry():
             print("❌ No entry content provided")
             return jsonify({"error": "Entry content is required"}), 400
         
+        # Analyze sentiment if not provided
+        if not journal_sentiments and entry_content:
+            print("🔍 Analyzing sentiment for journal entry")
+            try:
+                # Get sentiment analysis results
+                sentiment_results = sentiment_analyzer(entry_content)
+                # Convert to our format
+                journal_sentiments = [{
+                    "emotion": result["label"].lower(),
+                    "percentage": result["score"]
+                } for result in sentiment_results]
+                print(f"✅ Analyzed sentiments: {journal_sentiments}")
+            except Exception as e:
+                print(f"❌ Error analyzing sentiment: {str(e)}")
+                journal_sentiments = []
+        
         # Create new journal entry with its own ObjectId
         new_entry = {
             "_id": ObjectId(),  # Give each entry its own ID
@@ -57,8 +86,8 @@ def save_journal_entry():
             "images": images,
             "journalSentiments": journal_sentiments,
             "createdAt": datetime.now(),
-            "category" : category,
-            "prompt" : prompt
+            "category": category,
+            "prompt": prompt
         }
         
         print(f"📦 New entry data: {new_entry}")
@@ -194,8 +223,8 @@ def journal_entries_endpoint():
         # Adjust the end date to include the entire day.
         end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # Build the aggregation pipeline:
-        pipeline = [
+        # Build the aggregation pipeline for journal entries:
+        journal_pipeline = [
             # Match the user's document using _id
             {"$match": {"_id": user_id}},
             # Unwind the journalEntries array
@@ -214,26 +243,75 @@ def journal_entries_endpoint():
                 "entryDate": "$journalEntries.entryDate",
                 "images": "$journalEntries.images",
                 "journalSentiments": "$journalEntries.journalSentiments",
-                "createdAt": "$journalEntries.createdAt"
+                "createdAt": "$journalEntries.createdAt",
+                "category": "$journalEntries.category",
+                "prompt": "$journalEntries.prompt",
+                "type": "journal"
             }},
             # Sort by date descending (newest first)
             {"$sort": {"entryDate": -1}}
         ]
 
-        entries = list(journal_entries_collection.aggregate(pipeline))
+        # Build the aggregation pipeline for check-in entries:
+        checkin_pipeline = [
+            # Match using userId
+            {"$match": {"userId": str(user_id)}},
+            # Filter by date range
+            {"$match": {
+                "timestamp": {
+                    "$gte": start_date,
+                    "$lte": end_date
+                }
+            }},
+            # Project only the needed fields
+            {"$project": {
+                "_id": "$_id",
+                "entryContent": {"$cond": {
+                    "if": {"$gt": [{"$size": "$comments"}, 0]},
+                    "then": {"$arrayElemAt": ["$comments", 0]},
+                    "else": "No comments"
+                }},
+                "entryDate": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                "images": [],
+                "journalSentiments": {
+                    "$map": {
+                        "input": "$sentiments",
+                        "as": "sentiment",
+                        "in": {
+                            "emotion": {"$toLower": "$$sentiment"},
+                            "percentage": 1.0
+                        }
+                    }
+                },
+                "createdAt": "$timestamp",
+                "category": "checkin",
+                "prompt": "",
+                "type": "checkin"
+            }},
+            # Sort by date descending (newest first)
+            {"$sort": {"entryDate": -1}}
+        ]
+
+        # Execute both pipelines
+        journal_entries = list(journal_entries_collection.aggregate(journal_pipeline))
+        checkin_entries = list(check_in_collection.aggregate(checkin_pipeline))
+
+        # Combine and sort all entries
+        all_entries = journal_entries + checkin_entries
+        all_entries.sort(key=lambda x: x.get("entryDate", ""), reverse=True)
 
         # Convert ObjectId to string in the response
-        for entry in entries:
+        for entry in all_entries:
             if "_id" in entry:
                 entry["_id"] = str(entry["_id"])
 
         response_data = {
             "start_date": start_date_str,
             "end_date": end_date_str,
-            "entries": entries
+            "entries": all_entries
         }
         
-        print(f"Found {len(entries)} entries for user {user_id}")
+        print(f"Found {len(all_entries)} entries for user {user_id}")
         return jsonify(response_data), 200
 
     except Exception as e:
@@ -241,7 +319,6 @@ def journal_entries_endpoint():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 
 @journal_bp.route("/api/sentiment-analysis", methods=["GET"])
 @jwt_required()
@@ -251,7 +328,7 @@ def sentiment_analysis():
         user_id = get_jwt_identity()
         if not ObjectId.is_valid(user_id):
             return jsonify({"error": "Invalid user ID"}), 400
-        user_id = ObjectId(user_id)  # Fixed: was trying to convert already converted ObjectId
+        user_id = ObjectId(user_id)
 
         # Retrieve and validate query parameters
         start_date_str = request.args.get("start_date")
@@ -275,8 +352,8 @@ def sentiment_analysis():
             except Exception:
                 return jsonify({"error": "Invalid emotions parameter"}), 400
 
-        # Build the aggregation pipeline
-        pipeline = [
+        # Build the aggregation pipeline for journal entries
+        journal_pipeline = [
             # Match using _id
             {"$match": {"_id": user_id}},
             # Unwind the journalEntries array
@@ -289,68 +366,98 @@ def sentiment_analysis():
                 }
             }},
             # Unwind the sentiments array
-            {"$unwind": "$journalEntries.journalSentiments"}
+            {"$unwind": "$journalEntries.journalSentiments"},
+            # Add source field to identify data source
+            {"$addFields": {
+                "source": "journal",
+                "timestamp": {"$toDate": "$journalEntries.entryDate"},
+                "emotion": {"$toLower": "$journalEntries.journalSentiments.emotion"},  # Convert to lowercase
+                "percentage": "$journalEntries.journalSentiments.percentage"
+            }}
         ]
 
-        # Add emotion filter if provided
-        if emotion_filter:
-            pipeline.append({
-                "$match": {
-                    "journalEntries.journalSentiments.emotion": {"$in": emotion_filter}
+        # Build the aggregation pipeline for check-in entries
+        checkin_pipeline = [
+            # Match using userId
+            {"$match": {"userId": str(user_id)}},
+            # Filter by date range
+            {"$match": {
+                "timestamp": {
+                    "$gte": start_date,
+                    "$lte": end_date
                 }
-            })
+            }},
+            # Unwind the sentiments array
+            {"$unwind": "$sentiments"},
+            # Add source field and format data to match journal entries
+            {"$addFields": {
+                "source": "checkin",
+                "timestamp": "$timestamp",
+                "emotion": {
+                    "$let": {
+                        "vars": {
+                            "emotionIndex": {
+                                "$indexOfArray": [EMOTIONS, {"$toLower": "$sentiments"}]
+                            }
+                        },
+                        "in": {
+                            "$cond": {
+                                "if": {"$ne": ["$$emotionIndex", -1]},
+                                "then": "$$emotionIndex",
+                                "else": {"$toLower": "$sentiments"}
+                            }
+                        }
+                    }
+                },
+                "percentage": 1.0  # Check-in sentiments are binary (present/not present)
+            }}
+        ]
 
         # Add time grouping based on interval
         if interval == "daily":
             group_time = {
                 "$dateToString": {
                     "format": "%Y-%m-%d",
-                    "date": {"$toDate": "$journalEntries.entryDate"}
+                    "date": "$timestamp"
                 }
             }
         elif interval == "weekly":
-            pipeline.append({
-                "$addFields": {
-                    "weekYear": {"$isoWeekYear": {"$toDate": "$journalEntries.entryDate"}},
-                    "isoWeek": {"$isoWeek": {"$toDate": "$journalEntries.entryDate"}}
-                }
-            })
             group_time = {
                 "$concat": [
-                    {"$toString": "$weekYear"},
+                    {"$toString": {"$isoWeekYear": "$timestamp"}},
                     "-W",
-                    {"$toString": "$isoWeek"}
+                    {"$toString": {"$isoWeek": "$timestamp"}}
                 ]
             }
         elif interval == "yearly":
             group_time = {
                 "$dateToString": {
                     "format": "%Y",
-                    "date": {"$toDate": "$journalEntries.entryDate"}
+                    "date": "$timestamp"
                 }
             }
         else:  # Default to monthly
             group_time = {
                 "$dateToString": {
                     "format": "%Y-%m",
-                    "date": {"$toDate": "$journalEntries.entryDate"}
+                    "date": "$timestamp"
                 }
             }
 
-        # Group by time period and emotion
-        pipeline.append({
+        # Common grouping stage
+        group_stage = {
             "$group": {
                 "_id": {
                     "time_period": group_time,
-                    "emotion": "$journalEntries.journalSentiments.emotion"
+                    "emotion": "$emotion"
                 },
-                "average_percentage": {"$avg": "$journalEntries.journalSentiments.percentage"},
+                "average_percentage": {"$avg": "$percentage"},
                 "entry_count": {"$sum": 1}
             }
-        })
+        }
 
-        # Final projection
-        pipeline.append({
+        # Common projection stage
+        project_stage = {
             "$project": {
                 "_id": 0,
                 "time_period": "$_id.time_period",
@@ -358,22 +465,28 @@ def sentiment_analysis():
                 "percentage": "$average_percentage",
                 "count": "$entry_count"
             }
-        })
+        }
 
-        # Sort by time period
-        pipeline.append({"$sort": {"time_period": 1}})
+        # Add grouping and projection to both pipelines
+        journal_pipeline.extend([group_stage, project_stage])
+        checkin_pipeline.extend([group_stage, project_stage])
 
-        # Execute pipeline and get results
-        results = list(journal_entries_collection.aggregate(pipeline))
+        # Execute both pipelines
+        journal_results = list(journal_entries_collection.aggregate(journal_pipeline))
+        checkin_results = list(check_in_collection.aggregate(checkin_pipeline))
+
+        # Combine and sort results
+        combined_results = journal_results + checkin_results
+        combined_results.sort(key=lambda x: x["time_period"])
 
         # Add debug logging
-        print(f"Query results: {results}")
+        print(f"Query results: {combined_results}")
         
         response_data = {
             "start_date": start_date_str,
             "end_date": end_date_str,
             "interval": interval,
-            "emotion_analysis": results
+            "emotion_analysis": combined_results
         }
         return jsonify(response_data), 200
 

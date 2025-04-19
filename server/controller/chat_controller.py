@@ -926,7 +926,7 @@ async def analyze_and_log_sentiment(user_id, message, response):
             "user_sentiment": user_sentiment,
             "bot_sentiment": bot_sentiment
         }
-        await sentiments_collection.insert_one(log)
+        sentiments_collection.insert_one(log)
         if user_sentiment["label"] == "NEGATIVE" and user_sentiment["score"] > 0.8:
             await flag_conversation_for_review(user_id, message, response, user_sentiment["score"])
         return True
