@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 import boto3
 from botocore.exceptions import ClientError
+from config import AWS_CONFIG, S3_BUCKET
 import os
 from werkzeug.utils import secure_filename
 import time
@@ -28,13 +29,15 @@ sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertwe
 journal_bp = Blueprint("journal_bp", __name__)
 
 # AWS S3 configuration
-S3_BUCKET = "sentiobucket"
+""" S3_BUCKET = "sentiobucket"
 s3_client = boto3.client(
     's3',
     aws_access_key_id='AKIAXGZAMH3HUVQSPNED',
     aws_secret_access_key='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',
     region_name='eu-north-1'
-)
+) """
+s3 = boto3.client("s3", **AWS_CONFIG)
+
 
 @journal_bp.route("/save-journal-entry", methods=["POST"])
 @jwt_required()
