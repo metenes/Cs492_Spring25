@@ -152,7 +152,32 @@ const EntryDetail = () => {
   };
   
   // Handle deleting entry
-  const handleDeleteEntry = () => {
+  const handleDeleteEntry = async () => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this entry? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteEntry(entry);
+              Alert.alert("Deleted", "Entry deleted successfully");
+              navigation.navigate("Home");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete the entry.");
+              console.error("❌ Deletion failed:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+  
+  
+  /* const handleDeleteEntry = () => {
     Alert.alert(
       "Confirm Delete",
       "Are you sure you want to delete this journal entry? This action cannot be undone.",
@@ -179,7 +204,8 @@ const EntryDetail = () => {
         }
       ]
     );
-  };
+  }; */
+
 
   // Handle adding new image
   const handleAddImage = async () => {

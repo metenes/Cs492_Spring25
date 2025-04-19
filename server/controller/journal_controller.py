@@ -505,7 +505,7 @@ def sentiment_analysis():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
+""" @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_journal_entry(entry_id):
     try:
@@ -523,7 +523,51 @@ def delete_journal_entry(entry_id):
         return jsonify({"message": "Journal entry deleted successfully"}), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500 """
+
+@journal_bp.route("/delete/<entry_id>", methods=["DELETE"])
+@jwt_required()
+def delete_journal_entry(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        user_object_id = ObjectId(user_id)
+
+        # Find the user's journal document
+        journal_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not journal_doc:
+            return jsonify({"error": "No journal entries found for user"}), 404
+
+        # Find the entry by _id
+        target_entry = None
+        for entry in journal_doc.get("journalEntries", []):
+            if str(entry.get("_id")) == entry_id:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            return jsonify({"error": "Entry not found"}), 404
+
+        # Remove images from S3
+        for image in target_entry.get("images", []):
+            s3_key = image.get("fileName", "")
+            if s3_key:
+                s3.delete_object(Bucket="sentiobucket", Key=s3_key)
+
+        # Remove entry from array
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id},
+            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "Failed to delete entry"}), 500
+
+        return jsonify({"message": "Journal entry deleted successfully"}), 200
+
+    except Exception as e:
+        print("❌ Error deleting journal entry:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
 
 @journal_bp.route("/upload-image", methods=["POST"])
 @jwt_required()

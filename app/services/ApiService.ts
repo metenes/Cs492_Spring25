@@ -2,10 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://172.20.10.3:5000";
+//const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
+const API_URL = "http://192.168.1.29:5000";
+
 // Define the emotions array to match the backend
 const EMOTIONS = [
   // Free Journaling Emotions (28)
@@ -749,8 +751,47 @@ export const calculateStreak = (dates: string[]): number => {
 // **********************************************
 // ** Homepage API ** - Entry Details 
 // **********************************************
-
 export const deleteEntry = async (entry: any) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    const entryId = entry._id;
+    const category = entry.category;
+
+    if (!entryId || !category) {
+      throw new Error("Missing entry ID or category");
+    }
+
+    let endpoint = "";
+
+    if (category === "checkin") {
+      endpoint = `${API_URL}/check-in/delete/${entryId}`;
+    } else {
+      endpoint = `${API_URL}/journal/delete/${entryId}`;
+    }
+
+    const response = await fetch(endpoint, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to delete entry");
+    }
+
+    console.log("✅ Entry deleted successfully");
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error deleting entry:", error);
+    throw error;
+  }
+};
+
+/* export const deleteEntry = async (entry: any) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -798,7 +839,7 @@ export const deleteEntry = async (entry: any) => {
     throw error;
   }
 };
-
+ */
 // **********************************************
 // ** Homepage API ** - Entry 
 // **********************************************
