@@ -75,7 +75,7 @@ def get_check_in_history(user_id):
                 "sentiments": entry["sentiments"],  
                 "causes": entry["causes"],
                 "comments": entry.get("comments", []),
-                "created_at": entry.get("created_at").isoformat() if entry.get("created_at") else None
+                "created_at": entry.get("created_at") if entry.get("created_at") else None
             }
             for entry in entries
         ]
@@ -100,7 +100,7 @@ def get_check_in_entry(entry_id):
             "sentiments": entry["sentiments"],
             "causes": entry["causes"],
             "comments": entry.get("comments", []),
-            "created_at": entry.get("created_at").isoformat() if entry.get("created_at") else None
+            "created_at": entry.get("created_at") if entry.get("created_at") else None
         }
 
         return jsonify(entry_data), 200

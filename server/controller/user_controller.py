@@ -136,20 +136,19 @@ def register():
             return jsonify({"error": "User already exists"}), 400
 
         # Hash password before saving
-        registration_time = datetime.now().isoformat()
+        registration_time = datetime.now()
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
         new_user = {
             "email": email,
             "password": hashed_password,
-            "created_at": registration_time,
             "name": "User Name",
             "bio": "User biography or description",
             "phone": "+1234567890",
             "location": "City, Country",
             "profileImageUrl": "",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-            "last_login": datetime.now().isoformat(),
+            "created_at": registration_time,
+            "updated_at": registration_time,
+            "last_login": registration_time,
             "preferences": {
                 "darkMode": "false",
                 "notifications": {

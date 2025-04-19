@@ -56,7 +56,7 @@ def save_journal_entry():
             "entryDate": entry_date,
             "images": images,
             "journalSentiments": journal_sentiments,
-            "createdAt": datetime.now().isoformat(),
+            "createdAt": datetime.now(),
             "category" : category,
             "prompt" : prompt
         }
@@ -145,7 +145,7 @@ def get_journal_entries():
                 # Convert datetime objects to ISO format strings
                 for field in serialized_entry:
                     if isinstance(serialized_entry[field], datetime):
-                        serialized_entry[field] = serialized_entry[field].isoformat()
+                        serialized_entry[field] = serialized_entry[field]
                         
                 serialized_entries.append(serialized_entry)
             
@@ -203,8 +203,8 @@ def journal_entries_endpoint():
             # Filter entries by entryDate within the given period
             {"$match": {
                 "journalEntries.entryDate": {
-                    "$gte": start_date.isoformat(),
-                    "$lte": end_date.isoformat()
+                    "$gte": start_date,
+                    "$lte": end_date
                 }
             }},
             # Project only the needed fields
@@ -284,8 +284,8 @@ def sentiment_analysis():
             # Filter by date range
             {"$match": {
                 "journalEntries.entryDate": {
-                    "$gte": start_date.isoformat(),
-                    "$lte": end_date.isoformat()
+                    "$gte": start_date,
+                    "$lte": end_date
                 }
             }},
             # Unwind the sentiments array
@@ -401,7 +401,7 @@ def update_journal_entry(entry_id):
             "journalEntries.$.journalSentiments": data.get("journalSentiments", []),
             "journalEntries.$.category": data.get("category"),
             "journalEntries.$.prompt": data.get("prompt"),
-            "journalEntries.$.createdAt": datetime.now().isoformat()
+            "journalEntries.$.createdAt": datetime.now()
         }
 
         result = journal_entries_collection.update_one(
@@ -564,3 +564,31 @@ def delete_journal_image():
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
 
+@journal_bp.route("/face-photo-analysis", methods=["POST"])
+def upload_image():
+    if "image" not in request.files:
+        return jsonify({"error": "No image provided"}), 400
+
+    file = request.files["image"]
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+
+    # Run AI model inference on the image (optional)
+    image_bytes = file.read()
+    file.seek(0)  # Reset file pointer
+    emotion_result = predict_emotion(image_bytes)  # This is your model's output
+
+    # Optional: Upload to S3
+    try:
+        s3_filename = f"users/images/{datetime.now()}_{filename}"
+        s3_client.upload_fileobj(file, S3_BUCKET, s3_filename)
+        s3_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_filename}"
+    except Exception  as e:
+        return jsonify({"error": "S3 credentials error" }), 500
+
+    return jsonify({
+        "message": "Image uploaded and processed",
+        "emotion_result": emotion_result,
+        "s3_url": s3_url
+    })

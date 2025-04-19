@@ -66,7 +66,7 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "13.61.141.224" # E2C Distance Server Public IP
+E2C_IP = "13.50.16.88" # E2C Distance Server Public IP
 
 # Define the emotion labels - Local 
 emotion_labels = [
@@ -199,9 +199,9 @@ logger.info("✅ Endpoint done")
 # ---------------------------------------
 #  ** Chat Endpoints - Test/Send
 # ---------------------------------------
-@chat_bp.route("/perchat", methods=["POST"])
+@chat_bp.route("<chat_id>/chat-message", methods=["POST"])
 @jwt_required()
-async def personalized_chat():
+async def personalized_chat(chat_id ):
     """Chat endpoint that uses the user's personalized model"""
     try:
         # Validate incoming data
@@ -223,7 +223,8 @@ async def personalized_chat():
             return jsonify({"error": f"Invalid request format: {str(validation_error)}"}), 400
 
         # Generate conversation ID if new conversation
-        conversation_id = data.get("conversation_id", f"conv_{user_id}_{int(time.time())}")
+        if (chat_id == None) : 
+            chat_id = data.get("conversation_id", f"conv_{user_id}_{int(time.time())}")
         
         # Get user info from database
         try:
@@ -260,7 +261,10 @@ async def personalized_chat():
             response_text, inference_time = await invoke_user_model(
                 user_id=user_id,
                 message=chat_request.message,
-                context=chat_request.context or {}
+                context={
+                    "conversation_id": chat_id,
+                    **(chat_request.context or {})
+                }
             )
         except Exception as inference_error:
             logger.error(f"Model inference error: {inference_error}")
@@ -270,7 +274,7 @@ async def personalized_chat():
         try:
             await log_conversation(
                 user_id=user_id,
-                conversation_id=conversation_id,
+                conversation_id=chat_id,
                 message=chat_request.message,
                 response=response_text
             )
@@ -305,13 +309,13 @@ async def personalized_chat():
         # Prepare and return response
         response = ChatResponse(
             response=response_text,
-            conversation_id=conversation_id,
+            conversation_id=chat_id,
             model_version=str(model_version),
             model_updated=model_updated,
             inference_time=inference_time
         )
         
-        return jsonify(response.dict())
+        return jsonify(response.model_dump())
         
     except Exception as e:
         logger.error(f"Unhandled error in personalized chat: {str(e)}", exc_info=True)
@@ -327,7 +331,12 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
         "user_id": "test_user",
         "message": "I'm feeling really happy today because I accomplished something I've been working on for weeks!"
     }
+    response = requests.post(url, json=payload)
+    print(response.status_code)
+    print(json.dumps(response.json(), indent=2))
     """
+    """Invoke the user's personalized model from S3, with chat_id/context support."""
+
     context = context or {}  # Ensure context is not None
     logger.info(f"Starting model invocation for user {user_id}")
     
@@ -352,15 +361,17 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
         # Mode will be CLOUD based model - Server
         if(mode=="ec2") :
             try:
-                response = requests.post(url, json=payload)
-                print(response.status_code)
-                print(json.dumps(response.json(), indent=2))
-
                 import aiohttp
                 prompt = await process_chat_for_inference(user_id, message, context)
-                payload = {"user_id": user_id, "message": prompt}
+                # payload = {"user_id": user_id, "message": prompt}
+                # Update the paylod for multiple chat_id 
+                payload = {
+                    "user_id": user_id,
+                    "message": prompt,
+                    "conversation_id": context.get("conversation_id", "1")
+                }
                 ec2_url = f"http://{E2C_IP}:8080/predict"  # Send to cloud like this
-                logger.info(f"Connecting to E2C Distance Servre: {E2C_IP} to {ec2_url}")
+                logger.info(f"Connecting to E2C Distance Servre: {E2C_IP} to {ec2_url}\nSending payload :{payload}")
 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(ec2_url, json=payload) as resp:
@@ -385,15 +396,16 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
                 logger.info(f"Using SageMaker endpoint: {SAGEMAKER_ENDPOINT}")
                 
                 # Basic payload - only include what your endpoint expects
-                payload = { "user_id" : user_id, 
-                            "message": message
-                        }
-                
+                payload = {
+                    "user_id": user_id,
+                    "message": message,
+                    "conversation_id": context.get("conversation_id", "default")
+                }
+
                 logger.info(f"Prepared payload: {payload}")
                 start_time = time.time()
                 
                 try:
-                    # Make sure sagemaker_runtime is properly initialized
                     if not hasattr(invoke_user_model, 'sagemaker_runtime'):
                         logger.info("Initializing SageMaker runtime client")
                         sagemaker_runtime = boto3.client('sagemaker-runtime')
@@ -504,6 +516,107 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
         logger.error(f"Unexpected error in invoke_user_model: {str(e)}", exc_info=True)
         return "I'm sorry, an unexpected error occurred while processing your request.", 0.0
 
+# ---------------------------------------
+#  ** Chat APIs 
+# ---------------------------------------
+# Fetch chat history
+async def get_chat_history(user_id: str, limit: int = 5):
+    try:
+        history = chat_collection.find({"user_id": user_id}).sort("timestamp", -1).limit(limit).to_list(length=limit)
+        return history[::-1]  # reverse to chronological order
+    except Exception as e:
+        logger.error(f"Error fetching chat history: {e}")
+        return []
+
+@chat_bp.route("/clear-history" ,methods=["POST"])
+@jwt_required()
+async def clear_history():
+    user_id = get_jwt_identity() 
+    await chat_collection.delete_many({"user_id": user_id})
+    return {"message": f"Chat history cleared for user {user_id}"}
+
+@chat_bp.route("/<chat_id>/clear-chat", methods=["DELETE"])
+def clear_chat(chat_id):
+    chat_collection.update_one({"_id": chat_id}, {"$set": {"messages": []}})
+    return jsonify({"message": "Chat cleared."})
+
+@chat_bp.route("/list", methods=["GET"])
+@jwt_required()
+def list_chats():
+    user_id = get_jwt_identity() 
+    print("chat Listed for : ", user_id)
+    chats = chat_collection.find({"user_id": user_id})
+    #  get() method to  default value
+    result = []
+    for c in chats:
+        #  "Untitled Chat" if no title 
+        title = c.get("title", "Untitled Chat")
+        result.append({"chat_id": str(c["_id"]), "title": title})
+    return jsonify(result)
+
+@chat_bp.route("/<chat_id>/get-chat", methods=["GET"])
+def get_chat(chat_id):
+    chat = chat_collection.find_one({"_id": chat_id})
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+    return jsonify({"message": chat["messages"]})
+
+@chat_bp.route("/<chat_id>/export",  methods=["GET"])
+def export_chat(chat_id):
+    chat = chat_collection.find_one({"_id": chat_id})
+    return jsonify(chat)
+
+@chat_bp.route("/import",  methods=["POST"])
+def import_chat():
+    data = request.json
+    data["_id"] = ObjectId()
+    chat_collection.insert_one(data)
+    return jsonify({"chat_id": data["_id"]})
+
+@chat_bp.route("/new", methods=["GET"])
+@jwt_required()
+def create_chat():
+    print("chat created : ")
+
+    chat_id = ObjectId()
+    user_id = get_jwt_identity() 
+    print("chat created : " , chat_id)
+
+    chat_collection.insert_one({
+        "_id": str(chat_id),
+        "title": "Untitled Chat",
+        "user_id": user_id,
+        "messages": [],
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+
+    })
+    print("chat created : " , chat_id)
+
+    return jsonify({"chat_id": str(chat_id)})
+
+@chat_bp.route("/<chat_id>/send", methods=["POST"] )
+def send_message(chat_id : str):
+    data = request.json
+    message = data.get("message")
+    
+    # Run inference here
+    response = personalized_chat(chat_id)
+
+    chat_collection.update_one(
+        {"_id": chat_id},
+        {"$push": {
+            "messages": {"sender": "user", "text": message},
+        }}
+    )
+    chat_collection.update_one(
+        {"_id": chat_id},
+        {"$push": {
+            "messages": {"sender": "bot", "text": response},
+        }}
+    )
+    return jsonify({"response": response})
+
 # ------------------------------------------------------------------------ Helper Functions ------------------------------------------------------------------------
 
 # ---------------------------------------
@@ -532,8 +645,8 @@ def get_user_model_path(user_id: str) -> str:
                 "$set": {
                     "model_path": user_model_key,
                     "version": "1.0",
-                    "created_at": datetime.now().isoformat(),
-                    "last_updated": datetime.now().isoformat()
+                    "created_at": datetime.now(),
+                    "last_updated": datetime.now()
                 }
             },
             upsert=True
@@ -718,19 +831,9 @@ async def trigger_user_model_retrain(user_id: str):
         logger.error(f"❌ Failed to trigger retraining for {user_id}: {e}")
 
 
-# Fetch chat history
-async def get_chat_history(user_id: str, limit: int = 5):
-    try:
-        history = chat_collection.find({"user_id": user_id}).sort("timestamp", -1).limit(limit).to_list(length=limit)
-        return history[::-1]  # reverse to chronological order
-    except Exception as e:
-        logger.error(f"Error fetching chat history: {e}")
-        return []
-
-
 async def log_conversation(user_id: str, conversation_id: str, message: str, response: str):
     """Logs a conversation into memory and MongoDB properly"""
-    timestamp = datetime.now().isoformat()
+    timestamp = datetime.now()
 
     # In-memory logging - chat cache 
     if conversation_id not in conversations:
@@ -744,7 +847,7 @@ async def log_conversation(user_id: str, conversation_id: str, message: str, res
     })
     print("added to conversations")
 
-    # Store in MongoDB (chat message history)
+    # Store chat message history
     chat_collection.insert_one({
         "conversation_id": conversation_id,
         "user_id": user_id,
@@ -752,8 +855,8 @@ async def log_conversation(user_id: str, conversation_id: str, message: str, res
         "response": response,
         "timestamp": timestamp
     })
+
     print("added to chat_collections")
-    # Fetch or create a chat document
 
 
 # 1. Inference Prompt Generator
@@ -761,12 +864,21 @@ async def process_chat_for_inference(user_id, message, context=None, history_lim
     try:
         history = await get_chat_history(user_id, limit=history_limit)
         context_part = f"Context: {json.dumps(context)}\n" if context else ""
-        history_part = "\n".join(
-            f"User: {h['message']}\nAssistant: {h['response']}" for h in history
-        ) if history else ""
+        
+        # Add more robust history processing with defensive checks
+        history_parts = []
+        if history:
+            for h in history:
+                if isinstance(h, dict) and 'message' in h and 'response' in h:
+                    history_parts.append(f"User: {h['message']}\nAssistant: {h['response']}")
+                else:
+                    # Log malformed history item for debugging
+                    logger.warning(f"Skipping malformed history item for user {user_id}: {h}")
+        
+        history_part = "\n".join(history_parts)
         return f"{context_part}{history_part}\nUser: {message}\nAssistant:"
     except Exception as e:
-        logger.error(f"Error processing chat: {e}")
+        logger.error(f"Error processing chat: {e}", exc_info=True)
         raise
 
 
@@ -808,7 +920,7 @@ async def analyze_and_log_sentiment(user_id, message, response):
         bot_sentiment = analyzer(response)[0]
         log = {
             "user_id": user_id,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(),
             "user_message": message,
             "bot_response": response,
             "user_sentiment": user_sentiment,
@@ -827,7 +939,7 @@ async def flag_conversation_for_review(user_id, message, response, score):
     try:
         await activities_collection.insert_one({
             "user_id": user_id,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(),
             "user_message": message,
             "bot_response": response,
             "sentiment_score": score,

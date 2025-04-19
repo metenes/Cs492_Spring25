@@ -2,6 +2,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { facePhotoAnalysis } from './services/ApiService';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('front');
@@ -28,33 +29,18 @@ export default function App() {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   }
 
+  const takePhotoAndUpload = async () => {
+    if (cameraRef && cameraRef.current) {
+       const photo = await cameraRef.current.takePictureAsync({ base64: true });
 
-  const captureAndSend = async () => {
-    if (!cameraRef){
-      console.log("camera ref is not initialized...")
-      return;
+      try {
+        const result = await facePhotoAnalysis(photo.base64);
+        console.log("🔍 Analysis Result:", result);
+      } catch (error) {
+        console.error(error);
+        console.log("Upload Error", "Could not upload the image.");
+      }
     }
-    if (!cameraRef) return;
-  
-    setLoading(true);
-    const photo = await cameraRef.takePictureAsync({ base64: true });
-    const uri = photo.uri;
-  
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-  
-    try {
-      const response = await axios.post('http://<YOUR_FLASK_SERVER_IP>:<PORT>/predict_emotion', {
-        image: base64,
-      });
-      setEmotion(response.data.emotion);
-    } catch (error) {
-      console.error(error);
-      setEmotion("Error analyzing emotion");
-    }
-  
-    setLoading(false);
   };
 
   return (
@@ -69,8 +55,6 @@ export default function App() {
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -101,3 +85,4 @@ const styles = StyleSheet.create({
     color: 'white',
   },
 });
+

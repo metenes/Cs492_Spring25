@@ -125,20 +125,54 @@ export const fetchSentimentAnalysis = async (
 };
 
 // **********************************************
-// ** Chat API** - Send message
+// ** Chat API** 
 // **********************************************
-export const sendMessage = async (message: string) => {
+// Send message
+export const sendMessageChat = async (message: string, conversationId: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
-    const response = await fetch(`${API_URL}/chat/perchat`, {
+    const response = await fetch(`${API_URL}/chat/${conversationId}/chat-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
-
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId, 
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data received from server:", data);
+
+    if (!data.reply && !data.response) {
+      throw new Error("Invalid response format");
+    }
+    return data.reply || data.response; 
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+};
+
+// delete history of chat 
+export const deleteHistoryChat = async()  => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/clear-history`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
     });
 
     if (!response.ok) {
@@ -147,17 +181,167 @@ export const sendMessage = async (message: string) => {
 
     const data = await response.json();
     console.log("Data recived from test : ", data)
-    if (!data.reply) {
+    if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
 
-    return data.reply; // return the chatbot response
+  return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
   }
-};
+}
 
+// history of chat  - all
+export const getHistoryAllChat = async()  => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/get-history`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data recived from test : ", data)
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+  return data; // return the chatbot response
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+}
+
+
+export const startNewChat = async() => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    
+    // Check if token exists
+    if (!token) {
+      throw new Error("Authentication token not found");
+    }
+    
+    const response = await fetch(`${API_URL}/chat/new`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    // Check response status before trying to parse
+    if (!response.ok) {
+      // Get response text to debug the issue
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error(`API returned ${response.status}: ${response.statusText}`);
+    }
+    
+    // Check content type to ensure we're receiving JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      console.error("Non-JSON response:", errorText);
+      throw new Error("API didn't return JSON. Received: " + contentType);
+    }
+    
+    const data = await response.json();
+    console.log("Data received from API:", data);
+    
+    if (!data || !data.chat_id) {
+      throw new Error("Invalid response format: missing chat_id");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error creating chat:", error);
+    return { error: "Sorry, something went wrong." };
+  }
+}
+
+export const getChatList = async() => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    const response = await fetch(`${API_URL}/chat/list`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Chats received:", data);
+    
+    // The API returns an array of chat objects with chat_id and title
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid response format - expected array");
+    }
+    
+    // Transform the data to match your expected format
+    return data.map(chat => ({
+      id: chat.chat_id,
+      title: chat.title || "Untitled Chat"
+    }));
+    
+  } catch (error) {
+    console.error("Error fetching chat list:", error);
+    return [];
+  }
+}
+
+export const getHistoryChat = async(conversationId: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    const response = await fetch(`${API_URL}/chat/${conversationId}`, {
+      method: "GET", // Changed from POST to GET to match your backend
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      }
+    });
+    
+    // Check if response is OK before parsing
+    if (!response.ok) {
+      if(response.status == 404){
+        // No Data found 
+        console.log("No Data found 404");
+        // hrow new Error(`No data found ${response.status}: ${response.statusText}`);
+        return null;
+      }else{
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+
+      }
+    }
+    
+    const data = await response.json();
+    console.log("Data received from test: ", data);
+    
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error getting chat history:", error);
+    throw error; // Better to throw the error for handling upstream
+  }
+}
 
 // **********************************************
 // **Login&Register API** - Login
@@ -801,7 +985,7 @@ export const deleteJournalEntry = async (entryId: string) => {
     if (!entryId) {
       throw new Error("Invalid entry: Missing entry ID");
     }
-    
+
     console.log("Deleting entry id:", entryId);
 
     const response = await fetch(`${API_URL}/journal/delete-journal-entry/${entryId}`, {
@@ -931,7 +1115,6 @@ export const clearDraft = async () => {
     console.error('Error clearing draft:', error);
   }
 };
-
 
 // **********************************************
 // ** User CheckIn API **
@@ -1265,3 +1448,74 @@ export const deleteJournalImage = async (imageUrl: string): Promise<void> => {
     throw error;
   }
 };
+
+// **********************************************
+// ** Photo Face Analysis API **
+// **********************************************
+
+export const facePhotoAnalysis = async (imageUri: string) => {
+  console.log(' Starting image face analysis for URL:', imageUri);
+  const token = await AsyncStorage.getItem('userToken');
+  if (!token) {
+    throw new Error('No authentication token available');
+  }
+
+  // Extract the original filename from the URI
+  const originalFileName = imageUri.split('/').pop();
+  if (!originalFileName) {
+    throw new Error('Invalid image URI');
+  }
+
+  const formData = new FormData();
+  formData.append('image', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: originalFileName
+  } as any);
+
+  console.log('Uploading image with FormData:', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+  });
+
+  const uploadResponse = await fetch(`${API_URL}/journal/upload-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      console.error('Upload failed:', errorData);
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+    
+  try {
+    const response = await fetch(`${API_URL}/journal/face-photo-analysis`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to analyze photo: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data; 
+    
+  } catch (error) {
+    console.error("❌ Error in facePhotoAnalysis:", error);
+    return { error: "Photo analysis failed" };
+  }
+};
+
+

@@ -1,6 +1,7 @@
 E2C Properties
 
-Public Ip: 13.61.141.224
+Public Ip: 13.61.141.224 - t3 micro
+           56.228.1.248  - t3 medium
 
 Example file transfer command
 scp -i SentioKeyPair.pem inference_server.py requirements.txt ec2-user@13.61.141.224:/home/ec2-user/

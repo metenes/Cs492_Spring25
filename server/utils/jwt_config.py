@@ -19,7 +19,7 @@ def generate_token(user_id):
     token = jwt.encode(
         {
             "user_id": str(user_id),
-            "exp": datetime.now() + timedelta(days=1)  # Token expires in 1 day
+            "exp": datetime.now()+ timedelta(days=1)  # Token expires in 1 day
         },
         JWT_SECRET,
         algorithm=JWT_ALGORITHM

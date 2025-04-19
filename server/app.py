@@ -189,7 +189,7 @@ def fetch_check_ins():
         for entry in entries:
             result.append({
                 "entry_id": str(entry["_id"]),
-                "created_at": entry["timestamp"].isoformat(),
+                "created_at": entry["timestamp"],
                 "type": "checkin",
                 "date": entry["timestamp"].strftime("%Y-%m-%d"),
                 "sentiments": entry.get("sentiments", []),
