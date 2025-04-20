@@ -190,22 +190,6 @@ const SentimentAnalysisPage: React.FC = () => {
       }
     }
   };
-
-  // for emotion trends
-  /* useEffect(() => {
-    const fetchTrendInsight = async () => {
-      try {
-        const token = await AsyncStorage.getItem("userToken");
-        if (!token) return;
-        const res = await getEmotionalTrendInsight(token);
-        setTrendInsight(res.insight);
-      } catch (err) {
-        console.error("❌ Error fetching trend insight:", err);
-      }
-    };
-  
-    fetchTrendInsight();
-  }, []); */
   
 
   const handleEndDateChange = (event: any, isWeekly: boolean, date?: Date) => {
@@ -421,11 +405,6 @@ const SentimentAnalysisPage: React.FC = () => {
               darkMode={darkMode}
             />
           </View>
-          {/* {trendInsight && (
-            <View style={styles.trendInsightBox}>
-              <Text style={styles.trendInsightText}>{trendInsight}</Text>
-            </View>
-          )} */}
           {emotionalInsight && (
             <View style={styles.insightContainer}>
               <Text style={styles.insightTitle}>🧠 Emotional Insight</Text>
@@ -525,19 +504,6 @@ const styles = StyleSheet.create({
   chipTextUnselected: {
     color: "black",
   },
-  trendInsightBox: {
-    backgroundColor: "#FFF8EC",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderColor: "#FFE8B0",
-    borderWidth: 1,
-  },
-  trendInsightText: {
-    fontSize: 16,
-    color: "#444",
-    fontStyle: "italic",
-  },
   insightContainer: {
     backgroundColor: "#E6F0FA",
     padding: 16,
@@ -552,7 +518,8 @@ const styles = StyleSheet.create({
   },
   insightText: {
     fontSize: 14,
-    color: "#333",
+    //color: "#333",
+    color: "#1A3C6F",
   },
   
   recommendationContainer: {
@@ -574,7 +541,8 @@ const styles = StyleSheet.create({
   },
   recommendationText: {
     fontSize: 14,
-    color: "#444",
+    //color: "#444",
+    color: "#9C6B00",
   },
   recommendationBox: {
     backgroundColor: "#E8F0FE",
