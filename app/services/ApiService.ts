@@ -1190,6 +1190,38 @@ export const saveNotificationToken = async (token: string) => {
   }
 }
 
+export const updateNotificationFrequency = async (frequency: string) => {
+  try {
+    const userToken = await AsyncStorage.getItem('userToken');
+    if (!userToken) {
+      throw new Error('No authentication token available');
+    }
+
+    const pushToken = await AsyncStorage.getItem('expoPushToken');
+
+    const response = await fetch(`${API_URL}/notification/update-notification-preferences`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ frequency, pushToken }),
+    });
+
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("Error response data:", data);
+      return { message: data.error, status: response.status };
+    }
+  
+    return { message: data.message, status: response.status }; // success
+  } catch (error) {
+    console.error("Error updating notification frequency:", error);
+    throw error;
+  }
+}
+
 // **********************************************
 // ** Journal Image Upload API **
 // **********************************************

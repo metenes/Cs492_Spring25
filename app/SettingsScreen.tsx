@@ -49,7 +49,6 @@ const SettingsScreen = () => {
       alert("New password and confirm password do not match.");
       return;
     }
-    console.log("new passwords match");
     if (oldPassword === "" || newPassword === "" || confirmPassword === "") {
       alert("Please fill in all fields.");
       return;

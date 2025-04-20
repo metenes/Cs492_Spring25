@@ -47,9 +47,14 @@ def update_push_token_user():
 
         user_id = get_jwt_identity()
 
+        notification_tokens_collection.delete_many({"user_id": ObjectId(user_id)})
+
         result = notification_tokens_collection.update_one(
             {"token": token},
-            {"$set": {"user_id": ObjectId(user_id), "updated_at": datetime.utcnow()}}
+            {"$set": {"user_id": ObjectId(user_id), "updated_at": datetime.utcnow()},
+            "$setOnInsert": {"created_at": datetime.utcnow(), "notification_frequency": "daily"}
+            },
+            upsert=True
         )
 
         if result.matched_count == 0:
@@ -59,6 +64,36 @@ def update_push_token_user():
 
     except Exception as e:
         print(f"❌ Error in update_push_token_user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@notification_bp.route("/update-notification-preferences", methods=["PATCH"])
+@jwt_required()
+def update_notification_preferences():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        frequency = data.get("frequency")
+        pushToken = data.get("pushToken")
+
+        if not frequency or not pushToken:
+            return jsonify({"error": "Frequency and token are required"}), 400
+
+        user_id = get_jwt_identity()
+
+        result = notification_tokens_collection.update_one(
+            {"token": pushToken, "user_id": ObjectId(user_id)},
+            {"$set": {"notification_frequency": frequency, "updated_at": datetime.utcnow()}}
+        )
+
+        if result.matched_count == 0:
+            return jsonify({"error": "Token not found"}), 404
+
+        return jsonify({"success": True, "message": "Notification preferences updated."}), 200
+
+    except Exception as e:
+        print(f"❌ Error in update_notification_preferences: {e}")
         return jsonify({"error": str(e)}), 500
 
 
