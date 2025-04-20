@@ -6,7 +6,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
-const API_URL = "http://192.168.1.29:5000";
+const API_URL = "http://172.20.10.3:5000";
+
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -1323,6 +1324,101 @@ export const updateCheckIn = async (entryId: string, sentiments: string[], cause
     return await response.json();
   } catch (error) {
     console.error('Check-in update error:', error);
+    throw error;
+  }
+};
+
+export const updateJournalEntry = async (
+  entryId: string,
+  entryContent: string,
+  entryDate?: string,
+  images?: { fileName: string; signedUrl: string }[]
+) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    console.log('Starting sentiment analysis for entry content:', entryContent);
+    // Get sentiment analysis for the updated content
+    const sentimentResult = await analyzeSentiment(entryContent);
+    console.log('Raw sentiment analysis result:', JSON.stringify(sentimentResult, null, 2));
+
+    if (!sentimentResult.emotions || !Array.isArray(sentimentResult.emotions)) {
+      throw new Error('Invalid sentiment analysis result format');
+    }
+
+    // Define Emotion type
+    type Emotion = { code: string; score: number };
+
+    // Sort emotions by score (highest first)
+    const sortedEmotions = sentimentResult.emotions.sort(
+      (a: Emotion, b: Emotion) => b.score - a.score
+    );
+
+    // Get dominant emotion (highest score)
+    const dominantEmotion = sortedEmotions[0];
+
+    // Filter additional high-scoring emotions (>= 0.65)
+    const additionalEmotions = sortedEmotions
+      .slice(1)
+      .filter((emotion: Emotion) => emotion.score >= 0.65);
+
+    // Combine dominant emotion with high-scoring ones
+    const selectedEmotions: Emotion[] = [dominantEmotion, ...additionalEmotions];
+
+    // Map selected emotions
+    const mappedSentiments = selectedEmotions.map((emotion: Emotion) => ({
+      emotion: emotion.code,
+      percentage: emotion.score,
+    }));
+
+    console.log('Mapped sentiments for server:', JSON.stringify(mappedSentiments, null, 2));
+
+    const requestBody = {
+      entryContent,
+      entryDate: entryDate || new Date().toISOString(),
+      images: images || [],
+      journalSentiments: mappedSentiments
+    };
+
+    console.log('Sending update request with data:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(`${API_URL}/journal/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    // First get the raw response text
+    const responseText = await response.text();
+    console.log('Raw server response:', responseText);
+    
+    // Try to parse as JSON, but handle cases where it's not JSON
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse server response:', responseText);
+      throw new Error('Server returned an invalid response. Please try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(responseData.error || 'Failed to update journal entry');
+    }
+
+    // Ensure the response includes the updated sentiment analysis
+    if (!responseData.entry.journalSentiments) {
+      responseData.entry.journalSentiments = mappedSentiments;
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error('Journal entry update error:', error);
     throw error;
   }
 };

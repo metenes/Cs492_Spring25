@@ -6,9 +6,8 @@ import { Feather } from "@expo/vector-icons";
 import { RootStackParamList } from "./types/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
-import { API_URL, deleteEntry, uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory } from "./services/ApiService";
+import { deleteEntry, uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory, updateJournalEntry } from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';
-
 import { Feather as FeatherIcon } from "@expo/vector-icons"; // for emotion and reason icons
 
 // Define types for emotions and reasons
@@ -23,13 +22,36 @@ const EMOTIONS = [
 ]
 
 // Map emotion codes to emotion names
-const emotionMap: Record<number, string> = EMOTIONS.reduce(
-  (acc, emotion, index) => {
-    acc[index] = emotion;
-    return acc;
-  },
-  {} as Record<number, string>
-);
+const emotionMap: Record<number, string> = {
+  0: "admiration",
+  1: "amusement",
+  2: "anger",
+  3: "annoyance",
+  4: "approval",
+  5: "caring",
+  6: "confusion",
+  7: "curiosity",
+  8: "desire",
+  9: "disappointment",
+  10: "disapproval",
+  11: "disgust",
+  12: "embarrassment",
+  13: "excitement",
+  14: "fear",
+  15: "gratitude",
+  16: "grief",
+  17: "joy",
+  18: "love",
+  19: "nervousness",
+  20: "optimism",
+  21: "pride",
+  22: "realization",
+  23: "relief",
+  24: "remorse",
+  25: "sadness",
+  26: "surprise",
+  27: "neutral"
+};
 
 const emotionIcons: { [key: string]: string } = {
   admiration: "star",
@@ -63,9 +85,15 @@ const emotionIcons: { [key: string]: string } = {
 };
 
 // Helper function to get the correct icon name for check-in emotions
-const getCheckInEmotionIcon = (emotion: string): string => {
+const getCheckInEmotionIcon = (emotion: string): keyof typeof Feather.glyphMap => {
   const lowerEmotion = emotion.toLowerCase();
-  return emotionIcons[lowerEmotion] || "help-circle";
+  return (emotionIcons[lowerEmotion] as keyof typeof Feather.glyphMap) || "help-circle";
+};
+
+// Helper function to get the correct icon name for sentiment emotions
+const getSentimentEmotionIcon = (emotionCode: number): keyof typeof Feather.glyphMap => {
+  const emotionName = emotionMap[emotionCode];
+  return (emotionIcons[emotionName] as keyof typeof Feather.glyphMap) || "help-circle";
 };
 
 const reasonIcons: { [key: string]: string } = {
@@ -129,7 +157,7 @@ const EntryDetail = () => {
           }
 
           const data = await getCheckInHistory(token);
-          const updatedEntry = data.history.find((e: any) => e.entry_id === entry._id);
+          const updatedEntry = data.history.find((e: any) => e.entry_id === entry.entry_id);
           
           if (updatedEntry) {
             setEntry({
@@ -145,7 +173,7 @@ const EntryDetail = () => {
       };
 
       fetchUpdatedEntry();
-    }, [entry._id])
+    }, [entry.entry_id])
   );
   
   // State for editing mode and image selection
@@ -196,36 +224,42 @@ const EntryDetail = () => {
   // Handle saving edited entry
   const handleSaveEntry = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        Alert.alert("Error", "Authentication token not found");
-        return;
+      if (entry.category === "checkin") {
+        // Keep existing check-in update logic
+        await updateCheckIn(entry._id, selectedEmotions, selectedReasons, [comment]);
+        Alert.alert("Success", "Check-in updated successfully");
+        navigation.navigate("Home");
+      } else {
+        // Use updateJournalEntry for guided and freeform entries
+        const updatedEntry = await updateJournalEntry(
+          entry._id,
+          editedContent,
+          entry.entryDate,
+          images
+        );
+        
+        // Update the local entry state with the new data including sentiment analysis
+        if (updatedEntry && updatedEntry.entry) {
+          // Format the sentiment data to match the expected format
+          const formattedSentiments = updatedEntry.entry.journalSentiments.map((sentiment: any) => ({
+            emotion: sentiment.emotion,
+            percentage: sentiment.percentage
+          }));
+          
+          setEntry({
+            ...entry,
+            entryContent: editedContent,
+            journalSentiments: formattedSentiments,
+            images: images
+          });
+        }
+        
+        Alert.alert("Success", "Journal entry updated successfully");
+        setIsEditing(false);
       }
-      
-      const response = await fetch(`${API_URL}/journal/${entry._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          entryContent: editedContent,
-          images: images // Include the updated images array
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update journal entry");
-      }
-      
-      Alert.alert("Success", "Journal entry updated successfully");
-      setIsEditing(false);
-      // Navigate back and refresh the home screen
-      navigation.navigate("Home");
     } catch (error) {
       console.error("Error updating entry:", error);
-      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update journal entry");
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update entry");
     }
   };
   
@@ -402,7 +436,7 @@ const EntryDetail = () => {
                 <View style={styles.gridContainer}>
                   {entry.causes.map((cause: string, index: number) => (
                     <View key={index} style={styles.gridItem}>
-                      <Feather name={reasonIcons[cause] || "help-circle"} size={20} color="#444" />
+                      <Feather name={(reasonIcons[cause] as keyof typeof Feather.glyphMap) || "help-circle"} size={20} color="#444" />
                       <Text style={styles.gridLabel}>{cause}</Text>
                     </View>
                   ))}
@@ -441,14 +475,18 @@ const EntryDetail = () => {
               <View style={styles.sentimentsContainer}>
                 <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
                 <View style={styles.gridContainer}>
-                  {entry.journalSentiments.map((sentiment: { emotion: number; percentage: number }, index: number) => (
-                    <View key={index} style={styles.sentimentItem}>
-                      <Feather name={emotionIcons[emotionMap[sentiment.emotion]] || "help-circle"} size={20} color="#444" />
-                      <Text style={styles.sentimentText}>
-                        {emotionMap[sentiment.emotion]}: {Math.round(sentiment.percentage * 100)}%
-                      </Text>
-                    </View>
-                  ))}
+                  {entry.journalSentiments.map((sentiment: { emotion: number; percentage: number }, index: number) => {
+                    const emotionName = emotionMap[sentiment.emotion] || "unknown";
+                    const percentage = Math.round(sentiment.percentage * 100);
+                    return (
+                      <View key={index} style={styles.sentimentItem}>
+                        <Feather name={getSentimentEmotionIcon(sentiment.emotion)} size={20} color="#444" />
+                        <Text style={styles.sentimentText}>
+                          {emotionName}: {percentage}%
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -485,7 +523,7 @@ const EntryDetail = () => {
                           style={styles.deleteImageButton}
                           onPress={() => handleDeleteImage(image)}
                         >
-                          <Feather name="trash-2" size={20} color="#FF0000" />
+                          <Feather name="x" size={24} color="#000" />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -792,6 +830,17 @@ const styles = StyleSheet.create({
     padding: 10,
     textAlignVertical: "top",
     backgroundColor: "white",
+  },
+  option: {
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+  },
+  selectedOption: {
+    backgroundColor: '#e0e0e0',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
   },
 });
 

@@ -29,13 +29,13 @@ sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertwe
 journal_bp = Blueprint("journal_bp", __name__)
 
 # AWS S3 configuration
-""" S3_BUCKET = "sentiobucket"
+S3_BUCKET = "sentiobucket"
 s3_client = boto3.client(
     's3',
     aws_access_key_id='AKIAXGZAMH3HUVQSPNED',
     aws_secret_access_key='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',
     region_name='eu-north-1'
-) """
+) 
 s3 = boto3.client("s3", **AWS_CONFIG)
 
 
@@ -688,3 +688,100 @@ def delete_journal_image():
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
+
+@journal_bp.route("/<entry_id>", methods=["PUT"])
+@jwt_required()
+def update_journal_entry(entry_id):
+    try:
+        print("🔵 Starting update_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}, Entry ID: {entry_id}")
+        
+        # Validate IDs
+        try:
+            user_object_id = ObjectId(user_id)
+            entry_object_id = ObjectId(entry_id)
+        except:
+            print("❌ Invalid ID format")
+            return jsonify({"error": "Invalid ID format"}), 400
+        
+        data = request.get_json()
+        print(f"🔹 Received update data: {data}")
+        
+        # Extract only allowed fields from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images')
+        journal_sentiments = data.get('journalSentiments', [])
+        
+        # Find the user's document
+        user_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not user_doc:
+            print("❌ User document not found")
+            return jsonify({"error": "User not found"}), 404
+        
+        # Find the specific entry
+        entry_index = None
+        for i, entry in enumerate(user_doc.get("journalEntries", [])):
+            if str(entry["_id"]) == entry_id:
+                entry_index = i
+                break
+        
+        if entry_index is None:
+            print("❌ Entry not found")
+            return jsonify({"error": "Entry not found"}), 404
+        
+        # Prepare update fields - only include allowed fields
+        update_fields = {
+            "updatedAt": datetime.now()
+        }
+        
+        if entry_content is not None:
+            update_fields["entryContent"] = entry_content
+        
+        # Only update sentiments if they were provided in the request
+        if journal_sentiments:
+            update_fields["journalSentiments"] = journal_sentiments
+        
+        if entry_date is not None:
+            update_fields["entryDate"] = entry_date
+        if images is not None:
+            update_fields["images"] = images
+        
+        # Update the specific entry
+        update_operation = {"$set": {}}
+        for k, v in update_fields.items():
+            if k == "journalSentiments":
+                # Ensure journalSentiments is properly formatted as an array
+                update_operation["$set"]["journalEntries.$.journalSentiments"] = v
+            else:
+                update_operation["$set"][f"journalEntries.$.{k}"] = v
+        
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id, "journalEntries._id": entry_object_id},
+            update_operation
+        )
+        
+        if result.modified_count == 0:
+            print("❌ No changes made to the entry")
+            return jsonify({"error": "Failed to update entry"}), 400
+        
+        print("✅ Journal entry updated successfully")
+        
+        # Fetch the updated entry
+        updated_doc = journal_entries_collection.find_one(
+            {"_id": user_object_id},
+            {"journalEntries": {"$elemMatch": {"_id": entry_object_id}}}
+        )
+        updated_entry = updated_doc["journalEntries"][0] if updated_doc and "journalEntries" in updated_doc else None
+        
+        return jsonify({
+            "message": "Journal entry updated successfully",
+            "entry": {**updated_entry, "_id": str(updated_entry["_id"])}
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error updating journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
