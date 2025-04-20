@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
-import { fetchJournalEntriesWithDate, fetchSentimentAnalysis, getEmotionalTrendInsight } from "../services/ApiService"; // Our new function
+import { fetchJournalEntriesWithDate, 
+  fetchSentimentAnalysis, 
+  getEmotionalTrendInsight, 
+  fetchEmotionalRecommendations } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '../context/ThemeContext';
@@ -75,7 +78,31 @@ const SentimentAnalysisPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // emotional trends
-  const [trendInsight, setTrendInsight] = useState<string | null>(null);
+  // const [trendInsight, setTrendInsight] = useState<string | null>(null);
+
+  const [emotionalInsight, setEmotionalInsight] = useState(null);
+  const [recommendation, setRecommendation] = useState(null);
+
+  
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const data = await fetchEmotionalRecommendations();
+        console.log("RECOMMENDATIONS FROM DASHBOARD.TSX")
+        console.log(data)
+        setEmotionalInsight(data.insight || "");
+        setRecommendation(data.recommendation || []);
+        console.log("RECOMMENDATIONS FROM DASHBOARD.TSX")
+        console.log(recommendation)
+      } catch (error) {
+        console.error("❌ Error fetching trend insight:", error);
+      }
+    };
+  
+    fetchRecommendations();
+  }, []);
+  
+
 
 
   // Toggle emotion chip
@@ -165,7 +192,7 @@ const SentimentAnalysisPage: React.FC = () => {
   };
 
   // for emotion trends
-  useEffect(() => {
+  /* useEffect(() => {
     const fetchTrendInsight = async () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
@@ -178,7 +205,7 @@ const SentimentAnalysisPage: React.FC = () => {
     };
   
     fetchTrendInsight();
-  }, []);
+  }, []); */
   
 
   const handleEndDateChange = (event: any, isWeekly: boolean, date?: Date) => {
@@ -394,11 +421,28 @@ const SentimentAnalysisPage: React.FC = () => {
               darkMode={darkMode}
             />
           </View>
-          {trendInsight && (
+          {/* {trendInsight && (
             <View style={styles.trendInsightBox}>
               <Text style={styles.trendInsightText}>{trendInsight}</Text>
             </View>
+          )} */}
+          {emotionalInsight && (
+            <View style={styles.insightContainer}>
+              <Text style={styles.insightTitle}>🧠 Emotional Insight</Text>
+              <Text style={styles.insightText}>{emotionalInsight}</Text>
+            </View>
           )}
+
+          {recommendation && recommendation.length > 0 && (
+            <View style={styles.recommendationContainer}>
+              <Text style={styles.recommendationTitle}>💡Recommendations</Text>
+              {recommendation.map((rec, index) => (
+                <Text key={index} style={styles.recommendationText}>• {rec}</Text>
+              ))}
+            </View>
+          )}
+
+
 
         </View>
       </ScrollView>  
@@ -493,7 +537,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#444",
     fontStyle: "italic",
-  }
+  },
+  insightContainer: {
+    backgroundColor: "#E6F0FA",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  insightTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1A3C6F",
+    marginBottom: 8,
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  
+  recommendationContainer: {
+    backgroundColor: "#FDF3E7",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#9C6B00",
+    marginBottom: 4,
+  },
+  recommendationSubtitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  recommendationText: {
+    fontSize: 14,
+    color: "#444",
+  },
+  recommendationBox: {
+    backgroundColor: "#E8F0FE",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  
   
 });
 

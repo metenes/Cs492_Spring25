@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://172.20.10.3:5000";
+//const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.0.28:5000"; //kgn
-//const API_URL = "http://192.168.1.29:5000";
+const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -191,6 +191,38 @@ export const getEmotionalTrendInsight = async (token: string) => {
 
   return response.json();
 };
+
+export const fetchEmotionalRecommendations = async () => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    const response = await fetch(`${API_URL}/sentiment/insights`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to fetch emotional recommendations");
+    }
+
+    console.log("📡 Raw response:", response);
+
+    const data = await response.json();
+    console.log("📦 Parsed emotional insights and recommendations:", data);
+
+    return data;
+
+    // return await response.json();
+  } catch (error) {
+    console.error("❌ Error fetching emotional recommendations:", error);
+    throw error;
+  }
+};
+
 
 // **********************************************
 // ** Chat API** - Send message

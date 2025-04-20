@@ -226,7 +226,145 @@ def get_current_mood():
     
 
 #sentiment trends and insights
+
 @sentiments_bp.route("/insights", methods=["GET"])
+@jwt_required()
+def get_emotional_insights():
+    from collections import Counter
+
+    try:
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({"error": "Missing user_id"}), 400
+
+        # 🔍 Fetch journal entries with emotions
+        journal_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        journal_entries = journal_doc.get("journalEntries", []) if journal_doc else []
+
+        # 🔍 Fetch check-in entries with emotions
+        checkins = list(check_in_collection.find({"userId": user_id}))
+
+        # 🧠 Collect all emotions
+        all_emotions = []
+
+        for entry in journal_entries:
+            for s in entry.get("journalSentiments", []):
+                if isinstance(s, dict):
+                    all_emotions.append(s.get("emotion"))
+                elif isinstance(s, str):
+                    all_emotions.append(s)
+
+        for entry in checkins:
+            for s in entry.get("sentiments", []):
+                all_emotions.append(s)
+
+        if not all_emotions:
+            return jsonify({
+                "insight": "No emotional data found. Start journaling or check in to build your insights!",
+                "top_emotions": [],
+                "mental_state": None,
+                "recommendation": None
+            })
+
+        # 🧮 Count and sort top 3 emotions
+        emotion_counts = Counter(all_emotions)
+        """ top_emotions = emotion_counts.most_common(3)
+        top_emotion_labels = [e[0] for e in top_emotions] """
+        top_emotions_raw = emotion_counts.most_common(3)
+
+        # Convert int codes to emotion labels if necessary
+        top_emotions = []
+        top_emotion_labels = []
+        for emotion, count in top_emotions_raw:
+            label = EMOTIONS[emotion] if isinstance(emotion, int) else emotion.lower()
+            top_emotions.append((label, count))
+            top_emotion_labels.append(label)
+
+
+        # 📚 Science-backed combinations and mental states
+        combos_map = {
+            frozenset(["curiosity", "fear"]): {
+                "mental_state": "Navigating uncertainty",
+                "recommendation": "Try grounding techniques or guided journaling to process your thoughts."
+            },
+            frozenset(["gratitude", "sadness"]): {
+                "mental_state": "Bittersweet reflection",
+                "recommendation": "Reflect on what you're thankful for while acknowledging your grief."
+            },
+            frozenset(["joy", "remorse"]): {
+                "mental_state": "Conflicted contentment",
+                "recommendation": "Write about the source of your joy and what you’d do differently next time."
+            },
+            frozenset(["anger", "love"]): {
+                "mental_state": "Emotional ambivalence",
+                "recommendation": "Consider writing a letter (even if you don’t send it) to sort through those feelings."
+            },
+            frozenset(["fear", "optimism"]): {
+                "mental_state": "Hopeful anxiety",
+                "recommendation": "Try setting small, achievable goals to regain a sense of control."
+            }
+        }
+
+        matched_combo = None
+        for combo in combos_map.keys():
+            if combo.issubset(set(top_emotion_labels)):
+                matched_combo = combo
+                break
+
+        if matched_combo:
+            matched_data = combos_map[matched_combo]
+            insight = f"You’ve recently felt {', '.join(matched_combo)}—a unique emotional state known as **{matched_data['mental_state']}**."
+            return jsonify({
+                "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
+                "insight": insight,
+                "mental_state": matched_data["mental_state"],
+                "recommendation": matched_data["recommendation"]
+            })
+
+        # Fallback: generic message
+        emotion_recommendations = {
+            "joy": ["Celebrate the good moments by sharing them in your journal."],
+            "sadness": ["Try writing a letter to yourself expressing compassion."],
+            "anger": ["Write about what triggered the anger and what you'd rather do next time."],
+            "fear": ["Journaling can help reframe fearful thoughts with empowering ones."],
+            "love": ["Reflect on the relationships or people you're grateful for."],
+            "gratitude": ["List a few things you're thankful for today."],
+            "remorse": ["Explore what led to your remorse and what you can learn from it."],
+            "curiosity": ["Let your curiosity guide your writing today—ask 'why' and explore."],
+            "neutral": ["Neutral states are valid too. Journaling can help add intention or direction."]
+        }
+        individual_recs = []
+        for e in top_emotion_labels:
+            if e in emotion_recommendations:
+                individual_recs.extend(emotion_recommendations[e])
+        print("ITS AN ART PROJECT????????")
+        print("FULL RECOMMENDATION LIST:")
+        import pprint
+        pprint.pprint(individual_recs)
+
+
+
+        fallback_insight = f"You’ve been feeling {', '.join([e[0].lower() for e in top_emotions])} more often lately. Keep an eye on your emotional patterns!"
+
+        return jsonify({
+            "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
+            "insight": fallback_insight,
+            "mental_state": None,
+            "recommendation": individual_recs if individual_recs else ["Keep journaling to better understand your emotional patterns."]
+        })
+        """ fallback_insight = f"You’ve been feeling {', '.join([e[0].lower() for e in top_emotions])} more often lately. Keep an eye on your emotional patterns!"
+        return jsonify({
+            "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
+            "insight": fallback_insight,
+            "mental_state": None,
+            "recommendation": None
+        }) """
+
+    except Exception as e:
+        print("❌ Error generating insights:", e)
+        return jsonify({"error": "Failed to generate emotional insights."}), 500
+
+""" @sentiments_bp.route("/insights", methods=["GET"])
 @jwt_required()
 def get_emotional_insights():
     try:
@@ -305,3 +443,4 @@ def get_emotional_insights():
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Failed to generate emotional insights."}), 500
+ """
