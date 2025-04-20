@@ -352,12 +352,14 @@ const SentimentAnalysisPage: React.FC = () => {
               mode="date"
               display="default"
               onChange={(event, date) => handleStartDateChange(event, false, date)}
+              themeVariant={darkMode ? "dark" : "light"}
             />
             <DateTimePicker
               value={selectedEndDateForChart}
               mode="date"
               display="default"
               onChange={(event, date) => handleEndDateChange(event, false, date)}
+              themeVariant={darkMode ? "dark" : "light"}
             />
           </View>
 
