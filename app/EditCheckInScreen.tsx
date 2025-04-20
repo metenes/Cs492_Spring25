@@ -85,7 +85,12 @@ const EditCheckInScreen = () => {
         throw new Error("No authentication token found");
       }
 
-      await updateCheckIn(entry._id, selectedEmotions, selectedReasons, [comment]);
+      const entryId = entry._id || entry.entry_id;
+      if (!entryId) {
+        throw new Error("Invalid entry ID");
+      }
+
+      await updateCheckIn(entryId, selectedEmotions, selectedReasons, [comment]);
       
       Alert.alert(
         "Check-in Updated", 
