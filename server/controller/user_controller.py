@@ -445,12 +445,6 @@ def forgot_password():
         reset_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))
 
         # MODIFY HERE SIMIAR TI API FOR NOW, WE WILL SORT THIS OUT SMHW - TODO
-        
-        # const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
-        # const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-        # const API_URL = "http://192.168.1.104:5000";
-        # const API_URL = "http://10.203.122.69:5000";
-        # const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 
         reset_link = f"http://http://192.168.1.104:5000/reset-password?token={reset_token}"
 
@@ -559,10 +553,32 @@ def community_trends():
     return jsonify(stats)
 
 
-
-
 # ---------------------------------------
-#  **Delete User**
+#  **Change Password**
 # ---------------------------------------
 
+@user_bp.route('/change-password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    user_id = get_jwt_identity()
+    # Get user data from request
+    data = request.json
+    old_password = data.get("oldPassword")
+    new_password = data.get("newPassword")
 
+    # Check if user exists
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+        
+    # Check old password
+    if not bcrypt.check_password_hash(user["password"], old_password):
+        return jsonify({"error": "Old password is incorrect"}), 401
+        
+    # Update password
+    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": hashed_password}}
+    )
+    return jsonify({"message": "Password changed successfully"}), 200    

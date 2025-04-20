@@ -462,6 +462,27 @@ export const updateProfile = async (token: string, profileData: any) => {
   return await response.json();
 };
 
+export const changePassword = async (token: string, oldPassword: string, newPassword: string) => {
+  const response = await fetch(`${API_URL}/user/change-password`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Error response data:", data);
+    return { message: data.error, status: response.status };
+  }
+
+  return { message: data.message, status: response.status }; // success
+
+};
+
 // Upload profile image
 export const uploadProfileImage = async (token: string, imageFile: File) => {
 
