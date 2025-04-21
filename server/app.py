@@ -38,7 +38,7 @@ from controller.check_in_controller import check_bp
 from controller.notification_controller import notification_bp, send_journal_reminders
 
 # importing the database and mail configurations
-from utils.database import db, journal_entries_collection
+from utils.database import db, journal_entries_collection, check_in_collection
 from utils.mail_config import mail
 from utils.load_model import model
 from utils.jwt_config import jwt_manager
@@ -108,6 +108,13 @@ def get_journal_dates():
             else:
                 date_str = raw_date.strftime("%Y-%m-%d")
             dates.add(date_str)
+        
+         # Fetch check-in entry dates
+        checkins = check_in_collection.find({"userId": user_id})
+        for entry in checkins:
+            ts = entry.get("timestamp")
+            if ts:
+                dates.add(ts.strftime("%Y-%m-%d"))
 
         print("✅ Final list of journal dates:", dates)
         return jsonify(list(dates)), 200
