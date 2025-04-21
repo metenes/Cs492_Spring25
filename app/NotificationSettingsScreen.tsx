@@ -44,7 +44,7 @@ export const NotificationSettingsScreen = () => {
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
           <View style={{ marginTop: 50 }}>
-            <Text style={styles.label}>Notification Frequency</Text>
+            <Text style={styles.label}>Journal Reminder Frequency</Text>
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={frequency}

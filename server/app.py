@@ -35,7 +35,7 @@ from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp
 from controller.check_in_controller import check_bp
-from controller.notification_controller import notification_bp, send_daily_reminders
+from controller.notification_controller import notification_bp, send_journal_reminders
 
 # importing the database and mail configurations
 from utils.database import db, journal_entries_collection
@@ -241,10 +241,10 @@ scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
 
-# send daily reminders at 7:30 PM
+# send reminders at 7:30 PM
 scheduler.add_job(
-    id='daily_reminder_job',
-    func=send_daily_reminders,
+    id='journal_reminder_job',
+    func=send_journal_reminders,
     trigger='cron',
     hour=19,
     minute=30

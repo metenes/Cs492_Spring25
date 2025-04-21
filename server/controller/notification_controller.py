@@ -47,12 +47,11 @@ def update_push_token_user():
 
         user_id = get_jwt_identity()
 
-        notification_tokens_collection.delete_many({"user_id": ObjectId(user_id)})
 
         result = notification_tokens_collection.update_one(
             {"token": token},
             {"$set": {"user_id": ObjectId(user_id), "updated_at": datetime.utcnow()},
-            "$setOnInsert": {"created_at": datetime.utcnow(), "notification_frequency": "daily"}
+            "$setOnInsert": {"created_at": datetime.utcnow(), "reminder_notification_frequency": "daily"}
             },
             upsert=True
         )
@@ -84,7 +83,7 @@ def update_notification_preferences():
 
         result = notification_tokens_collection.update_one(
             {"token": pushToken, "user_id": ObjectId(user_id)},
-            {"$set": {"notification_frequency": frequency, "updated_at": datetime.utcnow()}}
+            {"$set": {"reminder_notification_frequency": frequency, "updated_at": datetime.utcnow()}}
         )
 
         if result.matched_count == 0:
@@ -96,19 +95,27 @@ def update_notification_preferences():
         print(f"❌ Error in update_notification_preferences: {e}")
         return jsonify({"error": str(e)}), 500
 
+def send_journal_reminders():
+    print("Running reminder job...")
 
-def send_daily_reminders():
-    print("Running daily reminder job...")
+    user_entries = get_all_user_push_tokens()
 
-    user_tokens = get_all_user_push_tokens()
-    for user_id in user_tokens:
-        has_user_written_today = has_written_journal_today(user_id)
-        if has_user_written_today:
+    for user_id, token_entry in user_entries.items():
+
+        notification_result = should_send_reminder(token_entry)
+        if not notification_result['result']: 
             continue
         
         result = send_push_to_user_id(
             user_id,
-            "🌞 Daily Reminder",
-            "Don't forget to write your journal for today!"
+            "🌞 Keep the Streak Going!",
+            notification_result['message'],
         )
         print(f" Notification Sent to {user_id}: {result}")
+
+        notification_tokens_collection.update_one(
+            {"user_id": ObjectId(user_id)},
+            {"$set": {"last_reminder_notification_date": datetime.utcnow()}}
+        )
+
+    print("Reminder job completed.")
