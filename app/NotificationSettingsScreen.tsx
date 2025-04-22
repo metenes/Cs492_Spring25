@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, Switch, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
 import { Picker } from '@react-native-picker/picker';
-import { updateNotificationFrequency } from './services/ApiService';
+import { updateNotificationFrequency, fetchNotificationPreferences } from './services/ApiService';
 
 type RootStackParamList = {
   NotificationSettings: undefined;
@@ -15,8 +15,14 @@ type RootStackParamList = {
 type NavigationProp = StackNavigationProp<RootStackParamList, 'NotificationSettings'>;
 
 export const NotificationSettingsScreen = () => {
+  const [loading, setLoading] = useState(true);
   const [frequency, setFrequency] = useState("daily");
   const navigation = useNavigation<NavigationProp>();
+
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleSelection = async (value: string) => {
     setFrequency(value);
@@ -33,31 +39,50 @@ export const NotificationSettingsScreen = () => {
     }
   };
 
+  const fetchData = async () => {
+    try {
+      const response = await fetchNotificationPreferences();
+      console.log("Notification preferences fetched:", response);
+      if (response.status === 200) {
+        console.log("Notification preferences fetched successfully.");
+        setFrequency(response.preference);
+      } else {
+        console.error("Failed to fetch notification preferences.");
+      }
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#F8F8F8' }}>
-        <View style={{ backgroundColor: 'white', padding: 16, marginTop: 16 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ padding: 2 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-          <View style={{ marginTop: 50 }}>
-            <Text style={styles.label}>Journal Reminder Frequency</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={frequency}
-                onValueChange={(itemValue) => handleSelection(itemValue)}
-              >
-                <Picker.Item label="Daily" value="daily" />
-                <Picker.Item label="Weekly" value="weekly" />
-                <Picker.Item label="Never" value="never" />
-              </Picker>
+      {!loading &&
+        (<View style={{ flex: 1, backgroundColor: '#F8F8F8' }}>
+          <View style={{ backgroundColor: 'white', padding: 16, marginTop: 16 }}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{ padding: 2 }}
+            >
+              <Ionicons name="arrow-back" size={24} color="black" />
+            </TouchableOpacity>
+            <View style={{ marginTop: 50 }}>
+              <Text style={styles.label}>Journal Reminder Frequency</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={frequency}
+                  onValueChange={(itemValue) => handleSelection(itemValue)}
+                >
+                  <Picker.Item label="Daily" value="daily" />
+                  <Picker.Item label="Weekly" value="weekly" />
+                  <Picker.Item label="Never" value="never" />
+                </Picker>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+        )}
       <BottomNavigation activeScreen="Settings" />
     </>
   );

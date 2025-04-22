@@ -5,8 +5,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 //const API_URL = "http://172.20.10.3:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-// const API_URL = "http://192.168.0.28:5000"; //kgn
-const API_URL = "http://172.20.10.3:5000";
+const API_URL = "http://192.168.0.28:5000"; //kgn
+//const API_URL = "http://172.20.10.3:5000";
 
 
 // Define the emotions array to match the backend
@@ -753,7 +753,7 @@ export const fetchJournalEntries = async (token: string) => {
 
 export const fetchJournalDates = async (token: string) => {
   try {
-    const response = await fetch(`${API_URL}/get-journal-dates`, {
+    const response = await fetch(`${API_URL}/journal/get-journal-dates`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -1222,6 +1222,35 @@ export const updateNotificationFrequency = async (frequency: string) => {
     throw error;
   }
 }
+
+export const fetchNotificationPreferences = async () => {
+  try {
+    const userToken = await AsyncStorage.getItem('userToken');
+    const pushToken = await AsyncStorage.getItem('expoPushToken');
+    if (!userToken) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(`${API_URL}/notification/get-notification-preferences/${pushToken}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${userToken}`,
+      },
+    });
+    console.log("Response status:", response);
+    const data = await response.json();
+    console.log("Response data:", data);
+    if (!response.ok) {
+      console.error("Error response data:", data);
+      return { message: data.error, status: response.status };
+    }
+
+    return { message: data.message, status: response.status, preference: data.reminder_notification_frequency }; // success
+  } catch (error) {
+    console.error("Error fetching notification preferences:", error);
+    throw error;
+  }
+};
 
 // **********************************************
 // ** Journal Image Upload API **
