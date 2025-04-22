@@ -53,7 +53,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to your camera to take profile pictures.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select profile pictures.",
-        "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library."
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library.",
+        "UIViewControllerBasedStatusBarAppearance": true
       }
     },
     "web": {

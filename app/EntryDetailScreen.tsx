@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 import { deleteEntry, uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory, updateJournalEntry } from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';
+import { useTheme } from './context/ThemeContext';
 import { Feather as FeatherIcon } from "@expo/vector-icons"; // for emotion and reason icons
 
 // Define types for emotions and reasons
@@ -141,6 +142,7 @@ const reasons = [
 ];
 
 const EntryDetail = () => {
+  const { theme, darkMode } = useTheme();
   const navigation = useNavigation<EntryDetailNavigationProp>();
   const route = useRoute<EntryDetailRouteProp>();
   const [entry, setEntry] = useState(route.params.entry);
@@ -182,9 +184,9 @@ const EntryDetail = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [images, setImages] = useState(entry.images || []);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
   
   // State for check-in editing
-  const [step, setStep] = useState(1);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>(entry.sentiments || []);
   const [selectedReasons, setSelectedReasons] = useState<string[]>(entry.causes || []);
   const [comment, setComment] = useState(entry.comments?.[0] || "");
@@ -225,10 +227,32 @@ const EntryDetail = () => {
   const handleSaveEntry = async () => {
     try {
       if (entry.category === "checkin") {
-        // Keep existing check-in update logic
-        await updateCheckIn(entry._id, selectedEmotions, selectedReasons, [comment]);
-        Alert.alert("Success", "Check-in updated successfully");
-        navigation.navigate("Home");
+        // Validate check-in data
+        if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
+          Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
+          return;
+        }
+
+        // Update check-in with new data
+        const updatedCheckIn = await updateCheckIn(
+          entry._id,
+          selectedEmotions,
+          selectedReasons,
+          [comment]
+        );
+
+        if (updatedCheckIn) {
+          // Update local state with new data
+          setEntry({
+            ...entry,
+            sentiments: selectedEmotions,
+            causes: selectedReasons,
+            comments: [comment]
+          });
+          
+          Alert.alert("Success", "Check-in updated successfully");
+          setIsEditing(false);
+        }
       } else {
         // Use updateJournalEntry for guided and freeform entries
         const updatedEntry = await updateJournalEntry(
@@ -259,7 +283,7 @@ const EntryDetail = () => {
       }
     } catch (error) {
       console.error("Error updating entry:", error);
-      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update entry");
+      Alert.alert("Error", "Failed to update entry. Please try again.");
     }
   };
   
@@ -320,7 +344,7 @@ const EntryDetail = () => {
 
   // Handle editing check-in
   const handleEditCheckIn = () => {
-    navigation.navigate("EditCheckIn", { entry });
+    setIsEditing(true);
   };
 
   // Handle adding new image
@@ -376,17 +400,31 @@ const EntryDetail = () => {
     }
   };
 
+  // Add useEffect to handle image loading state
+  useEffect(() => {
+    if (entry.images && entry.images.length > 0) {
+      setIsLoadingImages(true);
+      // Simulate loading time (you can adjust this or remove if not needed)
+      const timer = setTimeout(() => {
+        setIsLoadingImages(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoadingImages(false);
+    }
+  }, [entry.images]);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{entry.category === "checkin" ? "Check-in Entry" : "Journal Entry"}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{entry.category === "checkin" ? "Check-in Entry" : "Journal Entry"}</Text>
         <View style={styles.actionButtons}>
           {isEditing ? (
             <TouchableOpacity onPress={handleSaveEntry} style={styles.actionButton}>
-              <Feather name="check" size={24} color="#000" />
+              <Feather name="check" size={24} color={theme.text} />
             </TouchableOpacity>
           ) : (
             <>
@@ -394,63 +432,136 @@ const EntryDetail = () => {
                 onPress={entry.category === "checkin" ? handleEditCheckIn : () => setIsEditing(true)} 
                 style={styles.actionButton}
               >
-                <Feather name="edit" size={24} color="#000" />
+                <Feather name="edit" size={24} color={theme.text} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleDeleteEntry} style={styles.actionButton}>
-                <Feather name="trash-2" size={24} color="#FF0000" />
+                <Feather name="trash-2" size={24} color={theme.danger} />
               </TouchableOpacity>
             </>
           )}
         </View>
-
       </View>
       
       <ScrollView style={styles.content}>
         <View style={styles.entryDetails}>
-          <Text style={styles.date}>{formattedDate}</Text>
+          <Text style={[styles.date, { color: theme.text }]}>{formattedDate}</Text>
           {/* {entry.category && <Text style={styles.category}>{entry.category}</Text>} */}
-          {entry.prompt && <Text style={styles.prompt}>Prompt: {entry.prompt}</Text>}
+          {entry.prompt && <Text style={[styles.prompt, { color: theme.textSecondary }]}>Prompt: {entry.prompt}</Text>}
         </View>
         
         {entry.category === "checkin" ? (
           <>
-            <Text style={styles.sectionTitle}>Check-in Summary</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Check-in Summary</Text>
 
-            {entry.sentiments && entry.sentiments.length > 0 && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailLabel}>Emotions:</Text>
-                <View style={styles.gridContainer}>
-                  {entry.sentiments.map((emotion: string, index: number) => (
-                    <View key={index} style={styles.gridItem}>
-                      <Feather name={getCheckInEmotionIcon(emotion)} size={20} color="#444" />
-                      <Text style={styles.gridLabel}>{emotion}</Text>
-                    </View>
-                  ))}
+            {isEditing ? (
+              <>
+                <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                  <Text style={[styles.detailLabel, { color: theme.text }]}>Emotions:</Text>
+                  <View style={styles.gridContainer}>
+                    {emotions.map((emotion: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.gridItem,
+                          { backgroundColor: 'transparent' },
+                          selectedEmotions.includes(emotion.name) && styles.selectedItem
+                        ]}
+                        onPress={() => {
+                          if (selectedEmotions.includes(emotion.name)) {
+                            setSelectedEmotions(selectedEmotions.filter(e => e !== emotion.name));
+                          } else {
+                            setSelectedEmotions([...selectedEmotions, emotion.name]);
+                          }
+                        }}
+                      >
+                        <Feather name={emotion.icon} size={20} color={theme.icon} />
+                        <Text style={[styles.gridLabel, { color: theme.text }]}>{emotion.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            )}
 
-            {entry.causes && entry.causes.length > 0 && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailLabel}>Causes:</Text>
-                <View style={styles.gridContainer}>
-                  {entry.causes.map((cause: string, index: number) => (
-                    <View key={index} style={styles.gridItem}>
-                      <Feather name={(reasonIcons[cause] as keyof typeof Feather.glyphMap) || "help-circle"} size={20} color="#444" />
-                      <Text style={styles.gridLabel}>{cause}</Text>
-                    </View>
-                  ))}
+                <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                  <Text style={[styles.detailLabel, { color: theme.text }]}>Causes:</Text>
+                  <View style={styles.gridContainer}>
+                    {reasons.map((reason: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.gridItem,
+                          { backgroundColor: 'transparent' },
+                          selectedReasons.includes(reason.name) && styles.selectedItem
+                        ]}
+                        onPress={() => {
+                          if (selectedReasons.includes(reason.name)) {
+                            setSelectedReasons(selectedReasons.filter(r => r !== reason.name));
+                          } else {
+                            setSelectedReasons([...selectedReasons, reason.name]);
+                          }
+                        }}
+                      >
+                        <Feather name={reason.icon} size={20} color={theme.icon} />
+                        <Text style={[styles.gridLabel, { color: theme.text }]}>{reason.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            )}
 
-            {entry.comments && entry.comments.length > 0 && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailLabel}>Comments:</Text>
-                {entry.comments.map((comment: string, index: number) => (
-                  <Text key={index} style={styles.detailItem}>{comment}</Text>
-                ))}
-              </View>
+                <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                  <Text style={[styles.detailLabel, { color: theme.text }]}>Comments:</Text>
+                  <TextInput
+                    style={[styles.commentInput, { 
+                      backgroundColor: theme.inputBackground,
+                      borderColor: theme.border,
+                      color: theme.text
+                    }]}
+                    value={comment}
+                    onChangeText={setComment}
+                    placeholder="Add a comment (optional)"
+                    placeholderTextColor={theme.placeholder}
+                    multiline
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                {entry.sentiments && entry.sentiments.length > 0 && (
+                  <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                    <Text style={[styles.detailLabel, { color: theme.text }]}>Emotions:</Text>
+                    <View style={styles.gridContainer}>
+                      {entry.sentiments.map((emotion: string, index: number) => (
+                        <View key={index} style={[styles.gridItem, { backgroundColor: 'transparent' }]}>
+                          <Feather name={getCheckInEmotionIcon(emotion)} size={20} color={theme.icon} />
+                          <Text style={[styles.gridLabel, { color: theme.text }]}>{emotion}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {entry.causes && entry.causes.length > 0 && (
+                  <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                    <Text style={[styles.detailLabel, { color: theme.text }]}>Causes:</Text>
+                    <View style={styles.gridContainer}>
+                      {entry.causes.map((cause: string, index: number) => (
+                        <View key={index} style={[styles.gridItem, { backgroundColor: 'transparent' }]}>
+                          <Feather name={(reasonIcons[cause] as keyof typeof Feather.glyphMap) || "help-circle"} size={20} color={theme.icon} />
+                          <Text style={[styles.gridLabel, { color: theme.text }]}>{cause}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {entry.comments && entry.comments.length > 0 && (
+                  <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
+                    <Text style={[styles.detailLabel, { color: theme.text }]}>Comments:</Text>
+                    {entry.comments.map((comment: string, index: number) => (
+                      <Text key={index} style={[styles.detailItem, { color: theme.textSecondary }]}>{comment}</Text>
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </>
         ) : (
@@ -459,29 +570,34 @@ const EntryDetail = () => {
             <View style={styles.contentSection}>
               {isEditing ? (
                 <TextInput
-                  style={styles.editor}
+                  style={[styles.editor, { 
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.border,
+                    color: theme.text
+                  }]}
                   multiline
                   value={editedContent}
                   onChangeText={setEditedContent}
                   autoFocus
+                  placeholderTextColor={theme.placeholder}
                 />
               ) : (
-                <Text style={styles.entryContent}>{entry.entryContent}</Text>
+                <Text style={[styles.entryContent, { color: theme.text }]}>{entry.entryContent}</Text>
               )}
             </View>
 
             {/* Sentiment Analysis Section - For both guided and freeform */}
             {entry.journalSentiments && entry.journalSentiments.length > 0 && (
-              <View style={styles.sentimentsContainer}>
-                <Text style={styles.sentimentsTitle}>Sentiment Analysis</Text>
+              <View style={[styles.sentimentsContainer, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.sentimentsTitle, { color: theme.text }]}>Sentiment Analysis</Text>
                 <View style={styles.gridContainer}>
                   {entry.journalSentiments.map((sentiment: { emotion: number; percentage: number }, index: number) => {
                     const emotionName = emotionMap[sentiment.emotion] || "unknown";
                     const percentage = Math.round(sentiment.percentage * 100);
                     return (
-                      <View key={index} style={styles.sentimentItem}>
-                        <Feather name={getSentimentEmotionIcon(sentiment.emotion)} size={20} color="#444" />
-                        <Text style={styles.sentimentText}>
+                      <View key={index} style={[styles.sentimentItem, { backgroundColor: theme.backgroundColor }]}>
+                        <Feather name={getSentimentEmotionIcon(sentiment.emotion)} size={20} color={theme.icon} />
+                        <Text style={[styles.sentimentText, { color: theme.text }]}>
                           {emotionName}: {percentage}%
                         </Text>
                       </View>
@@ -494,40 +610,55 @@ const EntryDetail = () => {
             {/* Images Section - Only for freeform */}
             {entry.category === "freeform" && (
               <View style={styles.imagesContainer}>
-                <Text style={styles.sectionTitle}>Images</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Images</Text>
                 {isEditing ? (
                   <View style={styles.imagesHeader}>
                     <TouchableOpacity 
-                      style={styles.addImageButton}
+                      style={[styles.addImageButton, { backgroundColor: theme.cardBackground }]}
                       onPress={handleAddImage}
                       disabled={isUploading}
                     >
-                      <Feather name="plus" size={24} color="#000" />
-                      <Text style={styles.addImageText}>Add Image</Text>
+                      <Feather name="plus" size={24} color={theme.text} />
+                      <Text style={[styles.addImageText, { color: theme.text }]}>Add Image</Text>
                     </TouchableOpacity>
                   </View>
                 ) : null}
                 
                 <ScrollView horizontal style={styles.imagesScrollView}>
-                  {images.map((image: { signedUrl: string }, index: number) => (
-                    <View key={index} style={styles.imageWrapper}>
-                      <TouchableOpacity onPress={() => setSelectedImage(image.signedUrl)}>
-                        <Image
-                          source={{ uri: image.signedUrl }}
-                          style={styles.entryImage}
-                          resizeMode="cover"
+                  {isLoadingImages ? (
+                    // Skeleton loader for images
+                    <View style={styles.skeletonContainer}>
+                      {[1, 2, 3].map((_, index) => (
+                        <View 
+                          key={index} 
+                          style={[
+                            styles.skeletonImage, 
+                            { backgroundColor: darkMode ? '#2C2C2C' : '#E0E0E0' }
+                          ]} 
                         />
-                      </TouchableOpacity>
-                      {isEditing && (
-                        <TouchableOpacity 
-                          style={styles.deleteImageButton}
-                          onPress={() => handleDeleteImage(image)}
-                        >
-                          <Feather name="x" size={24} color="#000" />
-                        </TouchableOpacity>
-                      )}
+                      ))}
                     </View>
-                  ))}
+                  ) : (
+                    images.map((image: { signedUrl: string }, index: number) => (
+                      <View key={index} style={styles.imageWrapper}>
+                        <TouchableOpacity onPress={() => setSelectedImage(image.signedUrl)}>
+                          <Image
+                            source={{ uri: image.signedUrl }}
+                            style={styles.entryImage}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                        {isEditing && (
+                          <TouchableOpacity 
+                            style={[styles.deleteImageButton, { backgroundColor: theme.cardBackground }]}
+                            onPress={() => handleDeleteImage(image)}
+                          >
+                            <Feather name="x" size={24} color={theme.text} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))
+                  )}
                 </ScrollView>
               </View>
             )}
@@ -538,7 +669,7 @@ const EntryDetail = () => {
 
       {/* Image Preview Modal */}
       <Modal visible={!!selectedImage} transparent={true} animationType="fade">
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.9)' }]}>
           {selectedImage && (
             <Image
               source={{ uri: selectedImage }}
@@ -547,10 +678,10 @@ const EntryDetail = () => {
             />
           )}
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: theme.cardBackground }]}
             onPress={() => setSelectedImage(null)}
           >
-            <Text style={styles.closeButtonText}>Close</Text>
+            <Text style={[styles.closeButtonText, { color: theme.text }]}>Close</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -561,7 +692,6 @@ const EntryDetail = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   header: {
     flexDirection: "row",
@@ -570,7 +700,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
   },
   backButton: {
     padding: 8,
@@ -668,18 +797,18 @@ const styles = StyleSheet.create({
   
   detailBlock: {
     marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
   },
   
   detailLabel: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 4,
   },
   
   detailItem: {
     fontSize: 14,
-    color: "#444",
     marginLeft: 10,
   },
   gridContainer: {
@@ -693,11 +822,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     marginRight: "3.33%",
+    padding: 8,
+    borderRadius: 8,
   },
   gridLabel: {
     marginLeft: 6,
     fontSize: 14,
-    color: "#444",
   },
   
   imagesContainer: {
@@ -841,6 +971,27 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginVertical: 5,
+  },
+  selectedItem: {
+    borderWidth: 1,
+    borderColor: '#3498DB',
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    minHeight: 100,
+  },
+  skeletonContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+  },
+  skeletonImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    marginRight: 10,
   },
 });
 

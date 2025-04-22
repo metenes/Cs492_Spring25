@@ -22,14 +22,12 @@ import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount } from "./services/ApiService";
+import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount, API_URL } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
 import { useTheme } from './context/ThemeContext';
-const API_URL = 'http://172.20.10.2:5000';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
-
 
 const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
@@ -179,10 +177,10 @@ const ProfileScreen = () => {
     try {
       const storedDarkMode = await AsyncStorage.getItem('darkMode');
       if (storedDarkMode !== null) {
-        toggleDarkMode();
-      } else {
-        // Use system default if no preference saved
-        toggleDarkMode();
+        // Only set dark mode if it's different from current state
+        if (darkMode !== (storedDarkMode === 'true')) {
+          toggleDarkMode();
+        }
       }
     } catch (error) {
       console.error('Error loading app preferences:', error);
@@ -525,12 +523,16 @@ const ProfileScreen = () => {
               />
             )}
             {profileImage ? (
-              <Image
-                source={{ uri: profileImage }}
-                style={[styles.avatar, { backgroundColor: 'transparent' }]}
-                onLoadStart={() => setImageLoading(true)}
-                onLoadEnd={() => setImageLoading(false)}
-              />
+              <TouchableOpacity
+                onPress={() => setModalVisible(true)}
+              >
+                <Image
+                  source={{ uri: profileImage }}
+                  style={[styles.avatar, { backgroundColor: 'transparent' }]}
+                  onLoadStart={() => setImageLoading(true)}
+                  onLoadEnd={() => setImageLoading(false)}
+                />
+              </TouchableOpacity>
             ) : (
               <View style={[styles.skeletonAvatar, { backgroundColor: theme.cardBackground }]}>
                 <Ionicons name="person" size={40} color={theme.textSecondary} />

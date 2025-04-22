@@ -8,6 +8,7 @@ import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
+import { useTheme } from "./context/ThemeContext";
 
 type SettingScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -23,17 +24,13 @@ const SettingsScreen = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showOldPassword, setShowOldPassword] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   const navigation = useNavigation<SettingScreenNavigationProp>();
   const { logout } = useAuth();
-
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => !prev);
-  };
+  const { theme, darkMode } = useTheme();
 
   const handleLogout = () => {
     logoutDB();
-    logout(); // ✅ Call logout from AuthContext
+    logout();
     navigation.navigate("Login");
   };
 
@@ -72,32 +69,34 @@ const SettingsScreen = () => {
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
         <TouchableOpacity
-          style={styles.settingRow}
+          style={[styles.settingRow, { borderBottomColor: theme.border }]}
           onPress={() => navigation.navigate("PaymentMethodSettingScreen")}
         >
-          <Text style={styles.settingText}>Payment Settings</Text>
-          <Text style={styles.arrow}>›</Text>
+          <Text style={[styles.settingText, { color: theme.text }]}>Payment Settings</Text>
+          <Text style={[styles.arrow, { color: theme.placeholder }]}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.settingRow}
+          style={[styles.settingRow, { borderBottomColor: theme.border }]}
           onPress={() => navigation.navigate("NotificationSettingsScreen")}
         >
-          <Text style={styles.settingText}>Notification Settings</Text>
-          <Text style={styles.arrow}>›</Text>
+          <Text style={[styles.settingText, { color: theme.text }]}>Notification Settings</Text>
+          <Text style={[styles.arrow, { color: theme.placeholder }]}>›</Text>
         </TouchableOpacity>
 
-        <View style={styles.settingToggle}>
-          <Text style={styles.settingText}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={toggleDarkMode} />
-        </View>
-        <TouchableOpacity style={styles.changePasswordButton} onPress={handleChangePasswordModal}>
+        <TouchableOpacity 
+          style={[styles.changePasswordButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
+          onPress={handleChangePasswordModal}
+        >
           <Text style={styles.logoutText}>Change Password</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
+          onPress={handleLogout}
+        >
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
@@ -108,65 +107,84 @@ const SettingsScreen = () => {
           visible={openPasswordChangeModal}
           onRequestClose={() => setOpenPasswordChangeModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Change Password</Text>
+          <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+            <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1a1a1a' : theme.backgroundColor }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Change Password</Text>
 
               <View style={{ position: "relative" }}>
                 <TextInput
                   placeholder="Old Password"
+                  placeholderTextColor={theme.placeholder}
                   secureTextEntry={!showOldPassword}
                   value={oldPassword}
                   onChangeText={setOldPassword}
-                  style={styles.input}
+                  style={[styles.input, { 
+                    backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+                    borderColor: theme.border,
+                    color: theme.text
+                  }]}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
                   onPress={() => setShowOldPassword(prev => !prev)}
                 >
-                  <Feather name={showOldPassword ? "eye" : "eye-off"} size={20} color="#007BFF" />
+                  <Feather name={showOldPassword ? "eye" : "eye-off"} size={20} color={theme.primary} />
                 </TouchableOpacity>
-
               </View>
 
               <View style={{ position: "relative" }}>
                 <TextInput
                   placeholder="New Password"
+                  placeholderTextColor={theme.placeholder}
                   secureTextEntry={!showNewPassword}
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  style={styles.input}
+                  style={[styles.input, { 
+                    backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+                    borderColor: theme.border,
+                    color: theme.text
+                  }]}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
                   onPress={() => setShowNewPassword(prev => !prev)}
                 >
-                  <Feather name={showNewPassword ? "eye" : "eye-off"} size={20} color="#007BFF" />
+                  <Feather name={showNewPassword ? "eye" : "eye-off"} size={20} color={theme.primary} />
                 </TouchableOpacity>
               </View>
 
               <View style={{ position: "relative" }}>
                 <TextInput
                   placeholder="Confirm New Password"
+                  placeholderTextColor={theme.placeholder}
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  style={styles.input}
+                  style={[styles.input, { 
+                    backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+                    borderColor: theme.border,
+                    color: theme.text
+                  }]}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
                   onPress={() => setShowConfirmPassword(prev => !prev)}
                 >
-                  <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color="#007BFF" />
+                  <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color={theme.primary} />
                 </TouchableOpacity>
               </View>
 
-
               <View style={styles.modalButtons}>
-                <TouchableOpacity onPress={() => setOpenPasswordChangeModal(false)} style={styles.cancelButton}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                <TouchableOpacity 
+                  onPress={() => setOpenPasswordChangeModal(false)} 
+                  style={[styles.cancelButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]}
+                >
+                  <Text style={[styles.cancelButtonText, { color: '#fff' }]}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { handleChangePassword(); }} style={styles.confirmButton}>
+                <TouchableOpacity 
+                  onPress={handleChangePassword} 
+                  style={[styles.confirmButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]}
+                >
                   <Text style={styles.confirmButtonText}>Update</Text>
                 </TouchableOpacity>
               </View>
@@ -184,7 +202,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: "#fff",
   },
   settingRow: {
     flexDirection: "row",
@@ -192,41 +209,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  settingToggle: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    marginTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
   },
   settingText: {
     fontSize: 16,
-    color: "#333",
   },
   arrow: {
     fontSize: 18,
-    color: "#999",
   },
   changePasswordButton: {
-    marginTop: 40,
-    backgroundColor: "#007BFF",
+    marginTop: 20,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
     width: "85%",
-    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 10,
   },
@@ -238,7 +240,6 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
     borderRadius: 6,
     padding: 10,
     marginBottom: 12,
@@ -249,16 +250,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   cancelButton: {
-    backgroundColor: "#ccc",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 6,
   },
   cancelButtonText: {
-    color: "#333",
+    fontWeight: "bold",
   },
   confirmButton: {
-    backgroundColor: "#007BFF",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 6,
@@ -273,13 +272,8 @@ const styles = StyleSheet.create({
     top: 12,
     padding: 5,
   },
-  eyeText: {
-    color: "#007BFF",
-    fontSize: 14,
-  },
   logoutButton: {
-    marginTop: 40,
-    backgroundColor: "#ff4d4d",
+    marginTop: 10,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",

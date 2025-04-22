@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
 import { Picker } from '@react-native-picker/picker';
 import { updateNotificationFrequency } from './services/ApiService';
+import { useTheme } from './context/ThemeContext';
 
 type RootStackParamList = {
   NotificationSettings: undefined;
@@ -17,6 +18,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'NotificationSetti
 export const NotificationSettingsScreen = () => {
   const [frequency, setFrequency] = useState("daily");
   const navigation = useNavigation<NavigationProp>();
+  const { theme, darkMode } = useTheme();
 
   const handleSelection = async (value: string) => {
     setFrequency(value);
@@ -35,24 +37,35 @@ export const NotificationSettingsScreen = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#F8F8F8' }}>
-        <View style={{ backgroundColor: 'white', padding: 16, marginTop: 16 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ padding: 2 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
+      <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
+        <View style={{ 
+          backgroundColor: darkMode ? '#1a1a1a' : theme.backgroundColor, 
+          padding: 16, 
+          marginTop: 16 
+        }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ padding: 2 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
+          </TouchableOpacity>
           <View style={{ marginTop: 50 }}>
-            <Text style={styles.label}>Journal Reminder Frequency</Text>
-            <View style={styles.pickerContainer}>
+            <Text style={[styles.label, { color: theme.text }]}>Journal Reminder Frequency</Text>
+            <View style={[
+              styles.pickerContainer,
+              { 
+                borderColor: theme.border,
+                backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0'
+              }
+            ]}>
               <Picker
                 selectedValue={frequency}
                 onValueChange={(itemValue) => handleSelection(itemValue)}
+                style={{ color: theme.text }}
               >
-                <Picker.Item label="Daily" value="daily" />
-                <Picker.Item label="Weekly" value="weekly" />
-                <Picker.Item label="Never" value="never" />
+                <Picker.Item label="Daily" value="daily" color={theme.text} />
+                <Picker.Item label="Weekly" value="weekly" color={theme.text} />
+                <Picker.Item label="Never" value="never" color={theme.text} />
               </Picker>
             </View>
           </View>
@@ -61,7 +74,6 @@ export const NotificationSettingsScreen = () => {
       <BottomNavigation activeScreen="Settings" />
     </>
   );
-
 };
 
 const styles = StyleSheet.create({
@@ -77,8 +89,6 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#ccc",
     borderRadius: 6,
-    backgroundColor: "#f0f0f0",
   }
 });
