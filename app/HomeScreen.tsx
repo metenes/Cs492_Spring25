@@ -47,7 +47,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   ];
 
   // Pick a random quote
-const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
@@ -303,7 +303,9 @@ const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
         </View>
 
       <FlatList data={filteredEntries} renderItem={renderEntry} keyExtractor={(item) => item._id || Math.random().toString()} style={styles.list} 
-        ListEmptyComponent={<Text>No journal entries found.</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>{randomQuote}</Text>
+        }
       />
 
         {/* Floating Action Button (FAB) + Dropdown Menu */}
@@ -527,13 +529,22 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
   },
-  entryDate : {
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',           // soft gray
+    fontSize: 16,
+    fontStyle: 'italic',
+    marginTop: 40,
+    lineHeight: 24,
+    paddingHorizontal: 20,},
+
+  /* entryDate : {
     
   },
 
   entrySubtitle :{
 
-  }
+  } */
 });
 
 export default HomeScreen;
