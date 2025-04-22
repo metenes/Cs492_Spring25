@@ -39,6 +39,16 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const rotation = useState(new Animated.Value(0))[0];
   const [streak, setStreak] = useState(0);
 
+  // quotes for no entries empty screen
+  const quotes = [
+    '“The unexamined life is not worth living.”\n— Socrates',
+    '“Thoughts disentangle themselves when they pass through the lips and fingertips.”\n— Dawson Trotman',
+    '“You don’t write because you want to say something, you write because you have something to say.”\n— F. Scott Fitzgerald'
+  ];
+
+  // Pick a random quote
+const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
   // Filtering state
@@ -292,18 +302,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </ScrollView>
         </View>
 
-        <FlatList 
-          data={filteredEntries} 
-          renderItem={renderEntry} 
-          keyExtractor={(item) => item._id || Math.random().toString()} 
-          style={[styles.list, { marginBottom: 0 }]}
-          contentContainerStyle={{ paddingBottom: 0 }}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No journal entries found.
-            </Text>
-          }
-        />
+      <FlatList data={filteredEntries} renderItem={renderEntry} keyExtractor={(item) => item._id || Math.random().toString()} style={styles.list} 
+        ListEmptyComponent={<Text>No journal entries found.</Text>}
+      />
 
         {/* Floating Action Button (FAB) + Dropdown Menu */}
         <View style={styles.fabContainer}>
@@ -526,10 +527,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
   },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
+  entryDate : {
+    
+  },
+
+  entrySubtitle :{
+
   }
 });
 
