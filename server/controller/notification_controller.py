@@ -94,6 +94,39 @@ def update_notification_preferences():
     except Exception as e:
         print(f"❌ Error in update_notification_preferences: {e}")
         return jsonify({"error": str(e)}), 500
+    
+    
+@notification_bp.route("/get-notification-preferences/<push_token>", methods=["GET"])
+@jwt_required()
+def get_notification_preferences(push_token):
+    try:
+        user_id = get_jwt_identity()
+        if push_token in [None, "null", "None", ""]:
+            push_token = None
+
+        print(f"User ID: {user_id}, Push Token: {push_token}")
+        token_entry = None
+        if not push_token:
+            print("try to find without token")
+            token_entry = notification_tokens_collection.find_one({"user_id": ObjectId(user_id)})
+        else:
+            print("try to find with token")
+            token_entry = notification_tokens_collection.find_one({"token": push_token, "user_id": ObjectId(user_id)})
+
+        print(f"Token Entry: {token_entry}")
+        if not token_entry:
+            return jsonify({"error": "Token not found"}), 404
+
+        return jsonify({
+            "success": True,
+            "reminder_notification_frequency": token_entry.get("reminder_notification_frequency"),
+            "message": "Notification preferences retrieved."
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Error in get_notification_preferences: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 def send_journal_reminders():
     print("Running reminder job...")
