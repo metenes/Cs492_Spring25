@@ -1,13 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
-//const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-//const API_URL = "http://172.20.10.3:5000";
-// const API_URL = "http://10.203.122.69:5000";
-// const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-const API_URL = "http://192.168.0.28:5000"; //kgn
-//const API_URL = "http://172.20.10.3:5000";
-
+// export API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
+//export API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
+//export API_URL = "http://172.20.10.3:5000";
+// export API_URL = "http://10.203.122.69:5000";
+// export API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
+// export API_URL = "http://192.168.0.28:5000"; //kgn
+export const API_URL = "http://172.20.10.3:5000";
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
@@ -754,19 +753,35 @@ export const fetchJournalEntries = async (token: string) => {
 export const fetchJournalDates = async (token: string) => {
   try {
     const response = await fetch(`${API_URL}/journal/get-journal-dates`, {
+      method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
       },
     });
 
-    const data = await response.json();
-
-    if (!Array.isArray(data)) {
-      console.error("Unexpected response format:", data);
+    if (!response.ok) {
+      console.error("Error fetching journal dates:", response.statusText);
       return [];
     }
 
-    return data;
+    const data = await response.json();
+    console.log("Journal dates response:", data);
+
+    // Handle both array and object responses
+    if (Array.isArray(data)) {
+      return data;
+    } else if (typeof data === 'object' && data !== null) {
+      // If the response is an object, try to extract an array from it
+      if (Array.isArray(data.dates)) {
+        return data.dates;
+      } else if (Array.isArray(data.entries)) {
+        return data.entries.map((entry: any) => entry.entryDate);
+      }
+    }
+
+    console.warn("Unexpected response format for journal dates:", data);
+    return [];
   } catch (error) {
     console.error("Error fetching journal dates:", error);
     return [];

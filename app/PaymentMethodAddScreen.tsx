@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArrowLeft } from "lucide-react-native";
 import BottomNavigation from "./BottomNavigation";
+import { useTheme } from "./context/ThemeContext";
 
 // Define navigation types
 type RootStackParamList = {
@@ -18,32 +19,43 @@ export const PaymentMethodAddScreen = () => {
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
+  const { theme, darkMode } = useTheme();
 
   const navigation = useNavigation<NavigationProp>();
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
         {/* Header with Back Button */}
         <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
-          <ArrowLeft size={24} />
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>Add Payment</Text>
+        <Text style={[styles.headerText, { color: theme.text }]}>Add Payment</Text>
 
         {/* Cardholder Name */}
-        <Text style={styles.label}>Name on Card</Text>
+        <Text style={[styles.label, { color: theme.text }]}>Name on Card</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { 
+            backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+            borderColor: theme.border,
+            color: theme.text
+          }]}
           placeholder="Name on card"
+          placeholderTextColor={theme.placeholder}
           value={cardholderName}
           onChangeText={setCardholderName}
         />
 
         {/* Card Number */}
-        <Text style={styles.label}>Card Number</Text>
+        <Text style={[styles.label, { color: theme.text }]}>Card Number</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { 
+            backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+            borderColor: theme.border,
+            color: theme.text
+          }]}
           placeholder="Card Number"
+          placeholderTextColor={theme.placeholder}
           value={cardNumber}
           onChangeText={setCardNumber}
           keyboardType="number-pad"
@@ -52,19 +64,29 @@ export const PaymentMethodAddScreen = () => {
         {/* Expiry Date & CVV */}
         <View style={styles.row}>
           <View style={styles.flex1}>
-            <Text style={styles.label}>Expiry Date</Text>
+            <Text style={[styles.label, { color: theme.text }]}>Expiry Date</Text>
             <TextInput
-              style={[styles.input, styles.marginRight]}
+              style={[styles.input, styles.marginRight, { 
+                backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+                borderColor: theme.border,
+                color: theme.text
+              }]}
               placeholder="MM / YY"
+              placeholderTextColor={theme.placeholder}
               value={expiry}
               onChangeText={setExpiry}
             />
           </View>
           <View>
-            <Text style={styles.label}>CVV</Text>
+            <Text style={[styles.label, { color: theme.text }]}>CVV</Text>
             <TextInput
-              style={[styles.input, styles.cvvInput]}
+              style={[styles.input, styles.cvvInput, { 
+                backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+                borderColor: theme.border,
+                color: theme.text
+              }]}
               placeholder="***"
+              placeholderTextColor={theme.placeholder}
               value={cvv}
               onChangeText={setCvv}
               keyboardType="number-pad"
@@ -74,17 +96,25 @@ export const PaymentMethodAddScreen = () => {
         </View>
 
         {/* Billing Address */}
-        <Text style={styles.label}>Billing Address</Text>
+        <Text style={[styles.label, { color: theme.text }]}>Billing Address</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { 
+            backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0',
+            borderColor: theme.border,
+            color: theme.text
+          }]}
           placeholder="Billing Address"
+          placeholderTextColor={theme.placeholder}
           value={billingAddress}
           onChangeText={setBillingAddress}
           multiline
         />
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("PaymentMethodSettingScreen")}>
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
+          onPress={() => navigation.navigate("PaymentMethodSettingScreen")}
+        >
           <Text style={styles.buttonText}>Save</Text>
         </TouchableOpacity>
       </View>
@@ -96,7 +126,6 @@ export const PaymentMethodAddScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white",
     padding: 16,
     paddingTop: 8,
   },
@@ -118,12 +147,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    backgroundColor: "white",
     padding: 16,
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#000",
     fontSize: 16,
   },
   row: {
@@ -145,14 +172,13 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   button: {
-    backgroundColor: "black",
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
     marginTop: 12,
   },
   buttonText: {
-    color: "white",
+    color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
   },

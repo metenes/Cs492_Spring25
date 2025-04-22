@@ -10,13 +10,14 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "./types/types";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { useTheme } from './context/ThemeContext';
 
 type PromptSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, "GuidedJournaling">;
 
 const promptList = [
-  { id: 1, text: "What's something you’re anxious about today?", category: "Anxiety" },
+  { id: 1, text: "What's something you're anxious about today?", category: "Anxiety" },
   { id: 2, text: "List three things you're grateful for today.", category: "Gratitude" },
-  { id: 3, text: "What’s a small goal you accomplished this week?", category: "Productivity" },
+  { id: 3, text: "What's a small goal you accomplished this week?", category: "Productivity" },
   { id: 4, text: "How have you grown over the past month?", category: "Personal Growth" },
   { id: 5, text: "Describe a recent experience that made you reflect deeply.", category: "Reflection" },
   { id: 6, text: "What helps you feel calm during stressful times?", category: "Stress Relief" },
@@ -26,6 +27,7 @@ const categories = ["All", "Anxiety", "Gratitude", "Productivity", "Personal Gro
 
 const PromptSelectionScreen = () => {
   const navigation = useNavigation<PromptSelectionScreenNavigationProp>();
+  const { theme, darkMode } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
 
@@ -42,18 +44,30 @@ const PromptSelectionScreen = () => {
     const isExpanded = expandedPromptId === item.id;
 
     return (
-      <TouchableOpacity onPress={() => toggleExpand(item.id)} style={styles.promptCard}>
-        <Text style={styles.promptTitle}>Prompt {item.id}</Text>
-        <Text style={styles.promptCategory}>{item.category}</Text>
+      <TouchableOpacity 
+        onPress={() => toggleExpand(item.id)} 
+        style={[
+          styles.promptCard,
+          { 
+            backgroundColor: darkMode ? theme.cardBackground : "#F9F9F9",
+            borderColor: darkMode ? theme.border : "#DDD"
+          }
+        ]}
+      >
+        <Text style={[styles.promptTitle, { color: theme.text }]}>Prompt {item.id}</Text>
+        <Text style={[styles.promptCategory, { color: theme.placeholder }]}>{item.category}</Text>
 
         {isExpanded && (
           <>
-            <Text style={styles.promptText}>{item.text}</Text>
+            <Text style={[styles.promptText, { color: theme.text }]}>{item.text}</Text>
             <TouchableOpacity
-              style={styles.startButton}
+              style={[
+                styles.startButton,
+                { backgroundColor: darkMode ? '#404040' : '#E0E0E0' }
+              ]}
               onPress={() => navigation.navigate("GuidedJournaling", { prompt: item.text })}
             >
-              <Text style={styles.startButtonText}>Start Writing</Text>
+              <Text style={[styles.startButtonText, { color: darkMode ? theme.text : '#000' }]}>Start Writing</Text>
             </TouchableOpacity>
           </>
         )}
@@ -62,21 +76,25 @@ const PromptSelectionScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       <View style={styles.filterRow}>
         {categories.map((cat) => (
           <TouchableOpacity
             key={cat}
             style={[
               styles.filterButton,
-              selectedCategory === cat && styles.activeFilter,
+              { backgroundColor: darkMode ? theme.cardBackground : "#EEE" },
+              selectedCategory === cat && [
+                styles.activeFilter,
+                { backgroundColor: darkMode ? '#404040' : "#CCC" }
+              ],
             ]}
             onPress={() => {
               setExpandedPromptId(null);
               setSelectedCategory(cat);
             }}
           >
-            <Text>{cat}</Text>
+            <Text style={{ color: selectedCategory === cat ? theme.text : theme.placeholder }}>{cat}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -90,7 +108,10 @@ const PromptSelectionScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#FFF" },
+  container: { 
+    flex: 1, 
+    padding: 16,
+  },
   filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -98,36 +119,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterButton: {
-    backgroundColor: "#EEE",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
   },
-  activeFilter: { backgroundColor: "#CCC" },
+  activeFilter: {},
   promptCard: {
-    backgroundColor: "#F9F9F9",
     padding: 16,
     marginBottom: 12,
     borderRadius: 12,
-    borderColor: "#DDD",
     borderWidth: 1,
   },
-  promptTitle: { fontWeight: "bold", fontSize: 16 },
-  promptCategory: { color: "#666", marginTop: 4 },
+  promptTitle: { 
+    fontWeight: "bold", 
+    fontSize: 16,
+  },
+  promptCategory: { 
+    marginTop: 4,
+  },
   promptText: {
     marginTop: 10,
     fontSize: 15,
-    color: "#333",
   },
   startButton: {
     marginTop: 10,
-    backgroundColor: "#000",
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: "center",
   },
   startButtonText: {
-    color: "#FFF",
     fontWeight: "600",
   },
 });

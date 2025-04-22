@@ -1,150 +1,64 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from './context/ThemeContext';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootStackParamList } from './types/types';
+const BottomNavigation = ({ activeScreen }: { activeScreen: string }) => {
+  const navigation = useNavigation();
+  const { theme, darkMode } = useTheme();
 
-interface BottomNavigationProps {
-  activeScreen: keyof RootStackParamList;
-  darkMode?: boolean;
-}
-
-type BottomNavigationProp = BottomTabNavigationProp<RootStackParamList, 'Home'>;
-
-const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeScreen, darkMode = false }) => {
-  const navigation = useNavigation<BottomNavigationProp>();
-  const theme = darkMode ? darkTheme : lightTheme;
+  const tabs = [
+    { name: 'Home', icon: 'home', screen: 'Home' },
+    { name: 'Dashboard', icon: 'chart-bar', screen: 'Dashboard' },
+    { name: 'Profile', icon: 'account', screen: 'Profile' },
+    { name: 'Settings', icon: 'cog', screen: 'Settings' },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate('Home')}
-      >
-        <Icon
-          name="book"
-          size={24}
-          color={activeScreen === 'Home' ? theme.active : theme.inactive}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            {
-              color: activeScreen === 'Home' ? theme.active : theme.inactive,
-              fontWeight: activeScreen === 'Home' ? 'bold' : 'normal',
-            },
-          ]}
+      {tabs.map((tab) => (
+        <TouchableOpacity
+          key={tab.name}
+          style={styles.tab}
+          onPress={() => navigation.navigate(tab.screen)}
         >
-          Home
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate('Dashboard')}
-      >
-        <Icon
-          name="bar-chart-2"
-          size={24}
-          color={activeScreen === 'Dashboard' ? theme.active : theme.inactive}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            {
-              color: activeScreen === 'Dashboard' ? theme.active : theme.inactive,
-              fontWeight: activeScreen === 'Dashboard' ? 'bold' : 'normal',
-            },
-          ]}
-        >
-          Dashboard
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate('Profile')}
-      >
-        <Icon
-          name="user"
-          size={24}
-          color={activeScreen === 'Profile' ? theme.active : theme.inactive}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            {
-              color: activeScreen === 'Profile' ? theme.active : theme.inactive,
-              fontWeight: activeScreen === 'Profile' ? 'bold' : 'normal',
-            },
-          ]}
-        >
-          Profile
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate('Settings')}
-      >
-        <Icon
-          name="settings"
-          size={24}
-          color={activeScreen === 'Settings' ? theme.active : theme.inactive}
-        />
-        <Text
-          style={[
-            styles.tabLabel,
-            {
-              color: activeScreen === 'Settings' ? theme.active : theme.inactive,
-              fontWeight: activeScreen === 'Settings' ? 'bold' : 'normal',
-            },
-          ]}
-        >
-          Settings
-        </Text>
-      </TouchableOpacity>
+          <Icon
+            name={tab.icon}
+            size={24}
+            color={activeScreen === tab.screen ? theme.text : theme.placeholder}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              {
+                color: activeScreen === tab.screen ? theme.text : theme.placeholder,
+              },
+            ]}
+          >
+            {tab.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 };
 
-// Theme settings
-const lightTheme = {
-  backgroundColor: '#ffffff',
-  active: '#2196F3',
-  inactive: '#B0B0B0'
-};
-
-const darkTheme = {
-  backgroundColor: '#1E1E1E',
-  active: '#2196F3',
-  inactive: '#95a5a6'
-};
-
-const { width } = Dimensions.get('window');
-const isSmallDevice = width < 375;
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    height: 60,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-    height: isSmallDevice ? 55 : 60,
-    paddingBottom: isSmallDevice ? 5 : 8,
-    marginTop: 'auto',
   },
-  tabItem: {
+  tab: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 8,
   },
-  tabLabel: {
-    fontSize: isSmallDevice ? 10 : 12,
-    marginTop: 2,
+  tabText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 

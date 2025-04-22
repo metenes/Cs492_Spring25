@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, TextInput, Button, FlatList, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { sendMessage } from "./services/ApiService"; // API service for chatbot
 import BottomNavigation from "./BottomNavigation";
+import { useTheme } from './context/ThemeContext';
 
 // Define the type for each message
 interface Message {
@@ -13,6 +14,7 @@ const ChatbotScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false); // Show loading while waiting for bot reply
+  const { theme, darkMode } = useTheme();
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -39,13 +41,20 @@ const ChatbotScreen = () => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={item.sender === "user" ? styles.userMessage : styles.botMessage}>
-      <Text style={styles.messageText}>{item.text}</Text>
+    <View style={[
+      item.sender === "user" ? styles.userMessage : styles.botMessage,
+      {
+        backgroundColor: item.sender === "user" 
+          ? (darkMode ? '#404040' : '#d1f5d3')
+          : (darkMode ? theme.cardBackground : '#f5f5f5')
+      }
+    ]}>
+      <Text style={{ color: theme.text }}>{item.text}</Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       <FlatList
         data={messages}
         renderItem={renderMessage}
@@ -53,16 +62,29 @@ const ChatbotScreen = () => {
         style={styles.messageList}
         inverted // Makes new messages appear at the bottom
       />
-      {loading && <ActivityIndicator size="small" color="#007BFF" />} 
+      {loading && <ActivityIndicator size="small" color={theme.text} />} 
       <View style={styles.inputContainer}>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: darkMode ? theme.cardBackground : '#fff',
+              borderColor: theme.border,
+              color: theme.text
+            }
+          ]}
           value={input}
           onChangeText={setInput}
           placeholder="Type a message..."
+          placeholderTextColor={theme.placeholder}
           onSubmitEditing={handleSend}
         />
-        <Button title="Send" onPress={handleSend} disabled={loading} />
+        <Button 
+          title="Send" 
+          onPress={handleSend} 
+          disabled={loading}
+          color={darkMode ? '#404040' : '#007BFF'}
+        />
       </View>
       <BottomNavigation activeScreen={"FreeJournaling"} />
     </View>
@@ -73,7 +95,6 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: "#fff"
   },
   messageList: {
     flex: 1
@@ -85,14 +106,12 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
     padding: 10,
     borderRadius: 5,
     marginRight: 10,
   },
   userMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "#d1f5d3",
     padding: 10,
     borderRadius: 10,
     marginVertical: 5,
@@ -100,14 +119,10 @@ const styles = StyleSheet.create({
   },
   botMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "#f5f5f5",
     padding: 10,
     borderRadius: 10,
     marginVertical: 5,
     maxWidth: "80%"
-  },
-  messageText: {
-    fontSize: 16,
   }
 });
 

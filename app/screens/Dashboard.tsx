@@ -81,7 +81,7 @@ const SentimentAnalysisPage: React.FC = () => {
   // const [trendInsight, setTrendInsight] = useState<string | null>(null);
 
   const [emotionalInsight, setEmotionalInsight] = useState(null);
-  const [recommendation, setRecommendation] = useState(null);
+  const [recommendation, setRecommendation] = useState<string[]>([]);
 
   //const [topCauses, setTopCauses] = useState<string[]>([]);
   const [emotionCauseLinks, setEmotionCauseLinks] = useState({});
@@ -318,16 +318,17 @@ const SentimentAnalysisPage: React.FC = () => {
 
   return (
     <>
-      <ScrollView>
-        <View style={[styles.container, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+      <ScrollView style={{ backgroundColor: theme.backgroundColor }}>
+        <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
           {/* Weekly Date Range */}
-          <View style={styles.dateRangeContainer}>
+          <View style={[styles.dateRangeContainer, { backgroundColor: theme.backgroundColor }]}>
             <DateTimePicker
               value={selectedStartDate}
               mode="date"
               display="default"
               onChange={(event, date) => handleStartDateChange(event, true, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
             <DateTimePicker
               value={selectedEndDate}
@@ -335,6 +336,7 @@ const SentimentAnalysisPage: React.FC = () => {
               display="default"
               onChange={(event, date) => handleEndDateChange(event, true, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
           </View>
 
@@ -356,6 +358,7 @@ const SentimentAnalysisPage: React.FC = () => {
               display="default"
               onChange={(event, date) => handleStartDateChange(event, false, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
             <DateTimePicker
               value={selectedEndDateForChart}
@@ -363,6 +366,7 @@ const SentimentAnalysisPage: React.FC = () => {
               display="default"
               onChange={(event, date) => handleEndDateChange(event, false, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
           </View>
 
@@ -411,17 +415,17 @@ const SentimentAnalysisPage: React.FC = () => {
             />
           </View>
           {emotionalInsight && (
-            <View style={styles.insightContainer}>
-              <Text style={styles.insightTitle}>🧠 Emotional Insight</Text>
-              <Text style={styles.insightText}>{emotionalInsight}</Text>
+            <View style={[styles.insightContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#E6F0FA' }]}>
+              <Text style={[styles.insightTitle, { color: darkMode ? theme.text : '#1A3C6F' }]}>🧠 Emotional Insight</Text>
+              <Text style={[styles.insightText, { color: darkMode ? theme.textSecondary : '#1A3C6F' }]}>{emotionalInsight}</Text>
             </View>
           )}
 
           {recommendation && recommendation.length > 0 && (
-            <View style={styles.recommendationContainer}>
-              <Text style={styles.recommendationTitle}>💡Recommendations</Text>
+            <View style={[styles.recommendationContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#FDF3E7' }]}>
+              <Text style={[styles.recommendationTitle, { color: darkMode ? theme.text : '#9C6B00' }]}>💡Recommendations</Text>
               {recommendation.map((rec, index) => (
-                <Text key={index} style={styles.recommendationText}>• {rec}</Text>
+                <Text key={index} style={[styles.recommendationText, { color: darkMode ? theme.textSecondary : '#9C6B00' }]}>• {rec}</Text>
               ))}
             </View>
           )}
@@ -455,7 +459,6 @@ const SentimentAnalysisPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
     padding: 16,
   },
   dateRangeContainer: {
@@ -475,28 +478,23 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 8,
-    backgroundColor: "#fff",
     marginRight: 12,
     justifyContent: 'space-between',
   },
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#828282",
     marginBottom: 8,
   },
   entryEmotion: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#000",
     lineHeight: 32,
     flexShrink: 1,
   },
   entryDetails: {
     fontSize: 16,
-    color: "#828282",
     marginTop: 8,
   },
   container2: {
@@ -511,22 +509,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginHorizontal: 5,
   },
-  chipSelected: {
-    backgroundColor: "black",
-  },
-  chipUnselected: {
-    backgroundColor: "#e0e0e0",
-  },
   chipText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "white",
-  },
-  chipTextUnselected: {
-    color: "black",
   },
   insightContainer: {
-    backgroundColor: "#E6F0FA",
     padding: 16,
     borderRadius: 12,
     marginTop: 20,
@@ -534,17 +521,12 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1A3C6F",
     marginBottom: 8,
   },
   insightText: {
     fontSize: 14,
-    //color: "#333",
-    color: "#1A3C6F",
   },
-  
   recommendationContainer: {
-    backgroundColor: "#FDF3E7",
     padding: 16,
     borderRadius: 12,
     marginTop: 16,
@@ -552,18 +534,10 @@ const styles = StyleSheet.create({
   recommendationTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#9C6B00",
-    marginBottom: 4,
-  },
-  recommendationSubtitle: {
-    fontSize: 15,
-    fontWeight: "600",
     marginBottom: 4,
   },
   recommendationText: {
     fontSize: 14,
-    //color: "#444",
-    color: "#9C6B00",
   },
   recommendationBox: {
     backgroundColor: "#E8F0FE",

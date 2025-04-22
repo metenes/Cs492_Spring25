@@ -17,6 +17,7 @@ import { RootStackParamList } from "./types/types";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { submitCheckIn, getCheckInDraft, saveCheckInDraft, clearCheckInDraft } from "./services/ApiService"; // Import the API functions
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from './context/ThemeContext';
 
 type CheckInNavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
 
@@ -42,6 +43,7 @@ const reasons = [
 
 const CheckInScreen = () => {
   const navigation = useNavigation<CheckInNavigationProp>();
+  const { theme, darkMode } = useTheme();
   const [step, setStep] = useState(1);
   const [selectedEmotions, setSelectedEmotions] = useState([]);
   const [selectedReasons, setSelectedReasons] = useState([]);
@@ -64,12 +66,16 @@ const CheckInScreen = () => {
     <TouchableOpacity
       style={[
         styles.option,
-        state.includes(item.name) && styles.selectedOption,
+        { backgroundColor: 'transparent' },
+        state.includes(item.name) && [
+          styles.selectedOption,
+          { backgroundColor: darkMode ? '#404040' : 'lavender' }
+        ],
       ]}
       onPress={() => toggleSelection(item.name, state, setState)}
     >
-      <Icon name={item.icon} size={24} color="#000" />
-      <Text>{item.name}</Text>
+      <Icon name={item.icon} size={24} color={darkMode ? theme.text : '#000'} />
+      <Text style={{ color: darkMode ? theme.text : '#000' }}>{item.name}</Text>
     </TouchableOpacity>
   );
 
@@ -174,7 +180,7 @@ const CheckInScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       {/* Clear Draft Icon */}
       {(selectedEmotions.length > 0 || selectedReasons.length > 0 || comment.trim()) && (
         <TouchableOpacity
@@ -206,14 +212,14 @@ const CheckInScreen = () => {
             );
           }}
         >
-          <Text style={{ fontSize: 18 }}>❌</Text>
+          <Text style={{ fontSize: 18, color: theme.text }}>❌</Text>
         </TouchableOpacity>
       )}
 
       {/* Emotions Screen (Step 1) */}
       {step === 1 && (
         <>
-          <Text style={styles.title}>How do you feel?</Text>
+          <Text style={[styles.title, { color: theme.text }]}>How do you feel?</Text>
           <FlatList
             data={emotions}
             renderItem={(item) => renderItem(item, selectedEmotions, setSelectedEmotions)}
@@ -221,11 +227,15 @@ const CheckInScreen = () => {
             numColumns={3}
           />
           <TouchableOpacity 
-            style={[styles.nextButton, selectedEmotions.length === 0 && styles.disabledButton]}
+            style={[
+              styles.nextButton, 
+              selectedEmotions.length === 0 && styles.disabledButton,
+              { backgroundColor: darkMode ? '#404040' : '#E0E0E0' }
+            ]}
             onPress={() => setStep(2)}
             disabled={selectedEmotions.length === 0}
           >
-            <Text style={styles.buttonText}>Next</Text>
+            <Text style={[styles.buttonText, { color: darkMode ? theme.text : '#000' }]}>Next</Text>
           </TouchableOpacity>
         </>
       )}
@@ -235,10 +245,10 @@ const CheckInScreen = () => {
         <>
           {/* Back Button to Step 1 */}
           <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
-            <Icon name="arrow-left" size={24} color="black" />
+            <Icon name="arrow-left" size={24} color={theme.text} />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Why do you feel this way?</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Why do you feel this way?</Text>
           <FlatList
             data={reasons}
             renderItem={(item) => renderItem(item, selectedReasons, setSelectedReasons)}
@@ -246,11 +256,15 @@ const CheckInScreen = () => {
             numColumns={3}
           />
           <TouchableOpacity 
-            style={[styles.nextButton, selectedReasons.length === 0 && styles.disabledButton]}
+            style={[
+              styles.nextButton, 
+              selectedReasons.length === 0 && styles.disabledButton,
+              { backgroundColor: darkMode ? '#404040' : '#E0E0E0' }
+            ]}
             onPress={() => setStep(3)}
             disabled={selectedReasons.length === 0}
           >
-            <Text style={styles.buttonText}>Next</Text>
+            <Text style={[styles.buttonText, { color: darkMode ? theme.text : '#000' }]}>Next</Text>
           </TouchableOpacity>
         </>
       )}
@@ -260,21 +274,21 @@ const CheckInScreen = () => {
         <>
           {/* Back Button to Step 2 */}
           <TouchableOpacity style={styles.backButton} onPress={() => setStep(2)}>
-            <Icon name="arrow-left" size={24} color="black" />
+            <Icon name="arrow-left" size={24} color={theme.text} />
           </TouchableOpacity>
 
           {/* Summary Container */}
-          <View style={styles.summaryContainer}>
+          <View style={[styles.summaryContainer, { backgroundColor: darkMode ? theme.cardBackground : '#f8f8f8' }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-              <Text style={styles.summaryTitle}>Check-in Summary</Text>
+              <Text style={[styles.summaryTitle, { color: theme.text }]}>Check-in Summary</Text>
 
               {/* Emotions Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Emotions</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Emotions</Text>
                 <View style={styles.tagsContainer}>
                   {selectedEmotions.map((emotion, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{emotion}</Text>
+                    <View key={index} style={[styles.tag, { backgroundColor: darkMode ? '#404040' : 'lavender' }]}>
+                      <Text style={[styles.tagText, { color: theme.text }]}>{emotion}</Text>
                     </View>
                   ))}
                 </View>
@@ -282,11 +296,11 @@ const CheckInScreen = () => {
               
               {/* Reasons Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Reasons</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Reasons</Text>
                 <View style={styles.tagsContainer}>
                   {selectedReasons.map((reason, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{reason}</Text>
+                    <View key={index} style={[styles.tag, { backgroundColor: darkMode ? '#404040' : 'lavender' }]}>
+                      <Text style={[styles.tagText, { color: theme.text }]}>{reason}</Text>
                     </View>
                   ))}
                 </View>
@@ -294,10 +308,18 @@ const CheckInScreen = () => {
 
               {/* Optional Comment */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Additional Thoughts (Optional)</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Additional Thoughts (Optional)</Text>
                 <TextInput
-                  style={styles.commentInput}
+                  style={[
+                    styles.commentInput,
+                    { 
+                      backgroundColor: darkMode ? theme.inputBackground : 'white',
+                      color: theme.text,
+                      borderColor: theme.border
+                    }
+                  ]}
                   placeholder="Add any additional thoughts here..."
+                  placeholderTextColor={theme.placeholder}
                   multiline={true}
                   numberOfLines={4}
                   value={comment}
@@ -309,14 +331,17 @@ const CheckInScreen = () => {
               <View style={styles.buttonContainer}>
                 {/* Complete Check-in Button */}
                 <TouchableOpacity 
-                  style={styles.completeButton} 
+                  style={[
+                    styles.completeButton,
+                    { backgroundColor: darkMode ? '#404040' : '#E0E0E0' }
+                  ]} 
                   onPress={handleSubmitCheckIn}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
-                    <ActivityIndicator color="white" />
+                    <ActivityIndicator color={darkMode ? theme.text : '#000'} />
                   ) : (
-                    <Text style={styles.completeButtonText}>Complete Check-in</Text>
+                    <Text style={[styles.completeButtonText, { color: darkMode ? theme.text : '#000' }]}>Complete Check-in</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -334,7 +359,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 5,
-    backgroundColor: "#fff",
   },
   title: {
     fontFamily: "Poppins",
@@ -350,14 +374,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     width: 123,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   selectedOption: {
-    backgroundColor: "lavender",
+    borderColor: '#000',
   },
   nextButton: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: "black",
     borderRadius: 10,
     width: "50%",
     alignSelf: "center",
@@ -375,8 +400,6 @@ const styles = StyleSheet.create({
     top: 20,
     left: 20,
     zIndex: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    borderRadius: 20,
     padding: 8,
   },
   summaryContainer: {
@@ -385,7 +408,6 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 20,
     borderRadius: 20,
-    backgroundColor: "#f8f8f8",
   },
   scrollContent: {
     alignItems: "center",
@@ -395,7 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "bold",
     marginBottom: 20,
-    color: "#000",
     textAlign: "center",
     fontFamily: "Poppins",
   },
@@ -408,7 +429,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#333",
   },
   tagsContainer: {
     flexDirection: "row",
@@ -417,7 +437,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tag: {
-    backgroundColor: "lavender",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -425,22 +444,18 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "black",
   },
   commentInput: {
     width: "100%",
     height: 100,
-    borderColor: "#ccc",
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
     textAlignVertical: "top",
-    backgroundColor: "white",
   },
   completeButton: {
     paddingVertical: 15,
     paddingHorizontal: 40,
-    backgroundColor: "black",
     borderRadius: 30,
     width: "80%",
     alignSelf: "center",
