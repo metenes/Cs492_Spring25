@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // export API_URL = "http://10.203.122.69:5000";
 // export API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // export API_URL = "http://192.168.0.28:5000"; //kgn
-export const API_URL = "http://172.20.10.3:5000";
+export const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
 const EMOTIONS = [
