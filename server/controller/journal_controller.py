@@ -787,45 +787,43 @@ def update_journal_entry(entry_id):
         return jsonify({"error": str(e)}), 500
 
 
-@journal_bp.route('/get-journal-dates', methods=['GET'])
+@journal_bp.route("/get-journal-dates", methods=["GET"])
 @jwt_required()
 def get_journal_dates():
     try:
         user_id = get_jwt_identity()
-        print(f"🔍 Fetching journal dates for user_id: {user_id}")
-
-        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        if not entry_doc or "journalEntries" not in entry_doc:
-            print("ℹ️ No entries found for user")
-            return jsonify([]), 200
-
-        dates = set()
-        for entry in entry_doc["journalEntries"]:
-            raw_date = entry.get("entryDate")
-            if not raw_date:
-                continue
-
-            if isinstance(raw_date, str):
-                date_str = raw_date.split("T")[0]
-            else:
-                date_str = raw_date.strftime("%Y-%m-%d")
-            dates.add(date_str)
+        print(f"🔍 Fetching journal dates for user: {user_id}")
         
-         # Fetch check-in entry dates
-        checkins = check_in_collection.find({"userId": user_id})
-        for entry in checkins:
-            ts = entry.get("timestamp")
-            if ts:
-                dates.add(ts.strftime("%Y-%m-%d"))
-
-        print("✅ Final list of journal dates:", dates)
-        return jsonify(list(dates)), 200
-
+        # Ensure user_id is converted to ObjectId
+        try:
+            user_object_id = ObjectId(user_id)
+        except Exception as e:
+            print(f"❌ Invalid user ID format: {user_id}")
+            return jsonify({"error": "Invalid user ID format"}), 400
+        
+        # Get the user's journal entries
+        journal_data = journal_entries_collection.find_one({"_id": user_object_id})
+        
+        # Initialize empty dates list
+        dates = []
+        
+        # Check if we have journal data
+        if journal_data and "journalEntries" in journal_data and journal_data["journalEntries"]:
+            # Extract unique dates from journal entries
+            dates = list(set(entry.get("entryDate") for entry in journal_data["journalEntries"] if entry.get("entryDate")))
+            # Sort dates in descending order (newest first)
+            dates.sort(reverse=True)
+        
+        print(f"✅ Found {len(dates)} unique journal dates")
+        # Return dates as a JSON array
+        return jsonify(dates), 200
+        
     except Exception as e:
-        print("❌ Error fetching journal dates:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
-    
-    
+        print(f"❌ Error fetching journal dates: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 @journal_bp.route("/guided", methods=["POST"])
 @jwt_required()
 def save_guided_journal():
