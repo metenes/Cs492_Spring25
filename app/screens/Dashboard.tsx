@@ -83,17 +83,20 @@ const SentimentAnalysisPage: React.FC = () => {
   const [emotionalInsight, setEmotionalInsight] = useState(null);
   const [recommendation, setRecommendation] = useState(null);
 
+  //const [topCauses, setTopCauses] = useState<string[]>([]);
+  const [emotionCauseLinks, setEmotionCauseLinks] = useState({});
+
   
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
         const data = await fetchEmotionalRecommendations();
-        console.log("RECOMMENDATIONS FROM DASHBOARD.TSX")
-        console.log(data)
         setEmotionalInsight(data.insight || "");
         setRecommendation(data.recommendation || []);
-        console.log("RECOMMENDATIONS FROM DASHBOARD.TSX")
-        console.log(recommendation)
+        //setTopCauses(data.top_causes || []);
+        setEmotionCauseLinks(data.emotion_cause_links || {});
+        console.log("***************RECOMMENDATIONS FROM DASHBOARD.TSX")
+        console.log(emotionCauseLinks)
       } catch (error) {
         console.error("❌ Error fetching trend insight:", error);
       }
@@ -423,6 +426,22 @@ const SentimentAnalysisPage: React.FC = () => {
             </View>
           )}
 
+          {Object.keys(emotionCauseLinks).length > 0 && (
+            <View style={styles.causeContainer}>
+              <Text style={styles.causeTitle}>🔍 Possible Causes</Text>
+              {Object.entries(emotionCauseLinks).map(([emotion, causes]: any) => (
+                <View key={emotion} style={{ marginBottom: 5 }}>
+                  <Text style={styles.causeText}>{emotion.toUpperCase()}</Text>
+                  {causes.map((item: any, index: number) => (
+                    <Text style={styles.causeText} key={index}>• {item.cause}</Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+
+
+
 
 
         </View>
@@ -551,6 +570,22 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
+  },
+  causeContainer: {
+    backgroundColor: "#F3E8FF",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  causeTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#5E3A87",
+    marginBottom: 4,
+  },
+  causeText: {
+    fontSize: 14,
+    color: "#5E3A87",
   },
   
   

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import numpy as np
 import json
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
@@ -257,19 +257,18 @@ def get_emotional_insights():
         for entry in checkins:
             for s in entry.get("sentiments", []):
                 all_emotions.append(s)
-
+        
         if not all_emotions:
             return jsonify({
                 "insight": "No emotional data found. Start journaling or check in to build your insights!",
                 "top_emotions": [],
                 "mental_state": None,
-                "recommendation": None
+                "recommendation": None,
+                "emotion_cause_links": {}
             })
 
         # 🧮 Count and sort top 3 emotions
         emotion_counts = Counter(all_emotions)
-        """ top_emotions = emotion_counts.most_common(3)
-        top_emotion_labels = [e[0] for e in top_emotions] """
         top_emotions_raw = emotion_counts.most_common(3)
 
         # Convert int codes to emotion labels if necessary
@@ -280,6 +279,32 @@ def get_emotional_insights():
             top_emotions.append((label, count))
             top_emotion_labels.append(label)
 
+        # Top causes linked with top emotions
+        aggregated = get_top_causes_by_emotion(user_id)
+        emotion_cause_links = {}
+
+        for record in aggregated:
+            emotion = record["emotion"]
+            if isinstance(emotion, int):
+                emotion = EMOTIONS[emotion]
+            emotion = emotion.lower()
+            if emotion in top_emotion_labels:
+                emotion_cause_links[emotion] = record["topCauses"]
+
+        """ emotion_to_causes = defaultdict(list)
+        for entry in checkins:
+            sentiments = entry.get("sentiments", [])
+            causes = entry.get("causes", [])
+            for s in sentiments:
+                label = EMOTIONS[s] if isinstance(s, int) else s
+                if label in top_emotion_labels:
+                    emotion_to_causes[label].extend(causes)
+
+        emotion_cause_links = {}
+        for emotion in top_emotion_labels:
+            cause_counter = Counter(emotion_to_causes[emotion])
+            emotion_cause_links[emotion] = cause_counter.most_common(3)
+ """
 
         # 📚 Science-backed combinations and mental states
         combos_map = {
@@ -318,7 +343,8 @@ def get_emotional_insights():
                 "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
                 "insight": insight,
                 "mental_state": matched_data["mental_state"],
-                "recommendation": matched_data["recommendation"]
+                "recommendation": matched_data["recommendation"],
+                "emotion_cause_links": emotion_cause_links
             })
 
         # Fallback: generic message
@@ -340,14 +366,50 @@ def get_emotional_insights():
 
         fallback_insight = f"You’ve been feeling {', '.join([e[0].lower() for e in top_emotions])} more often lately. Keep an eye on your emotional patterns!"
 
+        print("********** SO SAD ************")
+        print(emotion_cause_links)
         return jsonify({
             "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
             "insight": fallback_insight,
             "mental_state": None,
-            "recommendation": individual_recs if individual_recs else ["Keep journaling to better understand your emotional patterns."]
+            "recommendation": individual_recs if individual_recs else ["Keep journaling to better understand your emotional patterns."],
+            "emotion_cause_links": emotion_cause_links
         })
+    
 
     except Exception as e:
         print("❌ Error generating insights:", e)
         return jsonify({"error": "Failed to generate emotional insights."}), 500
 
+
+def get_top_causes_by_emotion(user_id):
+
+    print("Running aggregation for user:", user_id)
+    checkin_docs = list(check_in_collection.find({"userId": user_id}))
+    print(f"📦 Found {len(checkin_docs)} check-in entries for aggregation")
+    if checkin_docs:
+        print("Example document:", checkin_docs[0])
+
+    pipeline = [
+        {"$match": {"userId": user_id}},
+        {"$unwind": "$sentiments"},
+        {"$unwind": "$causes"},
+        {"$group": {
+            "_id": {"emotion": "$sentiments", "cause": "$causes"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}},
+        {"$group": {
+            "_id": "$_id.emotion",
+            "topCauses": {"$push": {"cause": "$_id.cause", "count": "$count"}}
+        }},
+        {"$project": {
+            "emotion": "$_id",
+            "topCauses": {"$slice": ["$topCauses", 2]},
+            "_id": 0
+        }}
+    ]
+
+    results = list(check_in_collection.aggregate(pipeline))
+    print("🎯 Aggregated top causes:", results)
+    return list(check_in_collection.aggregate(pipeline))
