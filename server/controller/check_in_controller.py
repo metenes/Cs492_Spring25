@@ -9,12 +9,72 @@ from bson import ObjectId
 # Initialize Blueprint for check-in routes
 check_bp = Blueprint("check_bp", __name__)
 
-# Route to submit a new check-in entry using PyMongo
-@check_bp.route('/submit', methods=['POST'])
+print("✅ check_in_controller.py loaded")
+
+@check_bp.route("/submit", methods=["POST"])
 @jwt_required()
+def submit_check_in():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+
+        sentiments = data.get("sentiments", [])
+        causes = data.get("causes", [])
+        comments = data.get("comments", [])
+        timestamp = datetime.utcnow()
+
+        if not sentiments or not causes:
+            return jsonify({"error": "Sentiments and causes are required."}), 400
+
+        new_check_in = {
+            "userId": user_id,
+            "sentiments": sentiments,
+            "causes": causes,
+            "comments": comments,
+            "timestamp": timestamp
+        }
+
+        check_in_collection.insert_one(new_check_in)
+        return jsonify({"message": "Check-in saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving check-in:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+@check_bp.route("/fetch", methods=["GET"])
+@jwt_required()
+def fetch_check_ins():
+    try:
+        user_id = get_jwt_identity()
+        entries = list(check_in_collection.find({"userId": user_id}))
+
+        result = []
+        for entry in entries:
+            result.append({
+                "entry_id": str(entry["_id"]),
+                "created_at": entry["timestamp"].isoformat(),
+                "type": "checkin",
+                "date": entry["timestamp"].strftime("%Y-%m-%d"),
+                "sentiments": entry.get("sentiments", []),
+                "causes": entry.get("causes", []),
+                "comments": entry.get("comments", []),
+            })
+
+        
+
+        return jsonify({"history": result}), 200
+    except Exception as e:
+        print("❌ Error fetching check-ins:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+# Route to submit a new check-in entry using PyMongo
+""" @check_bp.route('/submit', methods=['POST'])
 def create_check_in():
     try:
         data = request.get_json()
+        print("*******SUBMIT FROM CONTROLLER********")
         
         # Ensure required fields exist
         if not data.get('user_id') or not data.get('sentiments') or not data.get('causes'):
@@ -52,6 +112,7 @@ def create_check_in():
         return jsonify({"error": str(e)}), 500
 
 
+ """
 @check_bp.route('/history/<user_id>', methods=['GET'])
 @jwt_required()
 def get_check_in_history(user_id):
@@ -155,3 +216,38 @@ def delete_checkin(entry_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+        
+    
+
+@check_bp.route("/delete/<entry_id>", methods=["DELETE"])
+@jwt_required()
+def delete_checkin_entry(entry_id):
+    print("🔥 check-in delete route loaded")
+    try:
+        user_id = get_jwt_identity()
+
+        if not ObjectId.is_valid(entry_id):
+            return jsonify({"error": "Invalid check-in ID"}), 400
+
+        print(f"Deleting check-in with ID {entry_id} for user {user_id}")
+
+        print("🔍 Looking for check-in document...")
+        doc = check_in_collection.find_one({
+            "_id": ObjectId(entry_id),
+            "userId": user_id
+        })
+        print("📄 Found document:", doc)
+
+        result = check_in_collection.delete_one({
+            "_id": ObjectId(entry_id),
+            "userId": user_id
+        })
+
+        if result.deleted_count == 0:
+            return jsonify({"error": "Check-in not found or unauthorized"}), 404
+
+        return jsonify({"message": "Check-in deleted successfully"}), 200
+
+    except Exception as e:
+        print("❌ Error deleting check-in:", str(e))
+        return jsonify({"error": "Failed to delete check-in"}), 500

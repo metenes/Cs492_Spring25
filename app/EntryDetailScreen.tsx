@@ -138,6 +138,36 @@ const EntryDetail = () => {
       "Are you sure you want to delete this entry? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              if(entry.type == "Check-In") {
+                  deleteCheckIn(entry)
+              }
+              else{
+                  deleteJournalEntry(entry._id)
+              }
+              Alert.alert("Deleted", "Entry deleted successfully");
+              navigation.navigate("Home");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete the entry.");
+              console.error("❌ Deletion failed:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+  
+  
+  /* const handleDeleteEntry = async () => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this entry? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
         { 
           text: "Delete", 
           style: "destructive",
@@ -156,7 +186,8 @@ const EntryDetail = () => {
         }
       ]
     );
-  };
+  }; */
+
 
   // Handle adding new image
   const handleAddImage = async () => {

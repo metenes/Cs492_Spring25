@@ -26,7 +26,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 type RootStackParamList = {
   FreeJournaling: undefined;
   Home: undefined;
-  // ... other routes
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "FreeJournaling">;

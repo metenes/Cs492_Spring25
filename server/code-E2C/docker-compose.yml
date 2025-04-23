@@ -1,0 +1,20 @@
+version: '3'
+services:
+  inference:
+    build: ./inference_server
+    ports: [ "8080:8080" ]
+  trainer:
+    build: ./trainer_server
+    ports: [ "8081:8081" ]
+  federated:
+    build: ./federated_server
+    ports: [ "8082:8082" ]
+  sentiment:
+    build: ./face_server
+    ports: [ "8083:8083" ]
+  embed:
+    build: ./embed_server
+    ports: [ "8084:8084" ]
+  stats:
+    build: ./analytics_server
+    ports: [ "8086:8086" ]

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 const API_URL = "http://192.168.1.104:5000";
 // const API_URL = "http://10.203.122.69:5000";
@@ -147,7 +148,7 @@ export const sendMessageChat = async (message: string, conversationId: string) =
   try {
     const token = await AsyncStorage.getItem("userToken");
 
-    const response = await fetch(`${API_URL}/chat/${conversationId}/chat-message`, {
+    const response = await fetch(`${API_URL}/chat/chat-message/${conversationId}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -155,7 +156,7 @@ export const sendMessageChat = async (message: string, conversationId: string) =
       },
       body: JSON.stringify({
         message,
-        conversation_id: conversationId, 
+        conversationId
       }),
     });
 
@@ -178,12 +179,42 @@ export const sendMessageChat = async (message: string, conversationId: string) =
 };
 
 // delete history of chat 
-export const deleteHistoryChat = async()  => {
+export const deleteHistoryChat = async(chat_id : string)  => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
-    const response = await fetch(`${API_URL}/chat/clear-history`, {
-      method: "POST",
+    const response = await fetch(`${API_URL}/chat/clear-history/${chat_id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data recived from test : ", data)
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+  return data.message; // return the chatbot response
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+}
+
+// delete history of chat 
+export const deleteHistoryAllChat = async()  => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/clear-history-all`, {
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
@@ -212,7 +243,7 @@ export const getHistoryAllChat = async()  => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
-    const response = await fetch(`${API_URL}/chat/get-history`, {
+    const response = await fetch(`${API_URL}/chat/get-history-all`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -234,6 +265,42 @@ export const getHistoryAllChat = async()  => {
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
+  }
+}
+
+export const getHistoryChat = async(chat_id: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    const response = await fetch(`${API_URL}/chat/get-history/${chat_id}`, {
+      method: "GET", // Changed from POST to GET to match your backend
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      }
+    });
+    
+    // Check if response is OK before parsing
+    if (!response.ok) {
+      if(response.status == 404){
+        // No Data found 
+        console.log("No Data found 404");
+        return null;
+      }else{
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+    }
+    
+    const data = await response.json();
+    console.log("Data received from test: ", data);
+    
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error getting chat history:", error);
+    throw error; // Better to throw the error for handling upstream
   }
 }
 
@@ -284,6 +351,7 @@ export const startNewChat = async() => {
   }
 }
 
+// For the Menu List, now get all chat history 
 export const getChatList = async() => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -306,7 +374,6 @@ export const getChatList = async() => {
     if (!Array.isArray(data)) {
       throw new Error("Invalid response format - expected array");
     }
-    
     // Transform the data to match your expected format
     return data.map(chat => ({
       id: chat.chat_id,
@@ -319,28 +386,23 @@ export const getChatList = async() => {
   }
 }
 
-export const getHistoryChat = async(conversationId: string) => {
+export const renameChat = async(chat_id: string, name: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
-    const response = await fetch(`${API_URL}/chat/${conversationId}`, {
-      method: "GET", // Changed from POST to GET to match your backend
+    const response = await fetch(`${API_URL}/chat/rename-chat/${chat_id}`, {
+      method: "POST", // Changed from POST to GET to match your backend
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-      }
+      }, 
+      body: JSON.stringify({
+        "name" : name
+      }),
     });
     
     // Check if response is OK before parsing
     if (!response.ok) {
-      if(response.status == 404){
-        // No Data found 
-        console.log("No Data found 404");
-        // hrow new Error(`No data found ${response.status}: ${response.statusText}`);
-        return null;
-      }else{
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-
-      }
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
     
     const data = await response.json();
@@ -358,9 +420,37 @@ export const getHistoryChat = async(conversationId: string) => {
 }
 
 
+export const saveChat = async(chat_id: string) => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    const response = await fetch(`${API_URL}/chat/save-chat/${chat_id}`, {
+      method: "GET", 
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("Data received from test: ", data);
+    
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error getting chat history:", error);
+    throw error; // Better to throw the error for handling upstream
+  }
+}
 
 // **********************************************
-// ** Emotinal Trends Insight API** - Login
+// ** Emotinal Trends Insight API** 
 // **********************************************
 export const getEmotionalTrendInsight = async (token: string) => {
   const response = await fetch(`${API_URL}/sentiment/insights`, {
@@ -375,7 +465,6 @@ export const getEmotionalTrendInsight = async (token: string) => {
 
   return response.json();
 };
-
 
 
 // **********************************************
@@ -710,14 +799,18 @@ export const updatePassword = async (token: string, newPassword: string) => {
 };
 
 
-export const requestPasswordReset = async (email: string) => {
+export const requestPasswordReset = async (token : string, email: string) => {
+  console.log("api:", API_URL)
   const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email ,  API_URL }),
   });
+
+  console.log("response from forget password " , response.json())
 
   if (!response.ok) {
     throw new Error(`Failed to send reset link: ${response.statusText}`);
@@ -826,8 +919,6 @@ export const editJournalEntry = async (entryId: string, newContent: string, imag
 
     // RECALCULATE sentiment analysis
     const sentimentResult = await analyzeSentiment(newContent);
-
-    // Define Emotion type
     type Emotion = { code: string; score: number };
 
     // Sort emotions by score (highest first)
@@ -894,7 +985,7 @@ export const editJournalEntry = async (entryId: string, newContent: string, imag
   }
 };
 
-export const fetchJournalEntries = async (token: string) => {
+export const fetchJournalEntries = async (token: string, limit : Int32, skip : Int32 ) => {
   try {
     const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
       method: "GET",
@@ -902,6 +993,7 @@ export const fetchJournalEntries = async (token: string) => {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      body: JSON.stringify({"limit" : limit, "skip" : skip}),
     });
 
     console.log("API Response Status:", response.status);
@@ -928,12 +1020,13 @@ export const fetchJournalEntries = async (token: string) => {
   }
 };
 
-export const fetchJournalDates = async (token: string) => {
+export const fetchJournalDates = async (token: string, limit : Int32, skip : Int32 ) => {
   try {
-    const response = await fetch(`${API_URL}/get-journal-dates`, {
+    const response = await fetch(`${API_URL}/journal/get-journal-entries-dates`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify({"limit" : limit, "skip" : skip}),
     });
 
     const data = await response.json();
@@ -1050,7 +1143,7 @@ export const deleteJournalEntry = async (entryId: string) => {
 // **********************************************
 
 
-
+ 
 // **********************************************
 // ** Homepage API ** - Entry 
 // **********************************************
@@ -1241,7 +1334,6 @@ export const fetchCheckIn = async (token: string) => {
       throw new Error(data.message || 'Failed to fetch check-in history');
     }
 
-    console.log("YARDIM CIGLIKLARIIII")
     console.log(data);
 
     return data;
@@ -1320,7 +1412,6 @@ export const deleteCheckIn = async (entry : any) => {
 // ** CheckIn  API **
 // **********************************************
 
-const CHECK_IN_DRAFT_KEY = 'checkInDraft'; // Create a consistent key
 
 // Check-in draft functions
 export const saveCheckInDraft = async (checkInData: any) => {

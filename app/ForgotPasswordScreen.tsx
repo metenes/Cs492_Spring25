@@ -10,9 +10,10 @@ import {
   ActivityIndicator 
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { requestPasswordReset } from "./services/ApiService";
+import { requestPasswordReset  } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,14 +31,18 @@ const ForgotPasswordScreen = () => {
     }
   
     setLoading(true);
-  
     try {
-      const response = await requestPasswordReset(email);
+      const token = await AsyncStorage.getItem("userToken");
+      if(!token){
+        throw new Error("Token error ");
+      }
+      const response = await requestPasswordReset(token, email);
       if (response.message) {
         Alert.alert("Success", "A password reset link has been sent to your email.");
-        navigation.navigate("ResetPassword", { token: response.token }); // ✅ Fixed navigation
+        navigation.navigate("ResetPassword", { token: response.token });
       } else {
         Alert.alert("Error", "Something went wrong. Please try again.");
+        throw new Error("Something went wrong. Please try again");
       }
     } catch (error: unknown) {
       let errorMessage = "An unknown error occurred";
@@ -53,7 +58,6 @@ const ForgotPasswordScreen = () => {
       setLoading(false);
     }
   };
-  
 
   return (
     <View style={styles.container}>
@@ -90,61 +94,64 @@ const ForgotPasswordScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  appTitle: {
-    fontSize: width * 0.08,
-    fontWeight: "bold",
-    marginBottom: height * 0.02,
-  },
-  backToLoginText: {
-    fontSize: width * 0.04,
-    color: "#007bff",
-    textDecorationLine: "underline",
-  },
   container: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
     flex: 1,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: width * 0.03,
+    padding: 20,
+    backgroundColor: "#fff"
+  },
+  appTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    marginBottom: 30,
+    color: "#4A90E2"
   },
   subtitle: {
-    fontSize: width * 0.045,
-    color: "#666",
-    marginBottom: height * 0.02,
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333"
   },
   instructions: {
-    fontSize: width * 0.04,
-    color: "#888",
+    fontSize: 16,
     textAlign: "center",
-    marginBottom: height * 0.03,
-    width: "90%",
+    marginBottom: 30,
+    color: "#666",
+    width: "90%"
   },
   input: {
-    width: "90%",
-    height: height * 0.06,
+    width: width * 0.85,
+    height: 50,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#ddd",
     borderRadius: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#F4F4F4",
-    marginBottom: height * 0.02,
+    marginBottom: 20,
+    paddingHorizontal: 15,
+    fontSize: 16
   },
   resetButton: {
-    width: "90%",
-    backgroundColor: "#000000",
-    paddingVertical: height * 0.018,
+    width: width * 0.85,
+    height: 50,
+    backgroundColor: "#4A90E2",
     borderRadius: 8,
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: height * 0.025,
-  },
-  resetButtonText: {
-    color: "#FFFFFF",
-    fontSize: width * 0.045,
-    fontWeight: "bold",
+    marginBottom: 20
   },
   disabledButton: {
-    backgroundColor: "#555",
+    backgroundColor: "#A9CBEE"
   },
+  resetButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600"
+  },
+  backToLoginText: {
+    color: "#4A90E2",
+    fontSize: 16,
+    marginTop: 20
+  }
 });
 
 export default ForgotPasswordScreen;

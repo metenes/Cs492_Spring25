@@ -66,7 +66,8 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "13.50.16.88" # E2C Distance Server Public IP
+E2C_IP = "16.171.239.130" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
+# ssh -i SentioKeyPair.pem ec2-user@16.171.239.130
 
 # Define the emotion labels - Local 
 emotion_labels = [
@@ -199,9 +200,9 @@ logger.info("✅ Endpoint done")
 # ---------------------------------------
 #  ** Chat Endpoints - Test/Send
 # ---------------------------------------
-@chat_bp.route("<chat_id>/chat-message", methods=["POST"])
+@chat_bp.route("/chat-message/<chat_id>", methods=["POST"])
 @jwt_required()
-async def personalized_chat(chat_id ):
+async def personalized_chat(chat_id):
     """Chat endpoint that uses the user's personalized model"""
     try:
         # Validate incoming data
@@ -528,15 +529,17 @@ async def get_chat_history(user_id: str, limit: int = 5):
         logger.error(f"Error fetching chat history: {e}")
         return []
 
-@chat_bp.route("/clear-history" ,methods=["POST"])
+@chat_bp.route("/clear-history-all" ,methods=["DELETE"])
 @jwt_required()
 async def clear_history():
     user_id = get_jwt_identity() 
-    await chat_collection.delete_many({"user_id": user_id})
-    return {"message": f"Chat history cleared for user {user_id}"}
+    await chat_collection.delete_many({"user_id": user_id}) # delete the ALL of the chat
+    return {"message": f"All Chat history cleared for user {user_id}"}
 
-@chat_bp.route("/<chat_id>/clear-chat", methods=["DELETE"])
+@chat_bp.route("/clear-history/<chat_id>", methods=["DELETE"])
+@jwt_required()
 def clear_chat(chat_id):
+    print("clear history chat_id :" , chat_id)
     chat_collection.update_one({"_id": chat_id}, {"$set": {"messages": []}})
     return jsonify({"message": "Chat cleared."})
 
@@ -554,19 +557,38 @@ def list_chats():
         result.append({"chat_id": str(c["_id"]), "title": title})
     return jsonify(result)
 
-@chat_bp.route("/<chat_id>/get-chat", methods=["GET"])
+@chat_bp.route("/get-history/<chat_id>", methods=["GET"])
+@jwt_required()
 def get_chat(chat_id):
+    print("get_chat history chat_id :" , chat_id)
     chat = chat_collection.find_one({"_id": chat_id})
     if not chat:
         return jsonify({"error": "Chat not found"}), 404
     return jsonify({"message": chat["messages"]})
 
-@chat_bp.route("/<chat_id>/export",  methods=["GET"])
+
+@chat_bp.route("/get-history", methods=["GET"])
+@jwt_required()
+def get_chat_all():
+    user_id = get_jwt_identity() 
+    print("chat history for user: ", user_id)
+    chats = chat_collection.find({"user_id": user_id})
+    if not chats:
+        return jsonify({"error": "Chat not found"}), 404
+    result = []
+    for c in chats:
+        result.append(c)
+    return jsonify(result)
+
+@chat_bp.route("/export/<chat_id>",  methods=["GET"])
+@jwt_required()
 def export_chat(chat_id):
+    print("export history chat_id :" , chat_id)
     chat = chat_collection.find_one({"_id": chat_id})
     return jsonify(chat)
 
 @chat_bp.route("/import",  methods=["POST"])
+@jwt_required()
 def import_chat():
     data = request.json
     data["_id"] = ObjectId()
@@ -596,6 +618,7 @@ def create_chat():
     return jsonify({"chat_id": str(chat_id)})
 
 @chat_bp.route("/<chat_id>/send", methods=["POST"] )
+@jwt_required()
 def send_message(chat_id : str):
     data = request.json
     message = data.get("message")
@@ -617,6 +640,36 @@ def send_message(chat_id : str):
     )
     return jsonify({"response": response})
 
+# Rename the chat 
+@chat_bp.route("/rename-chat/<chat_id>",  methods=["POST"])
+@jwt_required()
+def rename_chat(chat_id):
+    print("get_chat history chat_id :" , chat_id)
+    data = request.json
+    name = data["name"]
+
+    chat = chat_collection.find_one({"_id": chat_id})
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+    
+    chat_collection.update_one(
+        {"_id": chat_id},
+        {"$push": {
+            "messages": {"sender": "user", "title": name},
+        }}
+    )
+    return jsonify({"message": chat["messages"]})
+
+
+# Rename the chat 
+@chat_bp.route("/save-chat/<chat_id>",  methods=["GET"])
+@jwt_required()
+def save_chat(chat_id):
+    print("save_chat chat_id :" , chat_id)
+    chat = chat_collection.find_one({"_id": chat_id})
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+    return jsonify({"message": chat["messages"]})
 # ------------------------------------------------------------------------ Helper Functions ------------------------------------------------------------------------
 
 # ---------------------------------------
@@ -849,7 +902,7 @@ async def log_conversation(user_id: str, conversation_id: str, message: str, res
 
     # Store chat message history
     chat_collection.insert_one({
-        "conversation_id": conversation_id,
+        "_id": conversation_id,
         "user_id": user_id,
         "message": message,
         "response": response,

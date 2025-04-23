@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 import boto3
 from botocore.exceptions import ClientError
+from config import AWS_CONFIG, S3_BUCKET
 import os
 from werkzeug.utils import secure_filename
 import time
@@ -28,13 +29,16 @@ sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertwe
 journal_bp = Blueprint("journal_bp", __name__)
 
 # AWS S3 configuration
+"""""" 
 S3_BUCKET = "sentiobucket"
 s3_client = boto3.client(
     's3',
     aws_access_key_id='AKIAXGZAMH3HUVQSPNED',
     aws_secret_access_key='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',
     region_name='eu-north-1'
-)
+) 
+s3 = boto3.client("s3", **AWS_CONFIG)
+
 
 @journal_bp.route("/save-journal-entry", methods=["POST"])
 @jwt_required()
@@ -137,6 +141,15 @@ def get_journal_entries():
     try:
         user_id = get_jwt_identity()
         print(f"🔍 Fetching journal entries for user: {user_id}")
+        data = request.get_json()
+        #  limit = int(request.args.get("limit", 2)) # default 30 size limit
+        limit = data.get("limit") # for limit
+        skip = data.get("skip") # for paging 
+
+        if(limit is None) : 
+            limit = 30
+        if(skip is None) : 
+            skip = 0
         
         # Ensure user_id is converted to ObjectId
         try:
@@ -151,7 +164,8 @@ def get_journal_entries():
         
         # Retrieve user's journal entries from MongoDB
         # This should be from journal_entries_collection, not the users collection
-        journal_data = journal_entries_collection.find_one({"_id": user_object_id})
+        
+        journal_data = journal_entries_collection.find_one({"_id": user_object_id}).limit(limit)
         print(f"🔍 Raw journal data: {journal_data}")
         
         # Initialize empty entries list as default
@@ -163,14 +177,22 @@ def get_journal_entries():
             entries_list = journal_data["journalEntries"]
             print(f"🔍 Found {len(entries_list)} raw entries")
             
+            # Sort by date descending
+            entries_list = sorted(entries_list, key=lambda x: x.get("entryDate", ""), reverse=True)
+
+            # Apply pagination and limit
+            entries_list = entries_list[skip:skip + limit]
+
             for entry in entries_list:
                 serialized_entry = {k: v for k, v in entry.items()}
                 if "_id" in serialized_entry:
                     serialized_entry["_id"] = str(serialized_entry["_id"])
+
                 # Convert any other ObjectId fields if present
                 for field in serialized_entry:
                     if isinstance(serialized_entry[field], ObjectId):
                         serialized_entry[field] = str(serialized_entry[field])
+
                 # Convert datetime objects to ISO format strings
                 for field in serialized_entry:
                     if isinstance(serialized_entry[field], datetime):
@@ -185,7 +207,6 @@ def get_journal_entries():
         else:
             if not journal_data:
                 print("⚠️ No journal data found for this user at all.")
-                print("⚠️ Creating empty journal entries document for user")
             elif "journalEntries" not in journal_data:
                 print("⚠️ Document exists but has no journalEntries field.")
                 print(f"⚠️ Document keys: {journal_data.keys()}")
@@ -200,6 +221,80 @@ def get_journal_entries():
         import traceback
         traceback.print_exc()  # Print the full stack trace
         return jsonify({"error": str(e)}), 500
+
+
+@journal_bp.route('/get-journal-entries-dates', methods=['GET'])
+@jwt_required()
+def get_journal_dates():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Fetching journal dates for user_id: {user_id}")
+        data = request.get_json()
+        #  limit = int(request.args.get("limit", 2)) # default 30 size limit
+        limit = data.get("limit") # for limit
+        skip = data.get("skip") # for paging 
+
+        if(limit is None) : 
+            limit = 30
+        if(skip is None) : 
+            skip = 0
+        
+        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not entry_doc or "journalEntries" not in entry_doc:
+            print("ℹ️ No entries found for user")
+            return jsonify([]), 200
+
+        dates = set()
+        for entry in entry_doc["journalEntries"]:
+            raw_date = entry.get("entryDate")
+            if not raw_date:
+                continue
+
+            if isinstance(raw_date, str):
+                date_str = raw_date.split("T")[0]
+            else:
+                date_str = raw_date.strftime("%Y-%m-%d")
+            dates.add(date_str)
+
+        print("✅ Final list of journal dates:", dates)
+        return jsonify(list(dates)), 200
+
+    except Exception as e:
+        print("❌ Error fetching journal dates:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+    
+@journal_bp.route("/guided", methods=["POST"])
+@jwt_required()
+def save_guided_journal():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+
+        entry_content = data.get("entryContent", "")
+        prompt = data.get("prompt", "")
+        if not entry_content or not prompt:
+            return jsonify({"error": "Entry content and prompt are required."}), 400
+
+        new_entry = {
+            "userId": user_id,
+            "entryContent": entry_content,
+            "category": "guided",
+            "prompt": prompt,
+            "createdAt": datetime.utcnow(),
+            "entryDate": datetime.utcnow().strftime("%Y-%m-%d"),
+            "images": [],
+            "journalSentiments": []
+        }
+
+        journal_entries_collection.insert_one(new_entry)
+        return jsonify({"message": "Guided journal entry saved successfully."}), 201
+
+    except Exception as e:
+        print("❌ Error saving guided entry:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+
 
 @journal_bp.route("/api/journal-entries", methods=["GET"])
 @jwt_required()
@@ -537,7 +632,7 @@ def update_journal_entry(entry_id):
         return jsonify({"error": str(e)}), 500
 
 
-@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
+""" @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_journal_entry(entry_id):
     try:
@@ -557,8 +652,51 @@ def delete_journal_entry(entry_id):
         return jsonify({"message": "Journal entry deleted successfully"}), 200
 
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500 """
+
+@journal_bp.route("/delete/<entry_id>", methods=["DELETE"])
+@jwt_required()
+def delete_journal_entry(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        user_object_id = ObjectId(user_id)
+
+        # Find the user's journal document
+        journal_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not journal_doc:
+            return jsonify({"error": "No journal entries found for user"}), 404
+
+        # Find the entry by _id
+        target_entry = None
+        for entry in journal_doc.get("journalEntries", []):
+            if str(entry.get("_id")) == entry_id:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            return jsonify({"error": "Entry not found"}), 404
+
+        # Remove images from S3
+        for image in target_entry.get("images", []):
+            s3_key = image.get("fileName", "")
+            if s3_key:
+                s3.delete_object(Bucket="sentiobucket", Key=s3_key)
+
+        # Remove entry from array
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id},
+            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "Failed to delete entry"}), 500
+
+        return jsonify({"message": "Journal entry deleted successfully"}), 200
+
+    except Exception as e:
+        print("❌ Error deleting journal entry:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
 
 @journal_bp.route("/upload-image", methods=["POST"])
 @jwt_required()
@@ -677,6 +815,9 @@ def delete_journal_image():
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
 
+
+
+# TODO
 @journal_bp.route("/face-photo-analysis", methods=["POST"])
 def upload_image():
     if "image" not in request.files:

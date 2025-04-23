@@ -28,10 +28,10 @@ const ResetPasswordScreen = () => {
   const route = useRoute<ResetPasswordRouteProp>();
 
   useEffect(() => {
-    // Extract token from route params
     if (route.params && route.params.token) {
       // Ensure we're setting a string
       const tokenValue = String(route.params.token);
+
       setToken(tokenValue);
       console.log("Token retrieved from route params:", tokenValue);
     } else {

@@ -48,18 +48,13 @@ from botocore.exceptions import ClientError
 app = Flask(__name__)
 CORS(app)
 
+# JWT Config
+
 JWT_SECRET = os.getenv("JWT_SECRET", "sentioSecretKey")
 JWT_ALGORITHM = "HS256"
 app.config['JWT_SECRET_KEY'] = 'sentioSecretKey'  # Replace with a strong random key
 app.config['SECRET_KEY'] = 'sentioSecretKey'    # If you want to use the same key for both Flask and JWT
 JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
-# Load ML Model
-
-# model = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-# if we need to use own fine tuning 
-# model = pipeline("sentiment-analysis", model="./fine_tuned_model")
-# JWT Config
-
 app.config["JWT_SECRET"] = os.getenv("JWT_SECRET_KEY", JWT_SECRET)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 # datetime.timedelta(days=1)
@@ -79,75 +74,16 @@ app.config["MAIL_ASCII_ATTACHMENTS"] = False
 
 # app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME", "sentioanalysis.co@gmail.com")
 # app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD", "1234SR71456.")
+
+
 mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
 
-@app.route('/get-journal-dates', methods=['GET'])
-@jwt_required()
-def get_journal_dates():
-    try:
-        user_id = get_jwt_identity()
-        print(f"🔍 Fetching journal dates for user_id: {user_id}")
-
-        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        if not entry_doc or "journalEntries" not in entry_doc:
-            print("ℹ️ No entries found for user")
-            return jsonify([]), 200
-
-        dates = set()
-        for entry in entry_doc["journalEntries"]:
-            raw_date = entry.get("entryDate")
-            if not raw_date:
-                continue
-
-            if isinstance(raw_date, str):
-                date_str = raw_date.split("T")[0]
-            else:
-                date_str = raw_date.strftime("%Y-%m-%d")
-            dates.add(date_str)
-
-        print("✅ Final list of journal dates:", dates)
-        return jsonify(list(dates)), 200
-
-    except Exception as e:
-        print("❌ Error fetching journal dates:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
-    
-@journal_bp.route("/guided", methods=["POST"])
-@jwt_required()
-def save_guided_journal():
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json()
-
-        entry_content = data.get("entryContent", "")
-        prompt = data.get("prompt", "")
-        if not entry_content or not prompt:
-            return jsonify({"error": "Entry content and prompt are required."}), 400
-
-        new_entry = {
-            "userId": user_id,
-            "entryContent": entry_content,
-            "category": "guided",
-            "prompt": prompt,
-            "createdAt": datetime.utcnow(),
-            "entryDate": datetime.utcnow().strftime("%Y-%m-%d"),
-            "images": [],
-            "journalSentiments": []
-        }
-
-        journal_entries_collection.insert_one(new_entry)
-        return jsonify({"message": "Guided journal entry saved successfully."}), 201
-
-    except Exception as e:
-        print("❌ Error saving guided entry:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
-
-check_bp = Blueprint('check_in', __name__)
-check_in_collection = db["check_in_entries"]
-
+#check_bp = Blueprint('check_in', __name__)
+#check_in_collection = db["check_in_entries"]
+""" 
 @check_bp.route("/submit", methods=["POST"])
 @jwt_required()
 def submit_check_in():
@@ -203,6 +139,7 @@ def fetch_check_ins():
     except Exception as e:
         print("❌ Error fetching check-ins:", str(e))
         return jsonify({"error": "Internal server error"}), 500
+"""
 
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
@@ -211,7 +148,6 @@ app.register_blueprint(journal_bp, url_prefix="/journal")
 app.register_blueprint(chat_bp, url_prefix="/chat")
 app.register_blueprint(check_bp, url_prefix="/check-in")
 app.register_blueprint(model_bp, url_prefix="/models") # metadata for S3 models 
-
 app.register_blueprint(notification_bp, url_prefix="/notification")
 
 if __name__ == "__main__":

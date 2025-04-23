@@ -1,63 +1,75 @@
 import React, { useState } from "react";
-import { View, Text, Switch, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Switch,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import BottomNavigation from "./BottomNavigation";
-import { useAuth } from "./auth/AuthContext"; // ✅ Correct import
+import { useAuth } from "./auth/AuthContext";
 import { logoutDB } from "./services/ApiService";
-import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "./types/types";
 
 type SettingScreenNavigationProp = NativeStackNavigationProp<
-RootStackParamList,
-"Login", 
-"PaymentMethodSettingScreen"
+  RootStackParamList,
+  "Login"
 >;
 
 const SettingsScreen = () => {
   const [darkMode, setDarkMode] = useState(false);
   const navigation = useNavigation<SettingScreenNavigationProp>();
-  const { logout } = useAuth(); // ✅ Get logout function from AuthContext
+  const { logout } = useAuth();
 
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => !prev);
-  };
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
   const handleLogout = () => {
-    logoutDB(); 
-    console.log("✅ DB logout ");
-    logout(); // ✅ Call logout from AuthContext
-    console.log("✅ User token removed out successfully");
-    navigation.navigate("Login"); 
+    logoutDB();
+    logout();
+    navigation.navigate("Login");
   };
 
   return (
     <>
-      <View style={styles.container}>
-        <TouchableOpacity 
-          style={styles.settingRow} 
-          onPress={() => navigation.navigate("PaymentMethodSettingScreen")}
-        >
-          <Text style={styles.settingText}>Payment Settings</Text>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
+      <ScrollView style={styles.container}>
+        <Text style={styles.sectionHeader}>Account</Text>
 
-        <TouchableOpacity 
-          style={styles.settingRow} 
-          onPress={() => navigation.navigate("NotificationSettingsScreen")}
-        >
-          <Text style={styles.settingText}>Notification Settings</Text>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate("PaymentMethodSettingScreen")}
+          >
+            <Text style={styles.settingText}>Payment Settings</Text>
+            <Text style={styles.arrow}>›</Text>
+          </TouchableOpacity>
 
-        <View style={styles.settingToggle}>
-          <Text style={styles.settingText}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={toggleDarkMode} />
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate("NotificationSettingsScreen")}
+          >
+            <Text style={styles.settingText}>Notification Settings</Text>
+            <Text style={styles.arrow}>›</Text>
+          </TouchableOpacity>
         </View>
+
+        <Text style={styles.sectionHeader}>Preferences</Text>
+
+        <View style={styles.card}>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingText}>Dark Mode</Text>
+            <Switch value={darkMode} onValueChange={toggleDarkMode} />
+          </View>
+        </View>
+
+        <Text style={styles.sectionHeader}>Danger Zone</Text>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       <BottomNavigation activeScreen="Settings" />
     </>
@@ -67,45 +79,55 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 16,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 24,
+    marginBottom: 8,
+    color: "#111827",
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+    elevation: 2,
   },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  settingToggle: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    marginTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#E5E7EB",
   },
   settingText: {
     fontSize: 16,
-    color: "#333",
+    color: "#111827",
   },
   arrow: {
-    fontSize: 18,
-    color: "#999",
+    fontSize: 20,
+    color: "#9CA3AF",
   },
   logoutButton: {
-    marginTop: 40,
-    backgroundColor: "#ff4d4d",
-    paddingVertical: 14,
+    marginTop: 16,
+    backgroundColor: "#EF4444",
+    paddingVertical: 16,
     borderRadius: 10,
     alignItems: "center",
   },
   logoutText: {
-    fontSize: 18,
-    color: "#fff",
+    fontSize: 16,
     fontWeight: "bold",
+    color: "#FFFFFF",
   },
 });
 

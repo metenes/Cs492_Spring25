@@ -1,4 +1,4 @@
- ========================= federated_server.py (on EC2) =========================
+ # ========================= federated_server.py (on EC2) =========================
 import os, json, torch, boto3
 from flask import Flask, request, jsonify
 from transformers import BertForSequenceClassification

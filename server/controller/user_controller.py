@@ -21,6 +21,8 @@ import os
 from werkzeug.utils import secure_filename
 import time
 
+from flask_dance.contrib.google import make_google_blueprint
+
 """
 // Sample MongoDB User Schema 
 // ----> documentation purposes
@@ -49,6 +51,10 @@ import time
 }
 """
 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID")
+APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
+TWITTER_CLIENT_ID = os.getenv("TWITTER_CLIENT_ID")
 
 # Initialize Blueprint for user routes
 user_bp = Blueprint("user_bp", __name__)
@@ -448,14 +454,17 @@ def delete_user(user_id):
 
 
 # ---------------------------------------
-#  **Forgot Password**
+#  **Forgot Password & Check mail **
 # ---------------------------------------
+
 @user_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
     try:
         data = request.json
         email = data.get("email")
+        api = data.get("API_URL")
         print(f"🔍 Received email: {email}")  # Debug log
+        print(f"🔍 Received api: {api}")  # Debug log
 
         user = users_collection.find_one({"email": email})
         if not user:
@@ -464,15 +473,7 @@ def forgot_password():
 
         reset_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))
 
-        # MODIFY HERE SIMIAR TI API FOR NOW, WE WILL SORT THIS OUT SMHW - TODO
-        
-        # const API_URL = "http://10.0.2.2:5000"; // Mete's API - LAN
-        # const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-        # const API_URL = "http://192.168.1.104:5000";
-        # const API_URL = "http://10.203.122.69:5000";
-        # const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-
-        reset_link = f"http://http://192.168.1.104:5000/reset-password?token={reset_token}"
+        reset_link = f"{api}/user/reset-password?token={reset_token}"
 
         print(f"✅ Reset link: {reset_link}")
 
@@ -515,22 +516,24 @@ def forgot_password():
         
         mail.send(msg)
 
-        return jsonify({"message": "Password reset email sent"}), 200
+        return jsonify({"message": "Password reset email sent" , "token": reset_token}), 200
     except Exception as e:
         print(f"🔥 Exception: {e}")  # Print exact error
         import traceback
-        traceback.print_exc()  # Print full traceback for better debugging
+        traceback.print_exc()  
         return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------
 #  **Reset Password**
 # ---------------------------------------
-@user_bp.route("/reset-password", methods=["POST"])
-def reset_password():
+@user_bp.route("/reset-password?token={reset_token}", methods=["POST"])
+def reset_password(reset_token):
     try:
-        data = request.json
+        data = request.get_json()
         token = data.get("token")
+        if(token is None) :
+          token = reset_token    
         new_password = data.get("newPassword")
 
         if not token or not new_password:
@@ -578,11 +581,47 @@ def community_trends():
     stats = list(users_collection.aggregate(pipeline))
     return jsonify(stats)
 
-
-
-
 # ---------------------------------------
-#  **Delete User**
+#  **Google / Appple Authentication **
 # ---------------------------------------
 
 
+@user_bp.route("/auth/oauth", methods=["POST"])
+def oauth_callback():
+    data = request.json
+    token = data.get("token")
+    provider = data.get("provider")
+
+    user_info = None
+
+    if provider == "google":
+        r = request.get("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": f"Bearer {token}"})
+        user_info = r.json()
+    elif provider == "facebook":
+        r = request.get(f"https://graph.facebook.com/me?fields=id,name,email&access_token={token}")
+        user_info = r.json()
+    elif provider == "apple":
+        # Apple provides ID token as JWT - decode using `pyjwt`
+        import jwt
+        user_info = jwt.decode(token, options={"verify_signature": False})
+    elif provider == "twitter":
+        # Twitter requires OAuth1.0a flow — separate endpoint needed
+        return jsonify({"error": "Twitter login not yet supported"}), 501
+
+    if not user_info:
+        return jsonify({"error": "Failed to fetch user info"}), 400
+
+    email = user_info.get("email") or user_info.get("sub")
+    user = users_collection.find_one({"email": email})
+    if not user:
+        user = {
+            "email": email,
+            "provider": provider,
+            "external_id": user_info.get("sub") or user_info.get("id"),
+            "name": user_info.get("name") or "",
+            "user_settings": {"notification_frequency": "daily"},
+        }
+        db.users.insert_one(user)
+
+    token = create_access_token(identity=str(user["_id"]))
+    return jsonify({"token": token, "user": user})

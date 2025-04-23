@@ -23,6 +23,10 @@ const DiaryMainScreen = () => {
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
   const [hasJournaledToday, setHasJournaledToday] = useState(false);
+  // For paging and limit 
+  const [limit] = useState(30); // entries per page
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true); // disable loading when all loaded
 
   useEffect(() => {
     const getJournalDates = async () => {
@@ -31,14 +35,24 @@ const DiaryMainScreen = () => {
       if (!token) return;
 
       try {
-        const dates = await fetchJournalDates(token);
-
+        const dates = await fetchJournalDates(token, limit, skip);
+        if (dates.length < limit) setHasMore(false); // no more data
+        
+        /* 
         const marked = dates.reduce((acc: any, date: string) => {
           acc[date] = { selected: true, marked: true, selectedColor: '#3D3D3D' };
           return acc;
         }, {});
         setMarkedDates(marked);
-
+        */ 
+        setMarkedDates(prev => ({
+          ...prev,
+          ...dates.reduce((acc: any, date: string) => {
+            acc[date] = { selected: true, marked: true, selectedColor: '#3D3D3D' };
+            return acc;
+          }, {})
+        }));
+  
         const dateSet = new Set(dates);
         setHasJournaledToday(dateSet.has(today));
 
@@ -67,7 +81,7 @@ const DiaryMainScreen = () => {
     };
 
     getJournalDates();
-  }, []);
+  }, [skip]);
 
   const onDayPress = (day: { dateString: string }) => {
     if (day.dateString <= today) {
@@ -84,7 +98,12 @@ const DiaryMainScreen = () => {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
           <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ padding: 10 }}>
             <Icon name="arrow-left" size={24} color="black" />
-          </TouchableOpacity>
+            </TouchableOpacity>
+            {hasMore && (
+                <TouchableOpacity onPress={() => setSkip(prev => prev + limit)}>
+                  <Text style={{ textAlign: 'center', color: 'blue' }}>Load More</Text>
+                </TouchableOpacity>
+            )}
           <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', flex: 1, marginRight: 40 }}>
             Calendar
           </Text>
