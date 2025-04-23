@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
-import { fetchJournalEntriesWithDate, fetchSentimentAnalysis, getEmotionalTrendInsight } from "../services/ApiService"; // Our new function
+import { fetchJournalEntriesWithDate, 
+  fetchSentimentAnalysis, 
+  getEmotionalTrendInsight, 
+  fetchEmotionalRecommendations } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '../context/ThemeContext';
@@ -75,7 +78,34 @@ const SentimentAnalysisPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // emotional trends
-  const [trendInsight, setTrendInsight] = useState<string | null>(null);
+  // const [trendInsight, setTrendInsight] = useState<string | null>(null);
+
+  const [emotionalInsight, setEmotionalInsight] = useState(null);
+  const [recommendation, setRecommendation] = useState<string[]>([]);
+
+  //const [topCauses, setTopCauses] = useState<string[]>([]);
+  const [emotionCauseLinks, setEmotionCauseLinks] = useState({});
+
+  
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        const data = await fetchEmotionalRecommendations();
+        setEmotionalInsight(data.insight || "");
+        setRecommendation(data.recommendation || []);
+        //setTopCauses(data.top_causes || []);
+        setEmotionCauseLinks(data.emotion_cause_links || {});
+        console.log("***************RECOMMENDATIONS FROM DASHBOARD.TSX")
+        console.log(emotionCauseLinks)
+      } catch (error) {
+        console.error("❌ Error fetching trend insight:", error);
+      }
+    };
+  
+    fetchRecommendations();
+  }, []);
+  
+
 
 
   // Toggle emotion chip
@@ -171,22 +201,6 @@ const SentimentAnalysisPage: React.FC = () => {
       }
     }
   };
-
-  // for emotion trends
-  useEffect(() => {
-    const fetchTrendInsight = async () => {
-      try {
-        const token = await AsyncStorage.getItem("userToken");
-        if (!token) return;
-        const res = await getEmotionalTrendInsight(token);
-        setTrendInsight(res.insight);
-      } catch (err) {
-        console.error("❌ Error fetching trend insight:", err);
-      }
-    };
-  
-    fetchTrendInsight();
-  }, []);
   
 
   const handleEndDateChange = (event: any, isWeekly: boolean, date?: Date) => {
@@ -312,16 +326,17 @@ const SentimentAnalysisPage: React.FC = () => {
 
   return (
     <>
-      <ScrollView>
-        <View style={[styles.container, { backgroundColor: darkMode ? '#121212' : '#fff' }]}>
+      <ScrollView style={{ backgroundColor: theme.backgroundColor }}>
+        <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
           {/* Weekly Date Range */}
-          <View style={styles.dateRangeContainer}>
+          <View style={[styles.dateRangeContainer, { backgroundColor: theme.backgroundColor }]}>
             <DateTimePicker
               value={selectedStartDate}
               mode="date"
               display="default"
               onChange={(event, date) => handleStartDateChange(event, true, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
             <DateTimePicker
               value={selectedEndDate}
@@ -329,6 +344,7 @@ const SentimentAnalysisPage: React.FC = () => {
               display="default"
               onChange={(event, date) => handleEndDateChange(event, true, date)}
               themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
           </View>
 
@@ -349,12 +365,16 @@ const SentimentAnalysisPage: React.FC = () => {
               mode="date"
               display="default"
               onChange={(event, date) => handleStartDateChange(event, false, date)}
+              themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
             <DateTimePicker
               value={selectedEndDateForChart}
               mode="date"
               display="default"
               onChange={(event, date) => handleEndDateChange(event, false, date)}
+              themeVariant={darkMode ? "dark" : "light"}
+              textColor={theme.text}
             />
           </View>
 
@@ -402,11 +422,39 @@ const SentimentAnalysisPage: React.FC = () => {
               darkMode={darkMode}
             />
           </View>
-          {trendInsight && (
-            <View style={styles.trendInsightBox}>
-              <Text style={styles.trendInsightText}>{trendInsight}</Text>
+          {emotionalInsight && (
+            <View style={[styles.insightContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#E6F0FA' }]}>
+              <Text style={[styles.insightTitle, { color: darkMode ? theme.text : '#1A3C6F' }]}>🧠 Emotional Insight</Text>
+              <Text style={[styles.insightText, { color: darkMode ? theme.textSecondary : '#1A3C6F' }]}>{emotionalInsight}</Text>
             </View>
           )}
+
+          {recommendation && recommendation.length > 0 && (
+            <View style={[styles.recommendationContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#FDF3E7' }]}>
+              <Text style={[styles.recommendationTitle, { color: darkMode ? theme.text : '#9C6B00' }]}>💡Recommendations</Text>
+              {recommendation.map((rec, index) => (
+                <Text key={index} style={[styles.recommendationText, { color: darkMode ? theme.textSecondary : '#9C6B00' }]}>• {rec}</Text>
+              ))}
+            </View>
+          )}
+
+          {Object.keys(emotionCauseLinks).length > 0 && (
+            <View style={styles.causeContainer}>
+              <Text style={styles.causeTitle}>🔍 Possible Causes</Text>
+              {Object.entries(emotionCauseLinks).map(([emotion, causes]: any) => (
+                <View key={emotion} style={{ marginBottom: 5 }}>
+                  <Text style={styles.causeText}>{emotion.toUpperCase()}</Text>
+                  {causes.map((item: any, index: number) => (
+                    <Text style={styles.causeText} key={index}>• {item.cause}</Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+
+
+
+
 
         </View>
       </ScrollView>  
@@ -419,7 +467,6 @@ const SentimentAnalysisPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
     padding: 16,
   },
   dateRangeContainer: {
@@ -439,28 +486,23 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 8,
-    backgroundColor: "#fff",
     marginRight: 12,
     justifyContent: 'space-between',
   },
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#828282",
     marginBottom: 8,
   },
   entryEmotion: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#000",
     lineHeight: 32,
     flexShrink: 1,
   },
   entryDetails: {
     fontSize: 16,
-    color: "#828282",
     marginTop: 8,
   },
   container2: {
@@ -475,33 +517,59 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginHorizontal: 5,
   },
-  chipSelected: {
-    backgroundColor: "black",
-  },
-  chipUnselected: {
-    backgroundColor: "#e0e0e0",
-  },
   chipText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "white",
   },
-  chipTextUnselected: {
-    color: "black",
-  },
-  trendInsightBox: {
-    backgroundColor: "#FFF8EC",
-    padding: 12,
+  insightContainer: {
+    padding: 16,
     borderRadius: 12,
-    marginBottom: 16,
-    borderColor: "#FFE8B0",
-    borderWidth: 1,
+    marginTop: 20,
   },
-  trendInsightText: {
+  insightTitle: {
     fontSize: 16,
-    color: "#444",
-    fontStyle: "italic",
-  }
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  insightText: {
+    fontSize: 14,
+  },
+  recommendationContainer: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  recommendationText: {
+    fontSize: 14,
+  },
+  recommendationBox: {
+    backgroundColor: "#E8F0FE",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  causeContainer: {
+    backgroundColor: "#F3E8FF",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  causeTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#5E3A87",
+    marginBottom: 4,
+  },
+  causeText: {
+    fontSize: 14,
+    color: "#5E3A87",
+  },
+  
   
 });
 

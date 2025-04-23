@@ -2,6 +2,7 @@ import "@expo/metro-runtime"
 import * as SplashScreen from "expo-splash-screen"
 import App from "@/app";
 import { ThemeProvider } from './app/context/ThemeContext';
+import EditCheckInScreen from './app/EditCheckInScreen';
 
 SplashScreen.preventAutoHideAsync()
 

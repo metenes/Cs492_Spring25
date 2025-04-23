@@ -8,6 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavigation from './BottomNavigation';
 import { fetchJournalDates } from './services/ApiService';
+import { useTheme } from './context/ThemeContext';
 
 type RootStackParamList = {
   Home: undefined;
@@ -18,6 +19,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'FreeJournaling'>;
 
 const DiaryMainScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { theme, darkMode } = useTheme();
   const today = new Date().toISOString().split('T')[0];
   const [markedDates, setMarkedDates] = useState<{ [date: string]: any }>({});
   const [loading, setLoading] = useState(true);
@@ -89,37 +91,59 @@ const DiaryMainScreen = () => {
     }
   };
 
-  const flameColor = hasJournaledToday ? 'orange' : 'black';
-  const quote = streak>0 ? "Keep going!" : "Start today!"
+  const flameColor = hasJournaledToday ? 'orange' : darkMode ? theme.placeholder : 'black';
+  const quote = streak > 0 ? "Keep going!" : "Start today!";
 
   return (
     <>
-      <SafeAreaView style={{ flex: 1, backgroundColor: 'white', paddingHorizontal: 16 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.backgroundColor, paddingHorizontal: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
           <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ padding: 10 }}>
-            <Icon name="arrow-left" size={24} color="black" />
+            <Icon name="arrow-left" size={24} color={theme.text} />
             </TouchableOpacity>
             {hasMore && (
                 <TouchableOpacity onPress={() => setSkip(prev => prev + limit)}>
                   <Text style={{ textAlign: 'center', color: 'blue' }}>Load More</Text>
                 </TouchableOpacity>
             )}
-          <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', flex: 1, marginRight: 40 }}>
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold', 
+            textAlign: 'center', 
+            flex: 1, 
+            marginRight: 40,
+            color: theme.text 
+          }}>
             Calendar
           </Text>
         </View>
 
         <View style={{ marginTop: 50 }}>
           {loading ? (
-            <ActivityIndicator size="large" color="#000" />
+            <ActivityIndicator size="large" color={theme.text} />
           ) : (
             <Calendar
               current={today}
               theme={{
-                todayTextColor: '#000',
-                todayBackgroundColor: '#E8E8E8',
-                selectedDayBackgroundColor: '#3D3D3D',
+                backgroundColor: theme.backgroundColor,
+                calendarBackground: theme.backgroundColor,
+                textSectionTitleColor: theme.text,
+                selectedDayBackgroundColor: darkMode ? '#404040' : '#3D3D3D',
                 selectedDayTextColor: '#ffffff',
+                todayTextColor: theme.text,
+                dayTextColor: theme.text,
+                textDisabledColor: theme.placeholder,
+                dotColor: theme.text,
+                selectedDotColor: '#ffffff',
+                arrowColor: theme.text,
+                monthTextColor: theme.text,
+                indicatorColor: theme.text,
+                textDayFontWeight: '300',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '300',
+                textDayFontSize: 16,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 16
               }}
               markedDates={markedDates}
               onDayPress={onDayPress}
@@ -127,10 +151,29 @@ const DiaryMainScreen = () => {
           )}
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, marginLeft: 10 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 5 }}>{streak}</Text>
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          marginTop: 20, 
+          marginLeft: 10 
+        }}>
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold', 
+            marginLeft: 5,
+            color: theme.text 
+          }}>
+            {streak}
+          </Text>
           <MaterialCommunityIcons name="fire" size={20} color={flameColor} />
-          <Text style={{ fontSize: 18, fontWeight: 'bold', marginLeft: 2 }}>{quote}</Text>
+          <Text style={{ 
+            fontSize: 18, 
+            fontWeight: 'bold', 
+            marginLeft: 2,
+            color: theme.text 
+          }}>
+            {quote}
+          </Text>
         </View>
       </SafeAreaView>
 

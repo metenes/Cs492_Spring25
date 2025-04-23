@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from models.journal_entry import JournalEntry  # Import the JournalEntry model
-from utils.database import journal_entries_collection, check_in_collection, db
+from utils.database import journal_entries_collection, check_in_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 import boto3
@@ -29,7 +29,6 @@ sentiment_analyzer = pipeline("sentiment-analysis", model="finiteautomata/bertwe
 journal_bp = Blueprint("journal_bp", __name__)
 
 # AWS S3 configuration
-"""""" 
 S3_BUCKET = "sentiobucket"
 s3_client = boto3.client(
     's3',
@@ -141,14 +140,13 @@ def get_journal_entries():
     try:
         user_id = get_jwt_identity()
         print(f"🔍 Fetching journal entries for user: {user_id}")
-        data = request.get_json()
-        #  limit = int(request.args.get("limit", 2)) # default 30 size limit
-        limit = data.get("limit") # for limit
-        skip = data.get("skip") # for paging 
+        
+        limit = int(request.args.get("limit", 30))
+        skip = int(request.args.get("skip", 0))
 
-        if(limit is None) : 
+        if(limit is None): 
             limit = 30
-        if(skip is None) : 
+        if(skip is None): 
             skip = 0
         
         # Ensure user_id is converted to ObjectId
@@ -158,14 +156,11 @@ def get_journal_entries():
             print(f"❌ Invalid user ID format: {user_id}")
             return jsonify({"error": "Invalid user ID format"}), 400
         
-        # IMPORTANT FIX: The user_id from JWT is used to query the journal entries
-        # But we need to make sure we're querying the correct collection
-        print(f"🔍 Running query: journal_entries_collection.findOne({{_id: ObjectId('{user_id}')}}")
+        print(f"🔍 Running query: journal_entries_collection.find_one({{_id: ObjectId('{user_id}')}}")
         
-        # Retrieve user's journal entries from MongoDB
-        # This should be from journal_entries_collection, not the users collection
-        
-        journal_data = journal_entries_collection.find_one({"_id": user_object_id}).limit(limit)
+        # The issue is here: find_one() returns a dictionary, not a cursor
+        # So we can't call .limit() on it
+        journal_data = journal_entries_collection.find_one({"_id": user_object_id})
         print(f"🔍 Raw journal data: {journal_data}")
         
         # Initialize empty entries list as default
@@ -196,11 +191,12 @@ def get_journal_entries():
                 # Convert datetime objects to ISO format strings
                 for field in serialized_entry:
                     if isinstance(serialized_entry[field], datetime):
-                        serialized_entry[field] = serialized_entry[field]
+                        serialized_entry[field] = serialized_entry[field].isoformat()
                         
                 serialized_entries.append(serialized_entry)
             
-            # Sort entries by date (latest first)
+            # Note: This second sort is redundant since we already sorted above
+            # But keeping it to maintain exact functionality
             serialized_entries = sorted(serialized_entries, 
                                   key=lambda x: x.get("entryDate", ""), 
                                   reverse=True)
@@ -222,17 +218,18 @@ def get_journal_entries():
         traceback.print_exc()  # Print the full stack trace
         return jsonify({"error": str(e)}), 500
 
-
 @journal_bp.route('/get-journal-entries-dates', methods=['GET'])
 @jwt_required()
 def get_journal_dates():
     try:
         user_id = get_jwt_identity()
         print(f"🔍 Fetching journal dates for user_id: {user_id}")
-        data = request.get_json()
-        #  limit = int(request.args.get("limit", 2)) # default 30 size limit
-        limit = data.get("limit") # for limit
-        skip = data.get("skip") # for paging 
+        # data = request.get_json()
+        # limit = int(request.args.get("limit", 2)) # default 30 size limit
+        # limit = data.get("limit") # for limit
+        # skip = data.get("skip") # for paging 
+        limit = int(request.args.get("limit", 30))
+        skip = int(request.args.get("skip", 0)) 
 
         if(limit is None) : 
             limit = 30
@@ -263,6 +260,46 @@ def get_journal_dates():
         print("❌ Error fetching journal dates:", str(e))
         return jsonify({"error": "Internal server error"}), 500
     
+""" 
+@journal_bp.route('/get-journal-dates', methods=['GET'])
+@jwt_required()
+def get_journal_dates():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Fetching journal dates for user_id: {user_id}")
+
+        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not entry_doc or "journalEntries" not in entry_doc:
+            print("ℹ️ No entries found for user")
+            return jsonify([]), 200
+
+        dates = set()
+        for entry in entry_doc["journalEntries"]:
+            raw_date = entry.get("entryDate")
+            if not raw_date:
+                continue
+
+            if isinstance(raw_date, str):
+                date_str = raw_date.split("T")[0]
+            else:
+                date_str = raw_date.strftime("%Y-%m-%d")
+            dates.add(date_str)
+        
+         # Fetch check-in entry dates -- ???? Niye ? 
+        checkins = check_in_collection.find({"userId": user_id})
+        for entry in checkins:
+            ts = entry.get("timestamp")
+            if ts:
+                dates.add(ts.strftime("%Y-%m-%d"))
+
+        print("✅ Final list of journal dates:", dates)
+        return jsonify(list(dates)), 200
+
+    except Exception as e:
+        print("❌ Error fetching journal dates:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+"""
+
 @journal_bp.route("/guided", methods=["POST"])
 @jwt_required()
 def save_guided_journal():
@@ -280,8 +317,8 @@ def save_guided_journal():
             "entryContent": entry_content,
             "category": "guided",
             "prompt": prompt,
-            "createdAt": datetime.utcnow(),
-            "entryDate": datetime.utcnow().strftime("%Y-%m-%d"),
+            "createdAt": datetime.now(),
+            "entryDate": datetime.now().strftime("%Y-%m-%d"),
             "images": [],
             "journalSentiments": []
         }
@@ -293,12 +330,9 @@ def save_guided_journal():
         print("❌ Error saving guided entry:", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
-
-
-
-@journal_bp.route("/api/journal-entries", methods=["GET"])
+@journal_bp.route("/journal-entries-with-date", methods=["GET"])
 @jwt_required()
-def journal_entries_endpoint():
+def journal_entries_with_date():
     try:
         # Get the user ID from the JWT token and validate it.
         user_id = get_jwt_identity()
@@ -591,6 +625,7 @@ def sentiment_analysis():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+"""
 @journal_bp.route("/update-journal-entry/<entry_id>", methods=["PUT"])
 @jwt_required()
 def update_journal_entry(entry_id):
@@ -630,9 +665,110 @@ def update_journal_entry(entry_id):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+"""
+
+@journal_bp.route("/<entry_id>", methods=["PUT"])
+@jwt_required()
+def update_journal_entry(entry_id):
+    try:
+        print("🔵 Starting update_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}, Entry ID: {entry_id}")
+        
+        # Validate IDs
+        try:
+            user_object_id = ObjectId(user_id)
+            entry_object_id = ObjectId(entry_id)
+        except:
+            print("❌ Invalid ID format")
+            return jsonify({"error": "Invalid ID format"}), 400
+        
+        data = request.get_json()
+        print(f"🔹 Received update data: {data}")
+        
+        # Extract only allowed fields from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images')
+        journal_sentiments = data.get('journalSentiments', [])
+        
+        # Find the user's document
+        user_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not user_doc:
+            print("❌ User document not found")
+            return jsonify({"error": "User not found"}), 404
+        
+        # Find the specific entry
+        entry_index = None
+        for i, entry in enumerate(user_doc.get("journalEntries", [])):
+            if str(entry["_id"]) == entry_id:
+                entry_index = i
+                break
+        
+        if entry_index is None:
+            print("❌ Entry not found")
+            return jsonify({"error": "Entry not found"}), 404
+        
+        # Prepare update fields - only include allowed fields
+        update_fields = {
+            "updatedAt": datetime.now()
+        }
+        
+        if entry_content is not None:
+            update_fields["entryContent"] = entry_content
+        
+        # Only update sentiments if they were provided in the request
+        if journal_sentiments:
+            update_fields["journalSentiments"] = journal_sentiments
+        
+        if entry_date is not None:
+            update_fields["entryDate"] = entry_date
+
+        if images is not None:
+            update_fields["images"] = images
+        
+        # Update the specific entry
+        update_operation = {"$set": {}}
+        for k, v in update_fields.items():
+            if k == "journalSentiments":
+                # Ensure journalSentiments is properly formatted as an array
+                update_operation["$set"]["journalEntries.$.journalSentiments"] = v
+            else:
+                update_operation["$set"][f"journalEntries.$.{k}"] = v
+        
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id, "journalEntries._id": entry_object_id},
+            update_operation
+        )
+        
+        if result.modified_count == 0:
+            print("❌ No changes made to the entry")
+            return jsonify({"error": "Failed to update entry"}), 400
+        
+        print("✅ Journal entry updated successfully")
+        
+        # Fetch the updated entry
+        updated_doc = journal_entries_collection.find_one(
+            {"_id": user_object_id},
+            {"journalEntries": {"$elemMatch": {"_id": entry_object_id}}}
+        )
+        updated_entry = updated_doc["journalEntries"][0] if updated_doc and "journalEntries" in updated_doc else None
+        
+        return jsonify({
+            "message": "Journal entry updated successfully",
+            "entry": {**updated_entry, "_id": str(updated_entry["_id"])}
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error updating journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
-""" @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
+
+""" 
+@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_journal_entry(entry_id):
     try:
@@ -654,7 +790,7 @@ def delete_journal_entry(entry_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500 """
 
-@journal_bp.route("/delete/<entry_id>", methods=["DELETE"])
+@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_journal_entry(entry_id):
     try:
@@ -814,7 +950,6 @@ def delete_journal_image():
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
-
 
 
 # TODO

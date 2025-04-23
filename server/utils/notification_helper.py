@@ -1,7 +1,7 @@
 import requests
 from bson import ObjectId
 from utils.database import notification_tokens_collection, journal_entries_collection
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import jsonify
 
 def send_push_to_user_id(user_id, title, body):
@@ -38,16 +38,15 @@ def send_push_to_user_id(user_id, title, body):
 def get_all_user_push_tokens():
     try:
         token_entries = notification_tokens_collection.find(
-            {"user_id": {"$ne": None}},
-            {"_id": 0, "user_id": 1, "token": 1}
+            {"user_id": {"$ne": None}}
         )
 
         user_token_map = {}
         for entry in token_entries:
             user_id = str(entry["user_id"])
-            token = entry["token"]
-            user_token_map[user_id] = token
+            user_token_map[user_id] = entry
 
+        print(f"User Token Map: {user_token_map}")
         return user_token_map
     except Exception as e:
         print(f"❌ Error in get_all_user_push_tokens: {e}")
@@ -120,3 +119,32 @@ def has_written_journal_today(user_id):
     except Exception as e:
         print(f" Error checking journal for user {user_id}: {e}")
         return False
+    
+
+def should_send_reminder(user_doc):
+
+    frequency = user_doc.get("reminder_notification_frequency", "daily")
+    last_sent = user_doc.get("last_reminder_notification_date", None)
+
+    last_sent_date = None
+    today = datetime.utcnow().date()
+
+    if frequency == "never":
+        return {"result": False, "push_message": ""}
+
+    if last_sent:
+        if isinstance(last_sent, str):
+            last_sent = datetime.fromisoformat(last_sent)
+        last_sent_date = last_sent.date()
+
+    if frequency == "daily" and not has_written_journal_today(user_doc["user_id"]):
+        if not last_sent_date:
+            return {"result": True, "push_message": "Don't forget to write your journal for today!"}
+        return {"result": (last_sent_date != today), "push_message": "Don't forget to write your journal for today!"}
+
+    if frequency == "weekly" and not has_written_journal_today(user_doc["user_id"]):
+        if not last_sent_date:
+            return {"result": True, "push_message": "Don't forget to write your journal for this week!"}
+        return {"result": ((today - last_sent_date).days >= 7), "push_message": "Don't forget to write your journal for this week!"}
+
+    return {"result": False, "push_message": ""}

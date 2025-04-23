@@ -1,6 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
+import { StatusBar, Platform } from "react-native";
 import { RootStackParamList } from "./types/types"; // Import the route types
 
 // Bottom Navigator
@@ -31,6 +32,7 @@ import JournalScreen from "./JournalScreen";
 // import  AnalysisScreen from "./AnalysisScreen";
 import ActivityLogScreen from "./ActivityLogScreen";
 import EntryDetailScreen from "./EntryDetailScreen";
+import EditCheckInScreen from "./EditCheckInScreen";
 // Bottom Menu
 import BottomNavigation from "./BottomNavigation";
 
@@ -42,6 +44,8 @@ import Dashboard from "./screens/Dashboard";
 
 
 import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
+import { useTheme } from './context/ThemeContext';
+
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -98,51 +102,81 @@ const BottomTabs = () => {
 //  <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
 //  <Stack.Screen name="Analysis" component={AnalysisScreen} /> // Grafikde hata var
 const AppNavigation = () => {
+  const { theme, darkMode } = useTheme();
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" >
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
-        <Stack.Screen 
-          name="Home" 
-          component={HomeScreen} 
-          options={{ headerShown: false }} // Removes the back button from Home
-        />
-        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Activity" component={ActivityScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Chatbot" component={ChatbotScreen} />
-        <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
-        <Stack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ headerShown: false }}/>
+    <>
+      <StatusBar 
+        barStyle={darkMode ? "light-content" : "dark-content"}
+        backgroundColor={Platform.OS === 'android' ? theme.backgroundColor : 'transparent'}
+        translucent={true}
+      />
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName="Login"
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: theme.backgroundColor,
+            },
+            headerTintColor: theme.text,
+            headerTitleStyle: {
+              color: theme.text,
+            },
+            contentStyle: {
+              backgroundColor: theme.backgroundColor,
+            },
+            // Android specific
+            ...(Platform.OS === 'android' && {
+              headerTransparent: true,
+              headerBlurEffect: 'dark',
+            }),
+          }}
+        >
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen} 
+            options={{ headerShown: false }} 
+          />
+          <Stack.Screen 
+            name="Home" 
+            component={HomeScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Activity" component={ActivityScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+          <Stack.Screen name="FaceEmotion" component={FaceEmotionScreen} />
+          <Stack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ headerShown: false }}/>
+          <Stack.Screen name="EditCheckIn" component={EditCheckInScreen} options={{ headerShown: false }}/>
 
-        {/* <Stack.Screen name="DiaryMain" component={DiaryMainScreen} /> */}
-        {/* Fix the Header Title for DiaryMain */}
-        <Stack.Screen 
-          name="DiaryMain" 
-          component={DiaryMainScreen} 
-          options={{ headerTitle: 'Calendar', headerShown: false }} 
-        />
-        
-        <Stack.Screen name="Dashboard" component={Dashboard} />
-        <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
-        <Stack.Screen name="PromptSelection" component={PromptSelectionScreen} />
-        <Stack.Screen name="GuidedJournaling" component={GuidedJournalingScreen} />
-        <Stack.Screen name="Journal" component={JournalScreen} />
-        <Stack.Screen name="CheckIn" component={CheckInScreen} />
-        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen 
+            name="DiaryMain" 
+            component={DiaryMainScreen} 
+            options={{ headerTitle: 'Calendar', headerShown: false }} 
+          />
+          
+          <Stack.Screen name="Dashboard" component={Dashboard} />
+          <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
+          <Stack.Screen name="PromptSelection" component={PromptSelectionScreen} />
+          <Stack.Screen name="GuidedJournaling" component={GuidedJournalingScreen} />
+          <Stack.Screen name="Journal" component={JournalScreen} />
+          <Stack.Screen name="CheckIn" component={CheckInScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
 
-        <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
-        <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
-       
-        <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
-        <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
-        <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
+          <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
+          <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
+         
+          <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
+          <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
+          <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
 
-        <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+          <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
   );
 };
 

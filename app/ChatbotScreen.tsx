@@ -3,6 +3,7 @@ import { View, TextInput, TouchableOpacity, Button, FlatList, Text, StyleSheet, 
 import { sendMessageChat, deleteHistoryChat, getHistoryChat, getHistoryAllChat, getChatList, startNewChat, renameChat, saveChat } from "./services/ApiService"; // API service for chatbot
 import BottomNavigation from "./BottomNavigation";
 import { AlignJustify, ArrowUp, Bot, Download, Edit2, Plus, Trash2, User, X, Zap } from "lucide-react-native";
+import { useTheme } from './context/ThemeContext';
 
 // Define the type for each message
 interface Message {
@@ -68,6 +69,7 @@ const ChatbotScreen = () => {
       setFetchingConversations(false);
     }
   };
+  const { theme, darkMode } = useTheme();
 
   const handleSend = async () => {
     if (!input.trim() || !activeConversation) return;
@@ -264,24 +266,46 @@ const ChatbotScreen = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
+  /*style={[
+      [styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
       <View style={item.sender === "user" ? styles.userAvatar : styles.botAvatar}>
         {item.sender === "user" ? (
           <User size={16} color="#fff" />
         ) : (
           <Bot size={16} color="#fff" />
-        )}
-      </View>
-      <View style={[styles.messageBubble, item.sender === "user" ? styles.userMessage : styles.botMessage]}>
-        <Text style={[styles.messageText, item.sender === "user" ? styles.userMessageText : styles.botMessageText]}>
-          {item.text}
-        </Text>
-        <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
-      </View>
-    </View>
-  );
+        )}*/ 
 
+
+  const renderMessage = ({ item }: { item: Message }) => (
+    <View style={[styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
+      <View style={item.sender === "user" ? styles.userAvatar : styles.botAvatar}>
+          {item.sender === "user" ? (
+            <User size={16} color="#fff" />
+            ) : (
+            <Bot size={16} color="#fff" />
+            )}
+      </View>
+    <View style={[
+                styles.messageBubble,
+                item.sender === "user" ? styles.userMessage : styles.botMessage,
+                {
+                  backgroundColor: item.sender === "user" 
+                    ? (darkMode ? '#404040' : '#d1f5d3')
+                    : (darkMode ? theme.cardBackground : '#f5f5f5')
+                }
+              ]}>
+                <Text style={[
+                  styles.messageText, 
+                  item.sender === "user" ? styles.userMessageText : styles.botMessageText,
+                  { color: theme.text }
+                ]}>
+                  {item.text}
+                </Text>
+                <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
+              </View>
+            </View>
+  );
+  
   const renderSidebar = () => (
     <View style={[styles.sidebar, showSidebar ? styles.sidebarVisible : {}]}>
       <TouchableOpacity style={styles.newChatButton} onPress={handleStartNewChat}>
@@ -496,6 +520,7 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1,
     backgroundColor: "#f9f9fb",
+    padding: 20,
   },
   header: {
     flexDirection: "row",

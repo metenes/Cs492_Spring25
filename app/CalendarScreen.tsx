@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-na
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import axios from 'axios';
+import { useTheme } from './context/ThemeContext';
 
 type Entry = {
   _id: string;
@@ -12,6 +13,7 @@ type Entry = {
 
 const CalendarScreen = () => {
   const navigation = useNavigation();
+  const { theme, darkMode } = useTheme();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -75,62 +77,67 @@ const CalendarScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}>
         <TouchableOpacity>
-          <Icon name="search" size={24} color="#000" />
+          <Icon name="search" size={24} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity>
-          <Icon name="link" size={24} color="#000" />
+          <Icon name="link" size={24} color={theme.text} />
         </TouchableOpacity>
       </View>
 
       {/* Filters */}
-      <View style={styles.filterContainer}>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text>Filter</Text>
-          <Icon name="chevron-down" size={16} color="#000" />
+      <View style={[styles.filterContainer, { backgroundColor: darkMode ? '#1a1a1a' : '#fff' }]}>
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0' }]}>
+          <Text style={{ color: theme.text }}>Filter</Text>
+          <Icon name="chevron-down" size={16} color={theme.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text>Sort</Text>
-          <Icon name="chevron-down" size={16} color="#000" />
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: darkMode ? '#2d2d2d' : '#f0f0f0' }]}>
+          <Text style={{ color: theme.text }}>Sort</Text>
+          <Icon name="chevron-down" size={16} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.resultCount}>{entries.length} results</Text>
+        <Text style={[styles.resultCount, { color: theme.placeholder }]}>{entries.length} results</Text>
       </View>
 
       {/* Calendar Header */}
-      <View style={styles.calendarHeader}>
-        <Text style={styles.monthYear}>{formatMonthYear()}</Text>
+      <View style={[styles.calendarHeader, { backgroundColor: darkMode ? '#1a1a1a' : '#fff' }]}>
+        <Text style={[styles.monthYear, { color: theme.text }]}>{formatMonthYear()}</Text>
         <View style={styles.monthControls}>
           <TouchableOpacity onPress={prevMonth}>
-            <Icon name="chevron-left" size={24} color="#000" />
+            <Icon name="chevron-left" size={24} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={nextMonth}>
-            <Icon name="chevron-right" size={24} color="#000" />
+            <Icon name="chevron-right" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Weekday Headers */}
-      <View style={styles.weekdayHeader}>
+      <View style={[styles.weekdayHeader, { 
+        borderBottomColor: theme.border,
+        backgroundColor: darkMode ? '#1a1a1a' : '#fff'
+      }]}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <Text key={day} style={styles.weekdayText}>{day}</Text>
+          <Text key={day} style={[styles.weekdayText, { color: theme.placeholder }]}>{day}</Text>
         ))}
       </View>
 
       {/* Calendar Grid */}
-      <View style={styles.calendarGrid}>
+      <View style={[styles.calendarGrid, { backgroundColor: darkMode ? '#1a1a1a' : '#fff' }]}>
         {generateCalendarDays().map((day, index) => (
           <TouchableOpacity 
             key={index}
             style={[
               styles.dayCell,
-              day.hasEntry && styles.dayWithEntry
+              { backgroundColor: darkMode ? '#1a1a1a' : '#fff' },
+              day.hasEntry && [styles.dayWithEntry, { backgroundColor: darkMode ? '#404040' : '#000' }]
             ]}
           >
             <Text style={[
               styles.dayText,
+              { color: theme.text },
               day.hasEntry && styles.dayWithEntryText
             ]}>
               {day.date}
@@ -140,12 +147,15 @@ const CalendarScreen = () => {
       </View>
 
       {/* Streak Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { 
+        borderTopColor: theme.border,
+        backgroundColor: darkMode ? '#1a1a1a' : '#fff'
+      }]}>
         <View style={styles.streakContainer}>
-          <Icon name="clock" size={20} color="#000" />
-          <Text style={styles.streakText}>3</Text>
-          <Icon name="droplet" size={20} color="#000" />
-          <Text style={styles.streakMessage}>Keep going ...</Text>
+          <Icon name="clock" size={20} color={theme.text} />
+          <Text style={[styles.streakText, { color: theme.text }]}>3</Text>
+          <Icon name="droplet" size={20} color={theme.text} />
+          <Text style={[styles.streakMessage, { color: theme.placeholder }]}>Keep going ...</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -155,7 +165,6 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -175,11 +184,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
   },
   resultCount: {
     marginLeft: 'auto',
-    color: '#666',
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -200,12 +207,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   weekdayText: {
     flex: 1,
     textAlign: 'center',
-    color: '#666',
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -219,7 +224,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayWithEntry: {
-    backgroundColor: '#000',
     borderRadius: 20,
     margin: 2,
   },
@@ -232,7 +236,6 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   streakContainer: {
     flexDirection: 'row',
@@ -244,7 +247,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   streakMessage: {
-    color: '#666',
+    fontSize: 14,
   },
 });
 

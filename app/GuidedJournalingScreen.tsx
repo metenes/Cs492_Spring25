@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/ApiService";
 import BottomNavigation from "./BottomNavigation";
+import { useTheme } from './context/ThemeContext';
 //import { saveGuidedJournalEntry } from "./services/ApiService";
 
 const MAX_CHAR_COUNT = 10000;
@@ -28,6 +29,7 @@ const GuidedJournalingScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { prompt } = route.params;
+  const { theme, darkMode } = useTheme();
 
   // Load draft when component mounts
   useEffect(() => {
@@ -109,16 +111,25 @@ const GuidedJournalingScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#FFF" }}>
-        <ActivityIndicator size="large" color="black" />
-        <Text style={{ marginTop: 20 }}>Loading your journal...</Text>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: theme.backgroundColor 
+      }}>
+        <ActivityIndicator size="large" color={theme.text} />
+        <Text style={{ marginTop: 20, color: theme.text }}>Loading your journal...</Text>
       </View>
     );
   }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={{ flex: 1, backgroundColor: "#FFF", padding: 20 }}>
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: theme.backgroundColor, 
+        padding: 20 
+      }}>
         <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
           {/* Display Prompt */}
           <View style={{ marginBottom: 20 }}>
@@ -127,11 +138,10 @@ const GuidedJournalingScreen = () => {
               fontWeight: "500",
               fontStyle: "italic",
               textAlign: "center",
-              color: "#333",
+              color: theme.text,
               padding: 10,
               borderLeftWidth: 2,
-              borderLeftColor: "#888",
-              backgroundColor: "#f9f9f9",
+              borderLeftColor: theme.border,
               borderRadius: 10,
             }}>
               "{prompt}"
@@ -139,7 +149,11 @@ const GuidedJournalingScreen = () => {
           </View>
 
           {/* Entry Input */}
-          <View style={{ backgroundColor: "#F5F5F5", padding: 20, borderRadius: 12 }}>
+          <View style={{ 
+            backgroundColor: darkMode ? theme.cardBackground : "#F5F5F5", 
+            padding: 20, 
+            borderRadius: 12 
+          }}>
             {/* Clear Draft Icon */}
             <TouchableOpacity
               style={{
@@ -170,18 +184,19 @@ const GuidedJournalingScreen = () => {
                 }
               }}
             >
-              <Text style={{ fontSize: 18 }}>❌</Text>
+              <Text style={{ fontSize: 18, color: theme.text }}>❌</Text>
             </TouchableOpacity>
 
             <TextInput
               style={{
                 minHeight: 200,
                 fontSize: 16,
-                color: "#222",
+                color: theme.text,
                 textAlignVertical: "top",
               }}
               multiline
               placeholder="Start writing your response..."
+              placeholderTextColor={theme.placeholder}
               value={content}
               onChangeText={(text) => {
                 if (text.length <= MAX_CHAR_COUNT) setContent(text);
@@ -189,15 +204,24 @@ const GuidedJournalingScreen = () => {
               keyboardType="default"
               returnKeyType="done"
             />
-            <Text style={{ textAlign: "right", color: "#999" }}>{content.length} / {MAX_CHAR_COUNT}</Text>
+            <Text style={{ 
+              textAlign: "right", 
+              color: theme.placeholder 
+            }}>
+              {content.length} / {MAX_CHAR_COUNT}
+            </Text>
           </View>
 
           {/* Button Container */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            marginTop: 20 
+          }}>
             {/* Save Entry Button */}
             <TouchableOpacity
               style={{
-                backgroundColor: "#111",
+                backgroundColor: darkMode ? '#404040' : '#E0E0E0',
                 padding: 14,
                 borderRadius: 10,
                 alignItems: "center",
@@ -205,7 +229,12 @@ const GuidedJournalingScreen = () => {
               }}
               onPress={handleSaveEntry}
             >
-              <Text style={{ color: "#FFF", fontSize: 14 }}>💾 Save Entry</Text>
+              <Text style={{ 
+                color: darkMode ? theme.text : '#000', 
+                fontSize: 14 
+              }}>
+                💾 Save Entry
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

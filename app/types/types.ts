@@ -1,5 +1,5 @@
 // types.ts
-import { Entry } from '../EntryDetailScreen';
+import { Entry } from './EntryDetailScreen';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -25,5 +25,6 @@ export type RootStackParamList = {
     GuidedJournaling : { prompt: string };
     PromptSelection : undefined;
     EntryDetail: { entry: Entry };
+    EditCheckIn: { entry: Entry };
   };
   

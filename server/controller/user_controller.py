@@ -585,7 +585,31 @@ def community_trends():
 #  **Google / Appple Authentication **
 # ---------------------------------------
 
+@user_bp.route('/change-password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    user_id = get_jwt_identity()
+    # Get user data from request
+    data = request.json
+    old_password = data.get("oldPassword")
+    new_password = data.get("newPassword")
 
+    # Check if user exists
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+        
+    # Check old password
+    if not bcrypt.check_password_hash(user["password"], old_password):
+        return jsonify({"error": "Old password is incorrect"}), 401
+        
+    # Update password
+    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": hashed_password}}
+    )
+    return jsonify({"message": "Password changed successfully"}), 200    
 @user_bp.route("/auth/oauth", methods=["POST"])
 def oauth_callback():
     data = request.json

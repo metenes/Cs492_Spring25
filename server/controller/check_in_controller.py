@@ -251,3 +251,58 @@ def delete_checkin_entry(entry_id):
     except Exception as e:
         print("❌ Error deleting check-in:", str(e))
         return jsonify({"error": "Failed to delete check-in"}), 500
+
+@check_bp.route("/<entry_id>", methods=["PUT"])
+@jwt_required()
+def update_check_in(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Validate entry_id
+        if not ObjectId.is_valid(entry_id):
+            return jsonify({"error": "Invalid check-in ID"}), 400
+
+        # Find the check-in entry
+        check_in = check_in_collection.find_one({
+            "_id": ObjectId(entry_id),
+            "userId": user_id
+        })
+
+        if not check_in:
+            return jsonify({"error": "Check-in entry not found or unauthorized"}), 404
+
+        # Update the check-in entry
+        update_data = {
+            "sentiments": data.get("sentiments", check_in.get("sentiments", [])),
+            "causes": data.get("causes", check_in.get("causes", [])),
+            "comments": data.get("comments", check_in.get("comments", [])),
+            "updatedAt": datetime.utcnow()
+        }
+
+        # Validate required fields
+        if not update_data["sentiments"] or not update_data["causes"]:
+            return jsonify({"error": "Sentiments and causes are required"}), 400
+
+        # Update the document
+        result = check_in_collection.update_one(
+            {"_id": ObjectId(entry_id), "userId": user_id},
+            {"$set": update_data}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "No changes were made"}), 400
+
+        return jsonify({
+            "message": "Check-in updated successfully",
+            "check_in": {
+                "id": str(check_in["_id"]),
+                "sentiments": update_data["sentiments"],
+                "causes": update_data["causes"],
+                "comments": update_data["comments"]
+            }
+        }), 200
+
+    except Exception as e:
+        print("❌ Error updating check-in:", str(e))
+        return jsonify({"error": "Failed to update check-in"}), 500

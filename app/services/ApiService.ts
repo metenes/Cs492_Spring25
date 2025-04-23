@@ -140,6 +140,41 @@ export const fetchSentimentAnalysis = async (
   }
 };
 
+
+export const fetchEmotionalRecommendations = async () => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) throw new Error("No token found");
+
+    const response = await fetch(`${API_URL}/sentiment/insights`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to fetch emotional recommendations");
+    }
+
+    console.log("📡 Raw response:", response);
+
+    const data = await response.json();
+    console.log("📦 Parsed emotional insights and recommendations:", data);
+
+    return data;
+
+    // return await response.json();
+  } catch (error) {
+    console.error("❌ Error fetching emotional recommendations:", error);
+    throw error;
+  }
+};
+
+
+
+
 // **********************************************
 // ** Chat API** 
 // **********************************************
@@ -674,6 +709,27 @@ export const updateProfile = async (token: string, profileData: any) => {
   return await response.json();
 };
 
+export const changePassword = async (token: string, oldPassword: string, newPassword: string) => {
+  const response = await fetch(`${API_URL}/user/change-password`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Error response data:", data);
+    return { message: data.error, status: response.status };
+  }
+
+  return { message: data.message, status: response.status }; // success
+
+};
+
 // Upload profile image
 export const uploadProfileImage = async (token: string, imageFile: File) => {
 
@@ -987,13 +1043,18 @@ export const editJournalEntry = async (entryId: string, newContent: string, imag
 
 export const fetchJournalEntries = async (token: string, limit : Int32, skip : Int32 ) => {
   try {
-    const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
+    // Body not allowed for GET or HEAD requests
+    const params = new URLSearchParams();
+    params.append("limit", limit.toString());
+    params.append("skip", skip.toString());
+
+    const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({"limit" : limit, "skip" : skip}),
+      // body: JSON.stringify({"limit" : limit, "skip" : skip}),
     });
 
     console.log("API Response Status:", response.status);
@@ -1022,21 +1083,43 @@ export const fetchJournalEntries = async (token: string, limit : Int32, skip : I
 
 export const fetchJournalDates = async (token: string, limit : Int32, skip : Int32 ) => {
   try {
-    const response = await fetch(`${API_URL}/journal/get-journal-entries-dates`, {
+    // Body not allowed for GET or HEAD requests
+    const params = new URLSearchParams();
+    params.append("limit", limit.toString());
+    params.append("skip", skip.toString());
+
+    const response = await fetch(`${API_URL}/journal/get-journal-entries-dates?${params.toString()}`, {
+      method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({"limit" : limit, "skip" : skip}),
+      // body: JSON.stringify({"limit" : limit, "skip" : skip}),
     });
-
-    const data = await response.json();
-
-    if (!Array.isArray(data)) {
-      console.error("Unexpected response format:", data);
+    if (!response.ok) {
+      console.error("Error fetching journal dates:", response.statusText);
       return [];
     }
 
-    return data;
+    const data = await response.json();
+    console.log("Journal dates response:", data);
+
+    // Handle both array and object responses
+    if (Array.isArray(data)) {
+      return data;
+    } 
+    else if (typeof data === 'object' && data !== null) {
+      // If the response is an object, try to extract an array from it
+      if (Array.isArray(data.dates)) {
+        return data.dates;
+      } 
+      else if (Array.isArray(data.entries)) {
+        return data.entries.map((entry: any) => entry.entryDate);
+      }
+    }
+
+    console.warn("Unexpected response format for journal dates:", data);
+    return [];
   } catch (error) {
     console.error("Error fetching journal dates:", error);
     return [];
@@ -1081,7 +1164,7 @@ export const fetchJournalEntriesWithDate = async (
     params.append("end_date", end_date);
 
     // Updated endpoint to match new data structure
-    const response = await fetch(`${API_URL}/journal/api/journal-entries?${params.toString()}`, {
+    const response = await fetch(`${API_URL}/journal/journal-entries-with-date?${params.toString()}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -1344,7 +1427,6 @@ export const fetchCheckIn = async (token: string) => {
 };
 
 
-
 export const editCheckIn = async (entryId: string, sentiments: string[], causes: string[], comments: string[] = []) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -1471,6 +1553,67 @@ export const saveNotificationToken = async (token: string) => {
   }
 }
 
+export const updateNotificationFrequency = async (frequency: string) => {
+  try {
+    const userToken = await AsyncStorage.getItem('userToken');
+    if (!userToken) {
+      throw new Error('No authentication token available');
+    }
+
+    const pushToken = await AsyncStorage.getItem('expoPushToken');
+
+    const response = await fetch(`${API_URL}/notification/update-notification-preferences`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ frequency, pushToken }),
+    });
+
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("Error response data:", data);
+      return { message: data.error, status: response.status };
+    }
+  
+    return { message: data.message, status: response.status }; // success
+  } catch (error) {
+    console.error("Error updating notification frequency:", error);
+    throw error;
+  }
+}
+
+export const fetchNotificationPreferences = async () => {
+  try {
+    const userToken = await AsyncStorage.getItem('userToken');
+    const pushToken = await AsyncStorage.getItem('expoPushToken');
+    if (!userToken) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(`${API_URL}/notification/get-notification-preferences/${pushToken}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${userToken}`,
+      },
+    });
+    console.log("Response status:", response);
+    const data = await response.json();
+    console.log("Response data:", data);
+    if (!response.ok) {
+      console.error("Error response data:", data);
+      return { message: data.error, status: response.status };
+    }
+
+    return { message: data.message, status: response.status, preference: data.reminder_notification_frequency }; // success
+  } catch (error) {
+    console.error("Error fetching notification preferences:", error);
+    throw error;
+  }
+};
+
 // **********************************************
 // ** Journal Image Upload API **
 // **********************************************
@@ -1571,6 +1714,134 @@ export const deleteJournalImage = async (imageUrl: string): Promise<void> => {
     console.log('✅ Image deleted successfully');
   } catch (error) {
     console.error('❌ Error deleting journal image:', error);
+    throw error;
+  }
+};
+
+// Function to update a check-in entry
+export const updateCheckIn = async (entryId: string, sentiments: string[], causes: string[], comments: string[] = []) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/check-in/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sentiments,
+        causes,
+        comments
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update check-in');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Check-in update error:', error);
+    throw error;
+  }
+};
+
+export const updateJournalEntry = async (
+  entryId: string,
+  entryContent: string,
+  entryDate?: string,
+  images?: { fileName: string; signedUrl: string }[]
+) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    console.log('Starting sentiment analysis for entry content:', entryContent);
+    // Get sentiment analysis for the updated content
+    const sentimentResult = await analyzeSentiment(entryContent);
+    console.log('Raw sentiment analysis result:', JSON.stringify(sentimentResult, null, 2));
+
+    if (!sentimentResult.emotions || !Array.isArray(sentimentResult.emotions)) {
+      throw new Error('Invalid sentiment analysis result format');
+    }
+
+    // Define Emotion type
+    type Emotion = { code: string; score: number };
+
+    // Sort emotions by score (highest first)
+    const sortedEmotions = sentimentResult.emotions.sort(
+      (a: Emotion, b: Emotion) => b.score - a.score
+    );
+
+    // Get dominant emotion (highest score)
+    const dominantEmotion = sortedEmotions[0];
+
+    // Filter additional high-scoring emotions (>= 0.65)
+    const additionalEmotions = sortedEmotions
+      .slice(1)
+      .filter((emotion: Emotion) => emotion.score >= 0.65);
+
+    // Combine dominant emotion with high-scoring ones
+    const selectedEmotions: Emotion[] = [dominantEmotion, ...additionalEmotions];
+
+    // Map selected emotions
+    const mappedSentiments = selectedEmotions.map((emotion: Emotion) => ({
+      emotion: emotion.code,
+      percentage: emotion.score,
+    }));
+
+    console.log('Mapped sentiments for server:', JSON.stringify(mappedSentiments, null, 2));
+
+    const requestBody = {
+      entryContent,
+      entryDate: entryDate || new Date().toISOString(),
+      images: images || [],
+      journalSentiments: mappedSentiments
+    };
+
+    console.log('Sending update request with data:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(`${API_URL}/journal/${entryId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    // First get the raw response text
+    const responseText = await response.text();
+    console.log('Raw server response:', responseText);
+    
+    // Try to parse as JSON, but handle cases where it's not JSON
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse server response:', responseText);
+      throw new Error('Server returned an invalid response. Please try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(responseData.error || 'Failed to update journal entry');
+    }
+
+    // Ensure the response includes the updated sentiment analysis
+    if (!responseData.entry.journalSentiments) {
+      responseData.entry.journalSentiments = mappedSentiments;
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error('Journal entry update error:', error);
     throw error;
   }
 };

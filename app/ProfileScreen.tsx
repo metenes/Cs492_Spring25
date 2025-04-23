@@ -14,29 +14,23 @@ import {
   useColorScheme,
   Dimensions,
   Platform,
-  PermissionsAndroid,
   Animated,
 } from "react-native";
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from "expo-media-library";
-import { Audio } from "expo-av";
 import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount } from "./services/ApiService";
+import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount, API_URL } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
 import { useTheme } from './context/ThemeContext';
-const API_URL = 'http://172.20.10.2:5000';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
-
 const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
-  const systemColorScheme = useColorScheme();
   const [isLoading, setIsLoading] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   
@@ -48,8 +42,6 @@ const ProfileScreen = () => {
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   
   // App preferences
   const { darkMode, theme, toggleDarkMode } = useTheme();
@@ -185,10 +177,10 @@ const ProfileScreen = () => {
     try {
       const storedDarkMode = await AsyncStorage.getItem('darkMode');
       if (storedDarkMode !== null) {
-        toggleDarkMode();
-      } else {
-        // Use system default if no preference saved
-        toggleDarkMode();
+        // Only set dark mode if it's different from current state
+        if (darkMode !== (storedDarkMode === 'true')) {
+          toggleDarkMode();
+        }
       }
     } catch (error) {
       console.error('Error loading app preferences:', error);
@@ -428,11 +420,6 @@ const ProfileScreen = () => {
       return;
     }
 
-    // Validate inputs
-    if (newPassword && newPassword !== confirmPassword) {
-      return Alert.alert('Error', 'Passwords do not match');
-    }
-
     try {
       setIsLoading(true);
       
@@ -440,16 +427,12 @@ const ProfileScreen = () => {
         name,
         bio,
         phone,
-        location,
-        ...(newPassword ? { password: newPassword } : {})
+        location
       };
 
       await updateProfile(token, profileData); 
 
       Alert.alert('Success', 'Profile updated successfully');
-      // Reset password fields
-      setNewPassword('');
-      setConfirmPassword('');
     } catch (error) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
@@ -540,12 +523,16 @@ const ProfileScreen = () => {
               />
             )}
             {profileImage ? (
-              <Image
-                source={{ uri: profileImage }}
-                style={[styles.avatar, { backgroundColor: 'transparent' }]}
-                onLoadStart={() => setImageLoading(true)}
-                onLoadEnd={() => setImageLoading(false)}
-              />
+              <TouchableOpacity
+                onPress={() => setModalVisible(true)}
+              >
+                <Image
+                  source={{ uri: profileImage }}
+                  style={[styles.avatar, { backgroundColor: 'transparent' }]}
+                  onLoadStart={() => setImageLoading(true)}
+                  onLoadEnd={() => setImageLoading(false)}
+                />
+              </TouchableOpacity>
             ) : (
               <View style={[styles.skeletonAvatar, { backgroundColor: theme.cardBackground }]}>
                 <Ionicons name="person" size={40} color={theme.textSecondary} />
@@ -625,24 +612,6 @@ const ProfileScreen = () => {
           placeholderTextColor={theme.placeholder}
           value={location}
           onChangeText={setLocation}
-        />
-        
-        <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 16 }]}>Change Password</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Enter new password"
-          placeholderTextColor={theme.placeholder}
-          secureTextEntry
-          value={newPassword}
-          onChangeText={setNewPassword}
-        />
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Retype new password"
-          placeholderTextColor={theme.placeholder}
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
         />
         
         <TouchableOpacity style={styles.saveButton} onPress={saveProfileChanges}>
