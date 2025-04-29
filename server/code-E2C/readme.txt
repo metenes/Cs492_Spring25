@@ -10,3 +10,4 @@ SSH connection command
 ssh -i SentioKeyPair.pem ec2-user@16.171.239.130
 
 DO NOT USE THESE CODE FILES IN /code-E2C they are already uploaded 
+13.60.245.250

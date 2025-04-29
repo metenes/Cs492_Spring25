@@ -3,6 +3,8 @@ import os, json, torch, boto3
 from flask import Flask, request, jsonify
 from transformers import BertTokenizer, BertForSequenceClassification
 from botocore.exceptions import ClientError
+# LLM 
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 app = Flask(__name__)
 BUCKET = "sentiobucket"
@@ -10,16 +12,23 @@ BASE_MODEL_KEY = "models/model.pt"
 LABELS = ["admiration", "amusement", "anger", "annoyance", "approval", "caring", "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust", "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love", "nervousness", "optimism", "pride", "realization", "relief", "remorse", "sadness", "surprise", "neutral"]
 
 s3 = boto3.client("s3")
+# Emotion model 
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-last_user_id, cached_model = None, None
 
+# LLM 
+chat_tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-rw-1b", trust_remote_code=True)
+chat_model = AutoModelForCausalLM.from_pretrained("tiiuae/falcon-rw-1b", trust_remote_code=True)
+chat_pipeline = pipeline("text-generation", model=chat_model, tokenizer=chat_tokenizer, device=0 if torch.cuda.is_available() else -1)
+
+# For fast response 
+last_user_id, cached_model = None, None
 
 @app.route("/predict", methods=["POST"])
 def predict():
     print("inferene/predict started")
     global last_user_id, cached_model
     data = request.get_json()
-    user_id, message, conversation_id  = data.get("user_id"), data.get("message"), data.get("conversation_id")
+    user_id, message, chat_id  = data.get("user_id"), data.get("message"), data.get("chat_id")
     print("message reviced to Predict : {}".format(message))
     if not user_id or not message:
         return jsonify({"error": "user_id and message required"}), 400
@@ -62,14 +71,30 @@ def predict():
         # emotion_probability_mapping = [(emotion_labels[i], probs[i]) for i in range(len(probs))]
         # sorted_emotions = sorted(emotion_probability_mapping, key=lambda x: x[1], reverse=True)
 
-        print("generating respose done : {}".format(top))
+        # Chat response 
+        print("generating emotion respose done: {} Chat response started".format(top))
+        # --------- NEW SECTION: Generate Chatbot Reply ---------
+        emotions_str = ", ".join(predicted_emotions[:3]) if predicted_emotions else "neutral"
+        # promt for the pre-trained 
+        prompt = (
+            "You are a friendly and supportive mental health assistant.\nThe user just said: \"{}\"\n.The user's emotional state includes: {}.\nHow would you support or reply to them?".format(message,emotions_str)
+        )
+        print("chat prompt to be given: {}".format(prompt))
+
+        chat_output = chat_pipeline(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)[0]['generated_text']
+        chatbot_reply = chat_output.split("How would you support or reply to them?")[-1].strip()
+        print("generating Chat response done : {}".format(chatbot_reply))
+
+        print("generating respose done :\n emotion: {},\n chat: {}".format(top,chatbot_reply))
         return jsonify({
             "user_id": user_id,
             "input_text": message,
             "predicted_emotions": predicted_emotions,
             "emotion_probabilities": {LABELS[i]: float(probs[i]) for i in range(len(probs))},
-            "top_emotions": top
+            "top_emotions": top,
+            "chat_response": chatbot_reply
         })
+    
     except Exception as e:
         print("error happened {}".format(e))
         return jsonify({"error": str(e)}), 500

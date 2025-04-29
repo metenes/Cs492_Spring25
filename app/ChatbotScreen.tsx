@@ -29,7 +29,7 @@ const ChatbotScreen = () => {
   const [fetchingConversations, setFetchingConversations] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTitle, setEditingTitle] = useState("");
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editingchat_id, setEditingchat_id] = useState<string | null>(null);
   const [savingChat, setSavingChat] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -174,19 +174,17 @@ const ChatbotScreen = () => {
   
     try {
       const data = await getHistoryChat(id);
-      
-      // Check if data.messages exists and has items
-      if (data && data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-        const loadedMessages: Message[] = data.messages.map((m: any, i: number) => ({
+      console.log("history chat: ", data); 
+      if (data && data.message && Array.isArray(data.message) && data.message.length > 0) {
+        const loadedMessages: Message[] = data.message.map((m: any, i: number) => ({
           id: String(i + 1),
           sender: m.sender,
-          text: m.text,
+          text: m.text,  // ✅ Use `text`, not `title`
           timestamp: new Date(m.timestamp || Date.now())
         }));
       
         setMessages(loadedMessages);
       } else {
-        // Return an empty array if no messages exist yet
         console.log("No messages found for this conversation, starting fresh");
         setMessages([
           { id: '1', sender: "bot", text: "Hi there! How can I help you today?", timestamp: new Date() }
@@ -242,7 +240,7 @@ const ChatbotScreen = () => {
   };
 
   const openEditModal = (id: string, currentTitle: string) => {
-    setEditingConversationId(id);
+    setEditingchat_id(id);
     setEditingTitle(currentTitle);
     setShowEditModal(true);
   };
@@ -397,8 +395,8 @@ const ChatbotScreen = () => {
             <TouchableOpacity 
               style={[styles.modalButton, styles.modalSaveButton]}
               onPress={() => {
-                if (editingConversationId && editingTitle.trim()) {
-                  handleRenameChat(editingConversationId, editingTitle);
+                if (editingchat_id && editingTitle.trim()) {
+                  handleRenameChat(editingchat_id, editingTitle);
                   setShowEditModal(false);
                 }
               }}
@@ -421,7 +419,7 @@ const ChatbotScreen = () => {
         <Text style={styles.headerTitle}>
           {activeConversation ? 
             (conversations.find(c => c.id === activeConversation)?.title || "Chat") : 
-            "Claude"}
+            "Sentio ChatBot"}
         </Text>
         
         {activeConversation && (
@@ -446,7 +444,7 @@ const ChatbotScreen = () => {
         <View style={styles.chatContainer}>
           {!activeConversation && conversations.length === 0 ? (
             <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeTitle}>Welcome to Claude</Text>
+              <Text style={styles.welcomeTitle}>Welcome to Sentio ChatBot</Text>
               <Text style={styles.welcomeText}>Start a new chat to begin conversation</Text>
               <TouchableOpacity style={styles.welcomeButton} onPress={handleStartNewChat}>
                 <Plus size={20} color="#fff" />
@@ -474,7 +472,7 @@ const ChatbotScreen = () => {
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#007BFF" />
-              <Text style={styles.loadingText}>Claude is thinking...</Text>
+              <Text style={styles.loadingText}>Sentio ChatBot is thinking...</Text>
             </View>
           )}
           
@@ -488,7 +486,7 @@ const ChatbotScreen = () => {
                   style={styles.input}
                   value={input}
                   onChangeText={setInput}
-                  placeholder="Message Claude..."
+                  placeholder="Message Sentio ChatBot..."
                   placeholderTextColor="#888"
                   multiline
                   onSubmitEditing={handleSend}
@@ -505,7 +503,7 @@ const ChatbotScreen = () => {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.disclaimer}>Claude may display inaccurate info, including about people.</Text>
+              <Text style={styles.disclaimer}>Sentio ChatBot may display inaccurate info, including about people.</Text>
             </KeyboardAvoidingView>
           )}
         </View>

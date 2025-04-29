@@ -7,6 +7,7 @@ const API_URL = "http://192.168.1.104:5000";
 // const API_URL = "http://192.168.1.40:5000"; kgn
 
 // Define the emotions array to match the backend
+/* 
 const EMOTIONS = [
   // Free Journaling Emotions (28)
   "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -21,7 +22,7 @@ const EMOTIONS = [
   // Check-in Emotions (5)
   "energy", "focus", "motivation", "stress", "balance"
 ];
-
+*/
 
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -179,11 +180,11 @@ export const fetchEmotionalRecommendations = async () => {
 // ** Chat API** 
 // **********************************************
 // Send message
-export const sendMessageChat = async (message: string, conversationId: string) => {
+export const sendMessageChat = async (message: string, chat_id: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
-    const response = await fetch(`${API_URL}/chat/chat-message/${conversationId}`, {
+    const response = await fetch(`${API_URL}/chat/chat-message/${chat_id}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -191,7 +192,7 @@ export const sendMessageChat = async (message: string, conversationId: string) =
       },
       body: JSON.stringify({
         message,
-        conversationId
+        chat_id
       }),
     });
 
@@ -214,7 +215,7 @@ export const sendMessageChat = async (message: string, conversationId: string) =
 };
 
 // delete history of chat 
-export const deleteHistoryChat = async(chat_id : string)  => {
+export const clearHistoryChat = async(chat_id : string)  => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
@@ -231,7 +232,7 @@ export const deleteHistoryChat = async(chat_id : string)  => {
     }
 
     const data = await response.json();
-    console.log("Data recived from test : ", data)
+    console.log("Data recived from delete : ", data)
     if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
@@ -244,7 +245,7 @@ export const deleteHistoryChat = async(chat_id : string)  => {
 }
 
 // delete history of chat 
-export const deleteHistoryAllChat = async()  => {
+export const clearHistoryAllChat = async()  => {
   try {
     const token = await AsyncStorage.getItem("userToken");
 
@@ -272,6 +273,69 @@ export const deleteHistoryAllChat = async()  => {
     return "Sorry, something went wrong.";
   }
 }
+
+
+// delete history of chat 
+export const deleteHistoryChat = async(chat_id : string)  => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/delete-chat/${chat_id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data recived from delete : ", data)
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+  return data.message; // return the chatbot response
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+}
+
+// delete history of chat 
+export const deleteHistoryAllChat = async()  => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    const response = await fetch(`${API_URL}/chat/delete-chat-all`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data recived from test : ", data)
+    if (!data || !data.message) {
+      throw new Error("Invalid response format");
+    }
+
+  return data.message; // return the chatbot response
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+}
+
+
 
 // history of chat  - all
 export const getHistoryAllChat = async()  => {
@@ -326,7 +390,7 @@ export const getHistoryChat = async(chat_id: string) => {
     }
     
     const data = await response.json();
-    console.log("Data received from test: ", data);
+    console.log("Data received from History: ", data);
     
     if (!data || !data.message) {
       throw new Error("Invalid response format");
@@ -441,9 +505,9 @@ export const renameChat = async(chat_id: string, name: string) => {
     }
     
     const data = await response.json();
-    console.log("Data received from test: ", data);
+    console.log("Data received from rename: ", data);
     
-    if (!data || !data.message) {
+    if (!data || !data.title) {
       throw new Error("Invalid response format");
     }
 
@@ -471,7 +535,7 @@ export const saveChat = async(chat_id: string) => {
     }
     
     const data = await response.json();
-    console.log("Data received from test: ", data);
+    console.log("Data received from save chat: ", data);
     
     if (!data || !data.message) {
       throw new Error("Invalid response format");

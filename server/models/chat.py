@@ -21,7 +21,7 @@ class Message(Document):
 
 class Chat(Document):
     user_id = StringField(required=True)  # Reference to User
-    conversation_id = StringField(required=True, unique=True)
+    chat_id = StringField(required=True, unique=True)
     messages = ListField(ReferenceField(Message))
     started_at = DateTimeField(default=datetime.now)
     last_updated = DateTimeField(default=datetime.now)
@@ -33,7 +33,7 @@ class Chat(Document):
     def to_json(self):
         return {
             "user_id": self.user_id,
-            "conversation_id": self.conversation_id,
+            "chat_id": self.chat_id,
             "started_at": self.started_at,
             "last_updated": self.last_updated,
             "model_version": self.model_version,
@@ -55,7 +55,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-    conversation_id: str
+    chat_id: str
     model_version: str
     model_updated: bool
     inference_time: float
