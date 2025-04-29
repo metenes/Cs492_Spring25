@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from './context/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeAreaView } from 'react-native-safe-area-context'; // 🆕 Added this
 
 const BottomNavigation = ({ activeScreen }: { activeScreen: string }) => {
   const navigation = useNavigation();
@@ -16,40 +17,43 @@ const BottomNavigation = ({ activeScreen }: { activeScreen: string }) => {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
+    <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.name}
           style={styles.tab}
           onPress={() => navigation.navigate(tab.screen)}
         >
-          <Icon
-            name={tab.icon}
-            size={24}
-            color={activeScreen === tab.screen ? theme.text : theme.placeholder}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color: activeScreen === tab.screen ? theme.text : theme.placeholder,
-              },
-            ]}
-          >
-            {tab.name}
-          </Text>
+          <View style={{ alignItems: 'center' }}>
+            <Icon
+              name={tab.icon}
+              size={24}
+              color={activeScreen === tab.screen ? theme.text : theme.placeholder}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color: activeScreen === tab.screen ? theme.text : theme.placeholder,
+                },
+              ]}
+            >
+              {tab.name}
+            </Text>
+          </View>
         </TouchableOpacity>
       ))}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: 60,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
+    paddingBottom: 5, // 🆕 slight padding
+    paddingTop: 5, // 🆕 slight padding
   },
   tab: {
     flex: 1,

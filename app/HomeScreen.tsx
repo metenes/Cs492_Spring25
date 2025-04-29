@@ -11,6 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useEffect } from "react";
 import { useTheme } from './context/ThemeContext';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchJournalEntries,fetchJournalDates, calculateStreak, fetchCheckIn} from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -31,6 +32,7 @@ type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
 const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) => {
   const { theme, darkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   // const navigation = useNavigation<HomeScreenNavigationProp>();
 
   // Animation state for the floating menu

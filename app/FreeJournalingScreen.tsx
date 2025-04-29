@@ -230,7 +230,8 @@ const FreeJournalingScreen = () => {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={{ flex: 1, backgroundColor: theme.backgroundColor, padding: 20 }}>
+      <View style={{ flex: 1, backgroundColor: theme.backgroundColor}}>
+         <View style={{ flex: 1, padding: 20 }}>
         {/* Journal Entry Section */}
         <View
           style={{
@@ -475,10 +476,12 @@ const FreeJournalingScreen = () => {
           </View>
         </Modal>
 
-        {/* ✅ Bottom Navigation */}
-        <BottomNavigation activeScreen="FreeJournaling" />
-      </View>
-    </TouchableWithoutFeedback>
+        </View> {/* closes the padding View */}
+          <View>
+            <BottomNavigation activeScreen="FreeJournaling" />
+          </View>
+        </View>
+  </TouchableWithoutFeedback>
   );
 };
 
