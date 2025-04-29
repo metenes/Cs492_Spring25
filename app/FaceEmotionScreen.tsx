@@ -1,57 +1,71 @@
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import { facePhotoAnalysis } from './services/ApiService';
+import { Camera, CameraType, useCameraPermissions } from 'expo-camera';
+import { useRef, useState } from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { facePhotoAnalysis } from './services/ApiService'; // Assuming you already made this API function
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('front');
   const [permission, requestPermission] = useCameraPermissions();
-  const [cameraRef, setCameraRef] = useState(null);
-  const [emotion, setEmotion] = useState(null);
+  const cameraRef = useRef<Camera>(null);
+  const [emotion, setEmotion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
   if (!permission) {
-    // Camera permissions are still loading.
     return <View />;
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button onPress={requestPermission} title="grant permission" />
+        <Button onPress={requestPermission} title="Grant Permission" />
       </View>
     );
   }
 
   function toggleCameraFacing() {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
   }
 
   const takePhotoAndUpload = async () => {
-    if (cameraRef && cameraRef.current) {
-       const photo = await cameraRef.current.takePictureAsync({ base64: true });
+    if (cameraRef.current) {
+      setLoading(true);
+      const photo = await cameraRef.current.takePictureAsync({ base64: true });
 
       try {
         const result = await facePhotoAnalysis(photo.base64);
         console.log("🔍 Analysis Result:", result);
+        if (result && result.emotion) {
+          setEmotion(result.emotion);
+        } else {
+          setEmotion("No emotion detected");
+        }
       } catch (error) {
         console.error(error);
-        console.log("Upload Error", "Could not upload the image.");
+        setEmotion("Error during analysis");
       }
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <CameraView style={styles.camera} facing={facing}>
+      <Camera style={styles.camera} type={facing} ref={cameraRef}>
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
             <Text style={styles.text}>Flip Camera</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={takePhotoAndUpload}>
+            <Text style={styles.text}>Take Photo</Text>
+          </TouchableOpacity>
         </View>
-      </CameraView>
+      </Camera>
+      {loading && <ActivityIndicator size="large" color="#0000ff" />}
+      {emotion && (
+        <View style={styles.emotionContainer}>
+          <Text style={styles.emotionText}>Detected Emotion: {emotion}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -59,7 +73,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
   },
   message: {
     textAlign: 'center',
@@ -69,20 +82,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   buttonContainer: {
-    flex: 1,
     flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 20,
     backgroundColor: 'transparent',
-    margin: 64,
   },
   button: {
-    flex: 1,
-    alignSelf: 'flex-end',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+    borderRadius: 8,
   },
   text: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
     color: 'white',
+    fontWeight: 'bold',
+  },
+  emotionContainer: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#eee',
+  },
+  emotionText: {
+    fontSize: 22,
+    fontWeight: 'bold',
   },
 });
-

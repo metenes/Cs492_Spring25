@@ -32,6 +32,7 @@ const ChatbotScreen = () => {
   const [editingchat_id, setEditingchat_id] = useState<string | null>(null);
   const [savingChat, setSavingChat] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { theme, darkMode } = useTheme();
 
   // Fetch conversations once when component mounts
   useEffect(() => {
@@ -69,7 +70,6 @@ const ChatbotScreen = () => {
       setFetchingConversations(false);
     }
   };
-  const { theme, darkMode } = useTheme();
 
   const handleSend = async () => {
     if (!input.trim() || !activeConversation) return;
@@ -179,7 +179,7 @@ const ChatbotScreen = () => {
         const loadedMessages: Message[] = data.message.map((m: any, i: number) => ({
           id: String(i + 1),
           sender: m.sender,
-          text: m.text,  // ✅ Use `text`, not `title`
+          text: m.text,
           timestamp: new Date(m.timestamp || Date.now())
         }));
       
@@ -264,44 +264,39 @@ const ChatbotScreen = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  /*style={[
-      [styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
+  const renderMessage = ({ item }: { item: Message }) => (
+    <View style={[styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
       <View style={item.sender === "user" ? styles.userAvatar : styles.botAvatar}>
         {item.sender === "user" ? (
           <User size={16} color="#fff" />
         ) : (
           <Bot size={16} color="#fff" />
-        )}*/ 
-
-
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageRow, item.sender === "user" ? styles.userRow : styles.botRow]}>
-      <View style={item.sender === "user" ? styles.userAvatar : styles.botAvatar}>
-          {item.sender === "user" ? (
-            <User size={16} color="#fff" />
-            ) : (
-            <Bot size={16} color="#fff" />
-            )}
+        )}
       </View>
-    <View style={[
-                styles.messageBubble,
-                item.sender === "user" ? styles.userMessage : styles.botMessage,
-                {
-                  backgroundColor: item.sender === "user" 
-                    ? (darkMode ? '#404040' : '#d1f5d3')
-                    : (darkMode ? theme.cardBackground : '#f5f5f5')
-                }
-              ]}>
-                <Text style={[
-                  styles.messageText, 
-                  item.sender === "user" ? styles.userMessageText : styles.botMessageText,
-                  { color: theme.text }
-                ]}>
-                  {item.text}
-                </Text>
-                <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
-              </View>
-            </View>
+      <View style={[
+        styles.messageBubble,
+        item.sender === "user" ? styles.userMessage : styles.botMessage,
+        {
+          backgroundColor: item.sender === "user" 
+            ? (darkMode ? '#404040' : '#d1f5d3')
+            : (darkMode ? theme.cardBackground : '#f5f5f5')
+        }
+      ]}>
+        <Text style={[
+          styles.messageText, 
+          {
+            color: item.sender === "user" 
+              ? (darkMode ? '#fff' : '#000') 
+              : theme.text
+          }
+        ]}>
+          {item.text}
+        </Text>
+        <Text style={[styles.timestamp, { color: darkMode ? '#aaa' : '#666' }]}>
+          {formatTime(item.timestamp)}
+        </Text>
+      </View>
+    </View>
   );
   
   const renderSidebar = () => (
@@ -368,28 +363,37 @@ const ChatbotScreen = () => {
       onRequestClose={() => setShowEditModal(false)}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: darkMode ? theme.cardBackground : '#fff' }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Edit Chat Name</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Chat Name</Text>
             <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <X size={20} color="#333" />
+              <X size={20} color={theme.text} />
             </TouchableOpacity>
           </View>
           
           <TextInput
-            style={styles.modalInput}
+            style={[styles.modalInput, { 
+              borderColor: darkMode ? '#444' : '#ddd',
+              backgroundColor: darkMode ? '#333' : '#fff',
+              color: theme.text
+            }]}
             value={editingTitle}
             onChangeText={setEditingTitle}
             placeholder="Enter chat name"
+            placeholderTextColor={darkMode ? '#aaa' : '#888'}
             autoFocus
           />
           
           <View style={styles.modalButtons}>
             <TouchableOpacity 
-              style={[styles.modalButton, styles.modalCancelButton]}
+              style={[styles.modalButton, styles.modalCancelButton, {
+                backgroundColor: darkMode ? '#333' : '#f0f0f0'
+              }]}
               onPress={() => setShowEditModal(false)}
             >
-              <Text style={styles.modalButtonText}>Cancel</Text>
+              <Text style={[styles.modalButtonText, {
+                color: darkMode ? '#fff' : '#333'
+              }]}>Cancel</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -411,12 +415,15 @@ const ChatbotScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? theme.background : "#f9f9fb" }]}>
+      <View style={[styles.header, { 
+        backgroundColor: darkMode ? theme.cardBackground : "#fff",
+        borderBottomColor: darkMode ? '#333' : '#eaecef'
+      }]}>
         <TouchableOpacity onPress={() => setShowSidebar(!showSidebar)} style={styles.menuButton}>
-          <AlignJustify size={24} color="#333" />
+          <AlignJustify size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
           {activeConversation ? 
             (conversations.find(c => c.id === activeConversation)?.title || "Chat") : 
             "Sentio ChatBot"}
@@ -441,11 +448,11 @@ const ChatbotScreen = () => {
         {renderSidebar()}
         {renderEditModal()}
         
-        <View style={styles.chatContainer}>
+        <View style={[styles.chatContainer, { backgroundColor: darkMode ? theme.background : 'transparent' }]}>
           {!activeConversation && conversations.length === 0 ? (
             <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeTitle}>Welcome to Sentio ChatBot</Text>
-              <Text style={styles.welcomeText}>Start a new chat to begin conversation</Text>
+              <Text style={[styles.welcomeTitle, { color: theme.text }]}>Welcome to Sentio ChatBot</Text>
+              <Text style={[styles.welcomeText, { color: darkMode ? '#aaa' : '#666' }]}>Start a new chat to begin conversation</Text>
               <TouchableOpacity style={styles.welcomeButton} onPress={handleStartNewChat}>
                 <Plus size={20} color="#fff" />
                 <Text style={styles.welcomeButtonText}>New chat</Text>
@@ -462,7 +469,7 @@ const ChatbotScreen = () => {
               ListEmptyComponent={
                 activeConversation ? (
                   <View style={styles.emptyChat}>
-                    <Text style={styles.emptyChatText}>No messages yet</Text>
+                    <Text style={[styles.emptyChatText, { color: darkMode ? '#aaa' : '#888' }]}>No messages yet</Text>
                   </View>
                 ) : null
               }
@@ -472,38 +479,52 @@ const ChatbotScreen = () => {
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#007BFF" />
-              <Text style={styles.loadingText}>Sentio ChatBot is thinking...</Text>
+              <Text style={[styles.loadingText, { color: darkMode ? '#aaa' : '#777' }]}>Sentio ChatBot is thinking...</Text>
             </View>
           )}
           
           {activeConversation && (
             <KeyboardAvoidingView 
               behavior={Platform.OS === "ios" ? "padding" : "height"} 
-              style={styles.inputWrapper}
+              style={[styles.inputWrapper, { 
+                backgroundColor: darkMode ? theme.cardBackground : '#fff',
+                borderTopColor: darkMode ? '#333' : '#eaecef'
+              }]}
             >
               <View style={styles.inputContainer}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, {
+                    backgroundColor: darkMode ? '#222' : '#fff',
+                    borderColor: darkMode ? '#444' : '#ddd',
+                    color: theme.text
+                  }]}
                   value={input}
                   onChangeText={setInput}
                   placeholder="Message Sentio ChatBot..."
-                  placeholderTextColor="#888"
+                  placeholderTextColor={darkMode ? '#aaa' : '#888'}
                   multiline
                   onSubmitEditing={handleSend}
                 />
                 <TouchableOpacity 
-                  style={[styles.sendButton, !input.trim() || !activeConversation ? styles.disabledButton : {}]} 
+                  style={[
+                    styles.sendButton, 
+                    !input.trim() || !activeConversation ? 
+                      [styles.disabledButton, { backgroundColor: darkMode ? '#333' : '#f0f0f0' }] : 
+                      {}
+                  ]} 
                   onPress={handleSend}
                   disabled={!input.trim() || loading || !activeConversation}
                 >
                   {input.trim() ? (
                     <ArrowUp size={20} color="#fff" />
                   ) : (
-                    <Zap size={20} color="#aaa" />
+                    <Zap size={20} color={darkMode ? '#777' : '#aaa'} />
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.disclaimer}>Sentio ChatBot may display inaccurate info, including about people.</Text>
+              <Text style={[styles.disclaimer, { color: darkMode ? '#888' : '#888' }]}>
+                Sentio ChatBot may display inaccurate info, including about people.
+              </Text>
             </KeyboardAvoidingView>
           )}
         </View>
@@ -517,7 +538,6 @@ const ChatbotScreen = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-    backgroundColor: "#f9f9fb",
     padding: 20,
   },
   header: {
@@ -525,8 +545,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eaecef",
-    backgroundColor: "#fff",
   },
   menuButton: {
     marginRight: 16,
@@ -534,7 +552,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     flex: 1,
   },
   saveButton: {
@@ -650,11 +667,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   userMessage: {
-    backgroundColor: "#10a37f",
     borderBottomRightRadius: 4,
   },
   botMessage: {
-    backgroundColor: "#fff",
     borderBottomLeftRadius: 4,
     borderWidth: 1,
     borderColor: "#eaecef",
@@ -663,15 +678,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
-  userMessageText: {
-    color: "#fff",
-  },
-  botMessageText: {
-    color: "#000",
-  },
+  userMessageText: {},
+  botMessageText: {},
   timestamp: {
     fontSize: 11,
-    color: "#666",
     alignSelf: "flex-end",
     marginTop: 4,
   },
@@ -680,8 +690,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: "#eaecef",
-    backgroundColor: "#fff",
   },
   inputContainer: {
     flexDirection: "row",
@@ -689,9 +697,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -710,9 +716,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  disabledButton: {
-    backgroundColor: "#f0f0f0",
-  },
+  disabledButton: {},
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -721,12 +725,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 8,
-    color: "#777",
     fontSize: 14,
   },
   disclaimer: {
     fontSize: 11,
-    color: "#888",
     textAlign: "center",
     marginTop: 8,
   },
@@ -751,7 +753,6 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
   },
@@ -764,11 +765,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 6,
     padding: 12,
     fontSize: 16,
@@ -784,9 +783,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginLeft: 10,
   },
-  modalCancelButton: {
-    backgroundColor: "#f0f0f0",
-  },
+  modalCancelButton: {},
   modalSaveButton: {
     backgroundColor: "#10a37f",
   },
@@ -804,11 +801,9 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#333",
   },
   welcomeText: {
     fontSize: 16,
-    color: "#666",
     marginBottom: 20,
     textAlign: "center",
   },
@@ -834,7 +829,6 @@ const styles = StyleSheet.create({
   },
   emptyChatText: {
     fontSize: 16,
-    color: "#888",
   }
 });
 

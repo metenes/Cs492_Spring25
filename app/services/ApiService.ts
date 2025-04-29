@@ -1284,12 +1284,6 @@ export const deleteJournalEntry = async (entryId: string) => {
   }
 };
 
-
-// **********************************************
-// ** Homepage API ** - Entry Details 
-// **********************************************
-
-
  
 // **********************************************
 // ** Homepage API ** - Entry 
@@ -1915,68 +1909,57 @@ export const updateJournalEntry = async (
 // **********************************************
 
 export const facePhotoAnalysis = async (imageUri: string) => {
-  console.log(' Starting image face analysis for URL:', imageUri);
+  console.log('🔍 Starting image face analysis for URI:', imageUri);
   const token = await AsyncStorage.getItem('userToken');
-  if (!token) {
-    throw new Error('No authentication token available');
-  }
+  if (!token) throw new Error('No authentication token available');
 
-  // Extract the original filename from the URI
   const originalFileName = imageUri.split('/').pop();
-  if (!originalFileName) {
-    throw new Error('Invalid image URI');
-  }
+  if (!originalFileName) throw new Error('Invalid image URI');
 
   const formData = new FormData();
   formData.append('image', {
     uri: imageUri,
     type: 'image/jpeg',
-    name: originalFileName
+    name: originalFileName,
   } as any);
 
-  console.log('Uploading image with FormData:', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: originalFileName
+  // Upload to S3 or store first if needed
+  const uploadResponse = await fetch(`${API_URL}/journal/upload-image`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+    },
+    body: formData,
   });
 
-  const uploadResponse = await fetch(`${API_URL}/journal/upload-image`, {
+  if (!uploadResponse.ok) {
+    const errorData = await uploadResponse.json();
+    console.error('❌ Upload failed:', errorData);
+    throw new Error(errorData.error || 'Image upload failed');
+  }
+
+  // Call emotion detection endpoint
+  try {
+    const response = await fetch(`${API_URL}/journal/face-photo-analysis`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-      },
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json();
-      console.error('Upload failed:', errorData);
-      throw new Error(errorData.error || 'Failed to upload image');
-    }
-    
-  try {
-    const response = await fetch(`${API_URL}/journal/face-photo-analysis`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        'Authorization': `Bearer ${token}`,
+        // ❌ Do not set Content-Type, let fetch handle it for FormData
       },
       body: formData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to analyze photo: ${errorText}`);
+      console.error('❌ Analysis failed:', errorText);
+      throw new Error(`Photo analysis failed: ${errorText}`);
     }
 
     const data = await response.json();
-    return data; 
-    
+    return data;
   } catch (error) {
-    console.error("❌ Error in facePhotoAnalysis:", error);
-    return { error: "Photo analysis failed" };
+    console.error('❌ Error in facePhotoAnalysis:', error);
+    return { error: 'Photo analysis failed' };
   }
 };
-
-
