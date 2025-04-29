@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 //const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.104:5000";
+const API_URL = "http://192.168.1.16:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
 // const API_URL = "http://192.168.1.40:5000"; kgn

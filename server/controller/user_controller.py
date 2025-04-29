@@ -169,7 +169,7 @@ def register():
         users_collection.insert_one(new_user)
 
         # Upload base model to S3 
-        user_model_path = f"models/{ObjectId(new_user["_id"])}/model.pt"
+        user_model_path = f"models/{ObjectId(new_user['_id'])}/model.pt"
         print(user_model_path," creating user model ")
         try:
             s3_client.copy_object(
