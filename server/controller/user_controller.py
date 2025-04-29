@@ -609,7 +609,9 @@ def change_password():
         {"_id": ObjectId(user_id)},
         {"$set": {"password": hashed_password}}
     )
-    return jsonify({"message": "Password changed successfully"}), 200    
+    return jsonify({"message": "Password changed successfully"}), 200   
+
+
 @user_bp.route("/auth/oauth", methods=["POST"])
 def oauth_callback():
     data = request.json
@@ -645,7 +647,7 @@ def oauth_callback():
             "name": user_info.get("name") or "",
             "user_settings": {"notification_frequency": "daily"},
         }
-        db.users.insert_one(user)
+        users_collection.insert_one(user)
 
     token = create_access_token(identity=str(user["_id"]))
     return jsonify({"token": token, "user": user})

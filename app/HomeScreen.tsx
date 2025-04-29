@@ -45,15 +45,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true); // disable loading when all loaded
   
-  // quotes for no entries empty screen
-  const quotes = [
-    '“The unexamined life is not worth living.”\n— Socrates',
-    '“Thoughts disentangle themselves when they pass through the lips and fingertips.”\n— Dawson Trotman',
-    '“You don’t write because you want to say something, you write because you have something to say.”\n— F. Scott Fitzgerald'
-  ];
-
   // Pick a random quote
-  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  const [randomQuote] = useState(() => {
+    const quotes = [
+      '“The unexamined life is not worth living.”\n— Socrates',
+      '“Thoughts disentangle themselves when they pass through the lips and fingertips.”\n— Dawson Trotman',
+      '“You don’t write because you want to say something, you write because you have something to say.”\n— F. Scott Fitzgerald'
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  });
 
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
@@ -63,11 +63,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
 
       // Map UI filter names to your backend category values
-      const filterMap: { [key: string]: string } = {
-        "checkin": "checkin",
-        "freeform": "freeform",
-        "guided": "guided"
-      };
+  const filterMap: { [key: string]: string } = {
+    "checkin": "checkin",
+    "freeform": "freeform",
+    "guided": "guided"
+  };
       
   // Apply filter function
   const applyFilter = (filter: string) => {
@@ -91,12 +91,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       rotation.setValue(0);
     }, [])
   );  
-
-  const checkStoredToken = async () => {
-    const token = await AsyncStorage.getItem("userToken");
-    console.log("🔹 Token in AsyncStorage:", token);
-  };
-  checkStoredToken();
 
   console.log("STARTING FROM HERE")
 
@@ -195,8 +189,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         else{
           return; 
         }
-    };
-    checkStoredToken();
+      };
+      checkStoredToken();
     
       const loadData = async () => {
         try {
@@ -577,9 +571,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 16,
   },
-  activeTab: {
-    // Removed the blue color
-  },
   tabText: {
     fontSize: 14,
     fontWeight: '500',
@@ -656,15 +647,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 40,
     lineHeight: 24,
-    paddingHorizontal: 20,},
-
-  /* entryDate : {
-    
+    paddingHorizontal: 20,
   },
-
-  entrySubtitle :{
-
-  } */
 });
 
 export default HomeScreen;
