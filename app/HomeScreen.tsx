@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, Animated, Easing } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, Animated, Easing, Modal, Alert, TextInput } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { useTheme } from './context/ThemeContext';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchJournalEntries,fetchJournalDates, calculateStreak, fetchCheckIn} from "./services/ApiService";
+import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -24,8 +24,9 @@ type Entry = {
   createdAt?: string;
   images?: string[];
   journalSentiments?: any[];
-  category :string,
-  prompt: string; 
+  category: string;
+  prompt: string;
+  lockCode?: string;
 };
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
@@ -44,7 +45,16 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [limit] = useState(30); // entries per page
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true); // disable loading when all loaded
-  
+
+  // PIN Modal state
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
+  const [verifyPinModalVisible, setVerifyPinModalVisible] = useState(false);
+  const [removePinModalVisible, setRemovePinModalVisible] = useState(false);
+
   // Pick a random quote
   const [randomQuote] = useState(() => {
     const quotes = [
@@ -62,23 +72,23 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
 
-      // Map UI filter names to your backend category values
+  // Map UI filter names to your backend category values
   const filterMap: { [key: string]: string } = {
     "checkin": "checkin",
     "freeform": "freeform",
     "guided": "guided"
   };
-      
+
   // Apply filter function
   const applyFilter = (filter: string) => {
     setActiveFilter(filter);
-    
+
     if (filter === "all") {
       setFilteredEntries(entries);
       return;
     }
     
-    
+
     const filtered = entries.filter(entry => entry.category === filterMap[filter]);
     setFilteredEntries(filtered);
   };
@@ -90,92 +100,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       menuPosition.setValue(0);
       rotation.setValue(0);
     }, [])
-  );  
+  );
 
-  console.log("STARTING FROM HERE")
-
-/* 
-  useEffect(() => {
-    const checkStoredToken = async () => {
-        const token = await AsyncStorage.getItem("userToken");
-        if (token) {
-            console.log("🔹 Found Token:", token);
-            storeToken(token); // ✅ Save token in state
-        }
-        else{
-          return; 
-        }
-    };
-    checkStoredToken();
-
-    const loadEntries = async () => {
-      try {
-        const token = await AsyncStorage.getItem("userToken");
-        if (!token) return;
-    
-        console.log("🔹 Fetching journal entries and check-ins using token:", token);
-    
-        // Fetch journal entries
-        const fetchedEntries = await fetchJournalEntries(token);
-        console.log("📖 Journal entries:", fetchedEntries);
-    
-        // Fetch check-ins
-        const checkInResponse = await fetchCheckIn(token);
-    
-        let fetchedCheckIns = [];
-        if (Array.isArray(checkInResponse.history)) {
-          fetchedCheckIns = checkInResponse.history;
-          console.log("✅ Check-in entries:", fetchedCheckIns);
-        } else {
-          console.warn("⚠️ No check-ins found.");
-}
-    
-        //const fetchedCheckIns = checkInResponse.history;
-        //console.log("✅ Check-in entries:", fetchedCheckIns);
-    
-        // Convert check-ins to match journal entry structure
-        const formattedCheckIns = fetchedCheckIns.map((checkIn: {
-          date: string;
-          causes: never[]; entry_id: any; comments: string | any[]; created_at: any; sentiments: any; 
-}) => ({
-          _id: checkIn.entry_id, // Match ID structure
-          entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments", // Use first comment as content
-          entryDate: checkIn.date || new Date().toISOString(), // Ensure valid date
-          createdAt: checkIn.created_at,
-          category: "checkin", // Mark as check-in
-          images: [], // Check-ins likely have no images
-          sentiments: checkIn.sentiments || [], // Keep sentiments
-          causes: checkIn.causes || [],
-          comments: checkIn.comments || [],
-          prompt: "", // No prompt for check-ins
-        }));
-
-        console.log("HERE ARE THE CHECKIN ENTRIESSSSSS")
-        console.log("✅ Fetched raw check-ins:", fetchedCheckIns);
-        console.log("✅ Formatted check-ins:", formattedCheckIns);
-    
-        // Merge journals and check-ins
-        let allEntries = [...fetchedEntries, ...formattedCheckIns];
-    
-        // Sort all entries by date (newest first)
-        allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-        // Limit to last 30 entries
-        allEntries = allEntries.slice(0, 30);
-
-        //console.log("📝 Merged Entries (Journals + Check-ins):", allEntries);
-    
-        setEntries(allEntries);
-        setFilteredEntries(allEntries); // Initially show all entries
-      } catch (error) {
-        console.error("❌ Error loading journal entries and check-ins:", error);
-      }
-    };
-    
-  
-    loadEntries();
-  }, []);
-  
-*/
+  console.log("STARTING FROM HERE");
 
   // Load entries and streak data when screen is focused
   useFocusEffect(
@@ -183,15 +110,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       const checkStoredToken = async () => {
         const token = await AsyncStorage.getItem("userToken");
         if (token) {
-            console.log("🔹 Found Token:", token);
-            storeToken(token); // ✅ Save token in state
+          console.log("🔹 Found Token:", token);
+          storeToken(token); // ✅ Save token in state
         }
         else{
-          return; 
+          return;
         }
       };
       checkStoredToken();
-    
+
       const loadData = async () => {
         try {
           const token = await AsyncStorage.getItem("userToken");
@@ -212,11 +139,13 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
           const formattedCheckIns = fetchedCheckIns.map((checkIn: {
             date: string;
-            causes: never[]; 
-            entry_id: any; 
-            comments: string | any[]; 
-            created_at: any; 
-            sentiments: any; }) => ({
+            causes: never[];
+            entry_id: any;
+            comments: string | any[];
+            created_at: any;
+            lockCode: String;
+            sentiments: any;
+          }) => ({
 
             _id: checkIn.entry_id,
             entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments",
@@ -228,7 +157,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             causes: checkIn.causes || [],
             comments: checkIn.comments || [],
             prompt: "",
-
+            lockCode: checkIn.lockCode || null,
           }));
 
           let allEntries = [...fetchedEntries, ...formattedCheckIns];
@@ -237,7 +166,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
           //console.log("ALL ENTRIES: " ,allEntries )
           setEntries(allEntries);
-          
+
           // Reapply the current filter
           if (activeFilter === "all") {
             setFilteredEntries(allEntries);
@@ -294,6 +223,156 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     }
   };
 
+  const handleLockPress = (entry: Entry) => {
+    setSelectedEntry(entry);
+    debugger;
+    // If entry already has a PIN, ask if they want to remove it
+    if (entry.lockCode) {
+      Alert.alert(
+        "PIN Options",
+        "What would you like to do with this journal's PIN?",
+        [
+          {
+            text: "Remove PIN",
+            onPress: () => {
+              setCurrentPin('');
+              setRemovePinModalVisible(true);
+            }
+          },
+          {
+            text: "Change PIN",
+            onPress: () => {
+              setPin('');
+              setConfirmPin('');
+              setPinModalVisible(true);
+            }
+          },
+          {
+            text: "Cancel",
+            style: "cancel"
+          }
+        ]
+      );
+    } else {
+      // No existing PIN, open modal to create one
+      setPin('');
+      setConfirmPin('');
+      setPinModalVisible(true);
+    }
+  };
+
+  // Handle PIN removal
+  const handleRemovePin = async (entry: Entry) => {
+    try {
+
+      if (!selectedEntry) return;
+
+      // Verify current PIN matches
+      if (currentPin !== selectedEntry.lockCode) {
+        Alert.alert("Incorrect PIN", "The PIN you entered is incorrect. Please try again.");
+        setCurrentPin('');
+        return;
+      }
+
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+
+      await updateJournalPin(entry._id, "", token, "journal");
+
+      const updatedEntries = entries.map(e =>
+        e._id === selectedEntry._id ? { ...e, lockCode: undefined } : e
+      );
+
+      setEntries(updatedEntries);
+
+      if (activeFilter === "all") {
+        setFilteredEntries(updatedEntries);
+      } else {
+        const filtered = updatedEntries.filter(e => e.category === filterMap[activeFilter]);
+        setFilteredEntries(filtered);
+      }
+
+      setRemovePinModalVisible(false);
+      setCurrentPin('');
+      setSelectedEntry(null);
+
+      Alert.alert("Success", "PIN has been removed from this journal.");
+    } catch (error) {
+      console.error("Error removing PIN:", error);
+      Alert.alert("Error", "Failed to remove PIN. Please try again.");
+    }
+  };
+
+  // Handle PIN creation/update
+  const handleSavePin = async () => {
+    debugger;
+    if (!selectedEntry) return;
+
+    if (selectedEntry.lockCode && (!currentPin || currentPin.length === 0)) {
+      Alert.alert("Invalid PIN", "Current PIN is required.");
+      return;
+    }
+
+    if (pin.length !== 4 || confirmPin?.length !== 4) {
+      Alert.alert("Invalid PIN", "PINs must be 4 digits.");
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      Alert.alert("PIN Mismatch", "PINs do not match. Please try again.");
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+
+      await updateJournalPin(selectedEntry._id, pin, token, "journal");
+
+      const updatedEntries = entries.map(entry =>
+        entry._id === selectedEntry._id ? { ...entry, lockCode: pin } : entry
+      );
+
+      setEntries(updatedEntries);
+
+      if (activeFilter === "all") {
+        setFilteredEntries(updatedEntries);
+      } else {
+        const filtered = updatedEntries.filter(entry => entry.category === filterMap[activeFilter]);
+        setFilteredEntries(filtered);
+      }
+
+      // Close modal and reset state
+      setPinModalVisible(false);
+      setPin('');
+      setConfirmPin('');
+      setSelectedEntry(null);
+
+      Alert.alert("Success", "Journal is now PIN protected.");
+    } catch (error) {
+      console.error("Error setting PIN:", error);
+      Alert.alert("Error", "Failed to set PIN. Please try again.");
+    }
+  };
+
+  // verify PIN
+  const handleVerifyPin = () => {
+    if (!selectedEntry) return;
+
+    // Check if entered PIN matches the entry's PIN
+    if (currentPin === selectedEntry.lockCode) {
+      // PIN is correct, navigate to entry detail
+      setVerifyPinModalVisible(false);
+      setCurrentPin('');
+      navigation.navigate("EntryDetail", { entry: selectedEntry });
+      setSelectedEntry(null);
+    } else {
+      // PIN is incorrect
+      Alert.alert("Incorrect PIN", "The PIN you entered is incorrect. Please try again.");
+      setCurrentPin('');
+    }
+  };
+
   const menuTranslateY = menuPosition.interpolate({
     inputRange: [0, 1],
     outputRange: [80, 0], // Menu slides up (not down!)
@@ -305,11 +384,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   });
 
   const renderTab = (title: string, filterValue: string, isActive: boolean) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.tab, 
+        styles.tab,
         isActive && styles.activeTab,
-        { 
+        {
           backgroundColor: isActive ? (darkMode ? '#2C2C2C' : '#E0E0E0') : 'transparent',
           borderColor: darkMode ? '#404040' : '#D0D0D0',
           borderWidth: 1
@@ -318,9 +397,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       onPress={() => applyFilter(filterValue)}
     >
       <Text style={[
-        styles.tabText, 
-        { 
-          color: isActive 
+        styles.tabText,
+        {
+          color: isActive
             ? (darkMode ? '#FFFFFF' : '#333333')
             : (darkMode ? '#A0A0A0' : '#666666')
         }
@@ -341,7 +420,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     } catch (error) {
       console.log("Error formatting date:", error);
     }
-  
+
     // Choose icon based on entry category
     let iconName = "edit-2";
     if (item.category === "checkin") {
@@ -349,11 +428,21 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     } else if (item.category === "guided") {
       iconName = "book-open";
     }
-  
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.entryItem, { backgroundColor: theme.cardBackground }]}
-        onPress={() => navigation.navigate("EntryDetail", { entry: item })}
+        onPress={() => {
+          if (item.lockCode) {
+            // Show PIN verification modal
+            setSelectedEntry(item);
+            setCurrentPin('');
+            setVerifyPinModalVisible(true);
+          } else {
+            // No PIN, navigate directly
+            navigation.navigate("EntryDetail", { entry: item });
+          }
+        }}
       >
         <View style={[styles.entryIcon, { backgroundColor: theme.inputBackground }]}>
           <Text>
@@ -363,9 +452,22 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         <View style={styles.entryContent}>
           <Text style={[styles.entryDate, { color: theme.text, fontWeight: 'bold' }]}>{formattedDate}</Text>
           <Text style={[styles.entrySubtitle, { color: theme.textSecondary }]} numberOfLines={2}>
-            {item.entryContent || "No content"}
+            {item.entryContent ? (item.lockCode ? "****** ***** *****" : item.entryContent) : "No content"}
           </Text>
         </View>
+
+        <TouchableOpacity
+          style={styles.lockContainer}
+          onPress={() => handleLockPress(item)}
+        >
+          <Text>
+            <Icon
+              name={item.lockCode ? "lock" : "unlock"}
+              size={18}
+              color={item.lockCode ? theme.icon : theme.textSecondary}
+            />
+          </Text>
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -374,10 +476,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
-      <SafeAreaView 
+      <SafeAreaView
         style={[
-          styles.container, 
-          { 
+          styles.container,
+          {
             backgroundColor: theme.backgroundColor,
             flex: 1,
             marginBottom: 0
@@ -386,8 +488,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       >
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Text style={[styles.title, { color: theme.text }]}>Your Entries</Text>
-          <TouchableOpacity 
-            style={[styles.streakContainer, { backgroundColor: 'transparent' }]} 
+          <TouchableOpacity
+            style={[styles.streakContainer, { backgroundColor: 'transparent' }]}
             onPress={() => navigation.navigate("DiaryMain")}
           >
             <Text style={[styles.streakText, { color: theme.text }]}>{streak}</Text>
@@ -395,7 +497,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
               <MaterialCommunityIcons name="fire" size={20} color={theme.text} />
             </Text>
           </TouchableOpacity>
-          
+
           {hasMore && (
             <TouchableOpacity onPress={() => setSkip(prev => prev + limit)}>
               <Text style={{ textAlign: 'center', color: 'blue' }}>Load More</Text>
@@ -404,9 +506,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         </View>
 
         <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}>
-          <ScrollView 
+          <ScrollView
             horizontal
-            showsHorizontalScrollIndicator={false} 
+            showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabContainer}
           >
             {renderTab("All Entries", "all", activeFilter === "all")}
@@ -416,20 +518,20 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </ScrollView>
         </View>
 
-      <FlatList data={filteredEntries} renderItem={renderEntry} keyExtractor={(item) => item._id || Math.random().toString()} style={styles.list} 
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>{randomQuote}</Text>
-        }
-      />
+        <FlatList data={filteredEntries} renderItem={renderEntry} keyExtractor={(item) => item._id || Math.random().toString()} style={styles.list}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>{randomQuote}</Text>
+          }
+        />
 
         {/* Floating Action Button (FAB) + Dropdown Menu */}
         <View style={styles.fabContainer}>
           {/* Drop-up menu */}
           {isMenuOpen && (
-            <Animated.View 
+            <Animated.View
               style={[
-                styles.menu, 
-                { 
+                styles.menu,
+                {
                   transform: [{ translateY: menuTranslateY }],
                   backgroundColor: theme.cardBackground,
                   shadowColor: theme.text
@@ -504,10 +606,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           )}
 
           {/* FAB Toggle Button */}
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.fab, 
-              { 
+              styles.fab,
+              {
                 transform: [{ rotate: rotationInterpolate }],
                 backgroundColor: theme.text
               }
@@ -521,6 +623,191 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </Animated.View>
         </View>
       </SafeAreaView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={pinModalVisible}
+        onRequestClose={() => {
+          setPinModalVisible(false);
+          setPin('');
+          setConfirmPin('');
+          setSelectedEntry(null);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={[styles.modalView, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {selectedEntry?.lockCode ? "Change PIN" : "Create PIN"}
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              Set a PIN to protect your journal entry.
+            </Text>
+
+            {selectedEntry?.lockCode &&
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                placeholder="Enter Current PIN"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="numeric"
+                secureTextEntry
+                value={currentPin}
+                onChangeText={setCurrentPin}
+                maxLength={6}
+              />}
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+              placeholder="Enter PIN (4 digits)"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              secureTextEntry
+              value={pin}
+              onChangeText={setPin}
+              maxLength={4}
+            />
+
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+              placeholder="Confirm PIN"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              secureTextEntry
+              value={confirmPin}
+              onChangeText={setConfirmPin}
+              maxLength={6}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.buttonCancel, { borderColor: theme.border }]}
+                onPress={() => {
+                  setPinModalVisible(false);
+                  setPin('');
+                  setConfirmPin('');
+                  setCurrentPin('');
+                  setSelectedEntry(null);
+                }}
+              >
+                <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSave, { backgroundColor: theme.primary }]}
+                onPress={handleSavePin}
+              >
+                <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={verifyPinModalVisible}
+        onRequestClose={() => {
+          setVerifyPinModalVisible(false);
+          setCurrentPin('');
+          setSelectedEntry(null);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={[styles.modalView, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Enter PIN
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              This journal entry is protected. Please enter the PIN to view it.
+            </Text>
+
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+              placeholder="Enter PIN"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              secureTextEntry
+              value={currentPin}
+              onChangeText={setCurrentPin}
+              maxLength={4}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.buttonCancel, { borderColor: theme.border }]}
+                onPress={() => {
+                  setVerifyPinModalVisible(false);
+                  setCurrentPin('');
+                  setSelectedEntry(null);
+                }}
+              >
+                <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSave, { backgroundColor: theme.primary }]}
+                onPress={handleVerifyPin}
+              >
+                <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Verify</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={removePinModalVisible}
+        onRequestClose={() => {
+          setRemovePinModalVisible(false);
+          setCurrentPin('');
+          setSelectedEntry(null);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={[styles.modalView, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Verify PIN
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              Please enter your current PIN to remove protection from this journal entry.
+            </Text>
+
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+              placeholder="Enter Current PIN"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              secureTextEntry
+              value={currentPin}
+              onChangeText={setCurrentPin}
+              maxLength={4}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.buttonCancel, { borderColor: theme.border }]}
+                onPress={() => {
+                  setRemovePinModalVisible(false);
+                  setCurrentPin('');
+                  setSelectedEntry(null);
+                }}
+              >
+                <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSave, { backgroundColor: theme.primary }]}
+                onPress={() => handleRemovePin(selectedEntry!)}
+              >
+                <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Remove PIN</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={{ backgroundColor: theme.backgroundColor }}>
         <BottomNavigation activeScreen="Home" darkMode={darkMode} />
       </View>
@@ -561,8 +848,8 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: "row",
-    paddingHorizontal: 10, 
-    paddingVertical: 5, 
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignItems: "center",
   },
   tab: {
@@ -604,6 +891,11 @@ const styles = StyleSheet.create({
   entrySubtitle: {
     fontSize: 14,
     marginTop: 4,
+  },
+  lockContainer: {
+    padding: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   fabContainer: {
     position: "absolute",
@@ -649,6 +941,63 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingHorizontal: 20,
   },
+  centeredView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)'
+  },
+  modalView: {
+    margin: 20,
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 8
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: 20
+  },
+  input: {
+    height: 50,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    fontSize: 16
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10
+  },
+  button: {
+    borderRadius: 8,
+    padding: 12,
+    width: '48%',
+    alignItems: 'center'
+  },
+  buttonCancel: {
+    borderWidth: 1,
+  },
+  buttonSave: {
+    elevation: 2
+  },
+  buttonText: {
+    fontWeight: "600",
+    fontSize: 16
+  }
 });
 
 export default HomeScreen;

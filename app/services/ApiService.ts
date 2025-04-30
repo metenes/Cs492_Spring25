@@ -4,7 +4,7 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // const API_URL = "http://192.168.1.16:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-// const API_URL = "http://192.168.1.40:5000"; kgn
+//const API_URL = "http://192.168.0.28:5000"; //kgn
 const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
@@ -1904,6 +1904,43 @@ export const updateJournalEntry = async (
     return responseData;
   } catch (error) {
     console.error('Journal entry update error:', error);
+    throw error;
+  }
+};
+
+
+// Function to update journal PIN
+export const updateJournalPin = async (journalId: string, pin: string, token: string, type: string) => {
+  try {
+    let response = null;
+    if(type === "checkin"){
+      response = await fetch(`${API_URL}/check-in/create-lock-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lockCode: pin ? pin : null, journalId })
+      });
+    }
+    else if (type === "journal"){
+      response = await fetch(`${API_URL}/journal/update-lock-code/${journalId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lockCode: pin ? pin : null })
+      });
+    }
+    if (!response?.ok) {
+      throw new Error('Failed to update PIN');
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error('Error updating PIN:', error);
     throw error;
   }
 };
