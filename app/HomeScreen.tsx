@@ -199,11 +199,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
           // Load entries
           const fetchedEntries = await fetchJournalEntries(token, limit, skip);
-          console.log("JOUNRAL ENTRIES: " ,fetchedEntries )
+          //console.log("JOUNRAL ENTRIES: " ,fetchedEntries )
 
           // const checkInResponse = await getCheckInHistory(token);
           const checkInResponse = await fetchCheckIn(token);
-          console.log("CHECK ENTRIES: " ,checkInResponse )
+          //console.log("CHECK ENTRIES: " ,checkInResponse )
 
           let fetchedCheckIns = [];
           if (Array.isArray(checkInResponse.history)) {
@@ -235,7 +235,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
           allEntries = allEntries.slice(0, 30);
 
-          console.log("ALL ENTRIES: " ,allEntries )
+          //console.log("ALL ENTRIES: " ,allEntries )
           setEntries(allEntries);
           
           // Reapply the current filter
@@ -369,7 +369,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       </TouchableOpacity>
     );
   };
-  console.log("🔹 Entries state:", entries);
+  //console.log("🔹 Entries state:", entries);
 
 
   return (
@@ -466,7 +466,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 style={styles.menuItem}
                 onPress={() => {
                   setMenuOpen(false);
-                  navigation.navigate("FreeJournaling", {selectedDate : "TODO"});
+                  navigation.navigate("FreeJournaling", {selectedDate : new Date().toISOString()});
                 }}
               >
                 <Text>

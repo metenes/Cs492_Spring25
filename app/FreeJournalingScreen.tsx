@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker";
 import { MediaType } from "expo-image-picker";
@@ -25,9 +25,11 @@ import { saveJournalEntry, saveDraft, getDraft, clearDraft, uploadJournalImage, 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
-  FreeJournaling: undefined;
+  FreeJournaling: { selectedDate?: string };  //undefined;
   Home: undefined;
 };
+
+type RouteProps = RouteProp<RootStackParamList, "FreeJournaling">;
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "FreeJournaling">;
 
@@ -45,6 +47,18 @@ const FreeJournalingScreen = () => {
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
 
   const navigation = useNavigation<NavigationProp>();
+
+  const route = useRoute<RouteProps>();
+  const [entryDate, setEntryDate] = useState(new Date().toISOString());
+  console.log("WHAT DAY IS ITTTT")
+  console.log(entryDate)
+
+  useEffect(() => {
+    if (route.params?.selectedDate) {
+      setEntryDate(route.params.selectedDate);
+      console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
+    }
+  }, [route.params]);
 
   useEffect(() => {
     requestPermissions();
@@ -188,7 +202,8 @@ const FreeJournalingScreen = () => {
       
       console.log('📦 Prepared image data:', imageData);
       
-      const response = await saveJournalEntry(content, imageData, "freeform");
+      const response = await saveJournalEntry(content, imageData, "freeform", undefined, entryDate);
+      console.log(entryDate)
       
       if (response.error) {
         console.error('❌ Failed to save journal entry:', response.error);
