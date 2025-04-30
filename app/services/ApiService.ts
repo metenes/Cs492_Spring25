@@ -1913,7 +1913,7 @@ export const updateJournalEntry = async (
 export const updateJournalPin = async (journalId: string, pin: string, token: string, type: string) => {
   try {
     let response = null;
-    if(type === "checkin"){
+    if(type === "checkin"){ // todo
       response = await fetch(`${API_URL}/check-in/create-lock-code`, {
         method: 'POST',
         headers: {

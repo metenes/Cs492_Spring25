@@ -225,7 +225,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   const handleLockPress = (entry: Entry) => {
     setSelectedEntry(entry);
-    debugger;
     // If entry already has a PIN, ask if they want to remove it
     if (entry.lockCode) {
       Alert.alert(
@@ -305,7 +304,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   // Handle PIN creation/update
   const handleSavePin = async () => {
-    debugger;
     if (!selectedEntry) return;
 
     if (selectedEntry.lockCode && (!currentPin || currentPin.length === 0)) {

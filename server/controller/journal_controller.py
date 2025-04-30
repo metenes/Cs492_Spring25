@@ -959,7 +959,6 @@ def update_lock_code(entry_id):
         user_id = get_jwt_identity()
         data = request.get_json()
         lock_code = data.get("lockCode")
-        print(f" Updating lock code for entry: {entry_id} for user: {user_id}")
         user_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
         if not user_doc:
             return jsonify({"error": "User not found"}), 404
@@ -972,7 +971,6 @@ def update_lock_code(entry_id):
             if str(journal.get("_id")) == entry_id:
                 journal_entry = journal
                 break
-        print(f" Found journal entry: {journal_entry}")
         if not journal_entry:
             return jsonify({"error": "Journal entry not found"}), 404
 
@@ -982,7 +980,6 @@ def update_lock_code(entry_id):
                 {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
                 {"$unset": {"journalEntries.$.lockCode": ""}}
             )
-            print(f" Result of removing lock code: {result}")
             if result.modified_count == 0:
                 return jsonify({"error": "Failed to remove lock code"}), 500
             return jsonify({"message": "Lock code removed successfully"}), 200
@@ -992,7 +989,6 @@ def update_lock_code(entry_id):
                 {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
                 {"$set": {"journalEntries.$.lockCode": lock_code}}
             )
-            print(f" Result of setting lock code: {result}")
             if result.modified_count == 0:
                 return jsonify({"error": "Failed to create lock code"}), 500
         
