@@ -1108,11 +1108,12 @@ export const editJournalEntry = async (entryId: string, newContent: string, imag
 export const fetchJournalEntries = async (token: string, limit : Int32, skip : Int32 ) => {
   try {
     // Body not allowed for GET or HEAD requests
-    const params = new URLSearchParams();
-    params.append("limit", limit.toString());
-    params.append("skip", skip.toString());
+    // const params = new URLSearchParams();
+    // params.append("limit", limit.toString());
+    // params.append("skip", skip.toString());
 
-    const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
+   // const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
+  const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,

@@ -141,13 +141,13 @@ def get_journal_entries():
         user_id = get_jwt_identity()
         print(f"🔍 Fetching journal entries for user: {user_id}")
         
-        limit = int(request.args.get("limit", 30))
-        skip = int(request.args.get("skip", 0))
+        #limit = int(request.args.get("limit", 30))
+        #skip = int(request.args.get("skip", 0))
 
-        if(limit is None): 
-            limit = 30
-        if(skip is None): 
-            skip = 0
+        #if(limit is None): 
+        #    limit = 30
+        #if(skip is None): 
+        #    skip = 0
         
         # Ensure user_id is converted to ObjectId
         try:
@@ -176,7 +176,7 @@ def get_journal_entries():
             entries_list = sorted(entries_list, key=lambda x: x.get("entryDate", ""), reverse=True)
 
             # Apply pagination and limit
-            entries_list = entries_list[skip:skip + limit]
+            #entries_list = entries_list[skip:skip + limit]
 
             for entry in entries_list:
                 serialized_entry = {k: v for k, v in entry.items()}
