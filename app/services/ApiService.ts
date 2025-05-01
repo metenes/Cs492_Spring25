@@ -3,8 +3,8 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
-//export const API_URL = "http://192.168.1.16:5000";
-export const API_URL = "http://172.20.10.3:5000"; //kgn
+export const API_URL = "http://192.168.1.16:5000";
+//export const API_URL = "http://172.20.10.3:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
 
 // Define the emotions array to match the backend
@@ -579,15 +579,16 @@ export const loginUser = async (email: string, password: string) => {
       body: JSON.stringify({ email, password }),
     });
 
+    const responseData = await response.json(); // ✅ Read response body once
+
     console.log("loginUser() response.ok: ", response.ok);
     console.log("loginUser() response.status: ", response.status);
     console.log("loginUser() response.headers: ", response.headers);
-
-    const responseData = await response.json(); // Await JSON parsing
     console.log("loginUser() response data: ", responseData);
 
     if (!response.ok) {
-      throw new Error(responseData.message || "Invalid email or password");
+      // If locked or failed login, return the error message provided by backend
+      throw new Error(responseData.error || "Login failed");
     }
 
     if (!responseData.access_token) {
@@ -597,24 +598,26 @@ export const loginUser = async (email: string, password: string) => {
 
     console.log("✅ Login successful. Token received:", responseData.access_token);
 
+    // Save token to AsyncStorage
     await AsyncStorage.setItem("userToken", responseData.access_token);
     console.log("🔹 Token successfully saved to AsyncStorage!");
 
+    // Handle push token sync if exists
     const expoPushToken = await AsyncStorage.getItem("expoPushToken");
-    if (!expoPushToken) {
-      console.warn("No Expo push token saved locally.");
-    } else {
+    if (expoPushToken) {
       const pushTokenResponse = await fetch(`${API_URL}/notification/update-push-token-user`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${responseData.access_token}`
+          "Authorization": `Bearer ${responseData.access_token}`,
         },
-        body: JSON.stringify({ token: expoPushToken })
+        body: JSON.stringify({ token: expoPushToken }),
       });
 
       const pushResponseData = await pushTokenResponse.json();
-      console.log("Push token update response:", pushResponseData);
+      console.log("📲 Push token update response:", pushResponseData);
+    } else {
+      console.warn("⚠️ No Expo push token found locally.");
     }
 
     return responseData;
@@ -623,6 +626,7 @@ export const loginUser = async (email: string, password: string) => {
     throw error;
   }
 };
+
 
 // **********************************************
 // **Login&Register API** - Register
@@ -951,6 +955,10 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
   try {
+    if (!content || !content.trim()) {
+      throw new Error("Journal content cannot be empty.");
+    }
+    
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
@@ -1027,6 +1035,7 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
 
 export const editJournalEntry = async (entryId: string, newContent: string, images?: string[], category?: string, prompt?: string) => {
   try {
+    
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 

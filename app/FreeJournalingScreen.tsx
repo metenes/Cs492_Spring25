@@ -190,38 +190,44 @@ const FreeJournalingScreen = () => {
   }, [content, imageUris]);
 
   const handleSaveEntry = async () => {
+    // Step 1: Prevent saving if entry content is empty
+    if (!content.trim()) {
+      Alert.alert("Empty Entry", "Please write something before saving.");
+      return;
+    }
+  
     try {
       console.log('🔄 Starting handleSaveEntry...');
       setIsSaving(true);
       
-      // Since images are already uploaded, we just need to prepare the data
       const imageData = localImageUris.map((uri, index) => ({
         fileName: `uploads/${uri.split('/').pop()}`,
         signedUrl: imageUris[index]
       }));
-      
+  
       console.log('📦 Prepared image data:', imageData);
-      
+  
       const response = await saveJournalEntry(content, imageData, "freeform", undefined, entryDate);
-      console.log(entryDate)
-      
+      console.log(entryDate);
+  
       if (response.error) {
         console.error('❌ Failed to save journal entry:', response.error);
-        alert("Failed to save journal entry.");
+        Alert.alert("Error", "Failed to save journal entry.");
         return;
       }
-
+  
       console.log('✅ Journal entry saved successfully');
       await clearDraft();
-      alert("Journal entry saved successfully!");
+      Alert.alert("Success", "Journal entry saved successfully!");
       navigation.navigate("Home");
     } catch (error) {
       console.error("❌ Error in handleSaveEntry:", error);
-      alert("An error occurred while saving the journal entry.");
+      Alert.alert("Error", "An error occurred while saving the journal entry.");
     } finally {
       setIsSaving(false);
     }
   };
+  
 
   if (isSaving) {
     return (

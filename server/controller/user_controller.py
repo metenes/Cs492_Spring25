@@ -164,7 +164,10 @@ def register():
                 "language": "en"
             },
             "account_status": "active",  # active, suspended, deactivated
-            "role": "user"               # user, admin
+            "role": "user",               # user, admin
+            "failed_login_attempts": 0,
+            "lockout_until": None,
+
         }
         users_collection.insert_one(new_user)
 
@@ -200,26 +203,62 @@ def login():
         email = data.get("email")
         password = data.get("password")
 
-        print(f"🔹 Login Attempt: email={email}, password={password}")
+        print(f"🔹 Login Attempt: email={email}")
 
         if not email or not password:
             return jsonify({"error": "Email and password are required"}), 400
 
-        # Fetch user from MongoDB
         user = users_collection.find_one({"email": email})
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
 
+        # Check if locked out
+        lockout_until = user.get("lockout_until")
+        if lockout_until and datetime.now() < lockout_until:
+            return jsonify({
+                "error": f"Account locked. Please try again after {lockout_until.strftime('%H:%M:%S')}."
+            }), 403
+
         # Check password
         if not bcrypt.check_password_hash(user["password"], password):
-            return jsonify({"error": "Invalid credentials"}), 401
+            failed_attempts = user.get("failed_login_attempts", 0) + 1
 
-        # Generate JWT token
-        access_token = create_access_token(identity=str(user["_id"]))  # You can pass user ID as string
-        print(f"LOGIN {access_token}")
+            if failed_attempts >= 5:
+                lockout_time = datetime.now() + timedelta(minutes=5)
+                users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {
+                        "lockout_until": lockout_time,
+                        "failed_login_attempts": 0  # reset after lock
+                    }}
+                )
+                return jsonify({
+                    "error": "Too many failed login attempts. Your account is locked for 5 minutes."
+                }), 403
 
+            else:
+                users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"failed_login_attempts": failed_attempts}}
+                )
+                return jsonify({"error": "Invalid credentials"}), 401
+
+        # ✅ Success: reset counters
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "failed_login_attempts": 0,
+                "lockout_until": None,
+                "last_login": datetime.now()
+            }}
+        )
+
+        access_token = create_access_token(identity=str(user["_id"]))
         return jsonify({"access_token": access_token}), 200
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
