@@ -50,7 +50,6 @@ const FreeJournalingScreen = () => {
 
   const route = useRoute<RouteProps>();
   const [entryDate, setEntryDate] = useState(new Date().toISOString());
-  console.log("WHAT DAY IS ITTTT")
   console.log(entryDate)
 
   useEffect(() => {
