@@ -1,32 +1,11 @@
 from functools import wraps
 import os
-import pymongo
-import certifi
-import torch
-import boto3
-import json
-import logging
-import time
-import uuid
-# User token 
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List, Optional, Any, Union
-from flask import Flask, request, jsonify, Blueprint
-from transformers import pipeline
+from flask import Flask
 from flask_cors import CORS
-from flask_jwt_extended import jwt_required, get_jwt_identity, JWTManager, create_access_token
 from flask_bcrypt import Bcrypt
 from flask_apscheduler import APScheduler
-# import bcrypt
-from flask_mail import Mail, Message
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
-from pydantic import BaseModel, Field
+from datetime import timedelta
 
-from bson import ObjectId
-from datetime import datetime, timedelta
-# User token 
-import jwt
 
 # importing the controller blueprints
 from controller.user_controller import user_bp
@@ -38,12 +17,9 @@ from controller.check_in_controller import check_bp
 from controller.notification_controller import notification_bp, send_journal_reminders
 
 # importing the database and mail configurations
-from utils.database import db, journal_entries_collection, check_in_collection
 from utils.mail_config import mail
 from utils.jwt_config import jwt_manager
 from botocore.exceptions import ClientError
-# Chat API from chat.py
-# from chat import Chat
 
 app = Flask(__name__)
 CORS(app)
@@ -80,7 +56,6 @@ mail.init_app(app)
 jwt_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
-
 app.register_blueprint(user_bp, url_prefix="/user")
 app.register_blueprint(sentiments_bp, url_prefix="/sentiment")
 app.register_blueprint(activities_bp, url_prefix="/activity")
@@ -89,6 +64,24 @@ app.register_blueprint(chat_bp, url_prefix="/chat")
 app.register_blueprint(check_bp, url_prefix="/check-in")
 app.register_blueprint(model_bp, url_prefix="/models") # metadata for S3 models 
 app.register_blueprint(notification_bp, url_prefix="/notification")
+
+class Config:
+     SCHEDULER_API_ENABLED = True
+ 
+app.config.from_object(Config())
+ 
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+ 
+# send daily reminders at 7:30 PM
+scheduler.add_job(
+     id='journal_reminder_job',
+     func=send_journal_reminders,
+     trigger='cron',
+     hour=19,
+     minute=30
+)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

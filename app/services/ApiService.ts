@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
-//const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-const API_URL = "http://192.168.1.104:5000";
+// const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
+// const API_URL = "http://192.168.1.16:5000";
 // const API_URL = "http://10.203.122.69:5000";
 // const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-// const API_URL = "http://192.168.1.40:5000"; kgn
+//const API_URL = "http://192.168.0.28:5000"; //kgn
+const API_URL = "http://192.168.1.104:5000";
 
 // Define the emotions array to match the backend
 /* 
@@ -959,7 +960,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 // ** Homepage API ** - FreeJournal & Guided Journal
 // **********************************************
 
-export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string) => {
+export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -998,9 +999,12 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
     console.log("Final mapped sentiments:", mappedSentiments);
     console.log("CATEGORY : " , category)
 
+    console.log("HEEEEEEEEEEEEEEEEEEELPPPPP*******")
+    console.log(entryDate)
+
     const entryData = {
       entryContent: content,
-      entryDate: new Date().toISOString(),
+      entryDate: entryDate || new Date().toISOString(),
       images: images || [],
       journalSentiments: mappedSentiments,
       category: category,
@@ -1901,6 +1905,43 @@ export const updateJournalEntry = async (
     return responseData;
   } catch (error) {
     console.error('Journal entry update error:', error);
+    throw error;
+  }
+};
+
+
+// Function to update journal PIN
+export const updateJournalPin = async (journalId: string, pin: string, token: string, type: string) => {
+  try {
+    let response = null;
+    if(type === "checkin"){ // todo
+      response = await fetch(`${API_URL}/check-in/create-lock-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lockCode: pin ? pin : null, journalId })
+      });
+    }
+    else if (type === "journal"){
+      response = await fetch(`${API_URL}/journal/update-lock-code/${journalId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lockCode: pin ? pin : null })
+      });
+    }
+    if (!response?.ok) {
+      throw new Error('Failed to update PIN');
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error('Error updating PIN:', error);
     throw error;
   }
 };

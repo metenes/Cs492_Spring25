@@ -87,6 +87,8 @@ const DiaryMainScreen = () => {
 
   const onDayPress = (day: { dateString: string }) => {
     if (day.dateString <= today) {
+      console.log("ARE YOU SUREEEEE")
+      console.log(day.dateString)
       navigation.navigate('FreeJournaling', { selectedDate: day.dateString });
     }
   };

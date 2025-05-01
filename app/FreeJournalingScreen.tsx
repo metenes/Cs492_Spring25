@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import * as ImagePicker from "expo-image-picker";
 import { MediaType } from "expo-image-picker";
@@ -25,9 +25,11 @@ import { saveJournalEntry, saveDraft, getDraft, clearDraft, uploadJournalImage, 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RootStackParamList = {
-  FreeJournaling: undefined;
+  FreeJournaling: { selectedDate?: string };  //undefined;
   Home: undefined;
 };
+
+type RouteProps = RouteProp<RootStackParamList, "FreeJournaling">;
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "FreeJournaling">;
 
@@ -45,6 +47,18 @@ const FreeJournalingScreen = () => {
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
 
   const navigation = useNavigation<NavigationProp>();
+
+  const route = useRoute<RouteProps>();
+  const [entryDate, setEntryDate] = useState(new Date().toISOString());
+  console.log("WHAT DAY IS ITTTT")
+  console.log(entryDate)
+
+  useEffect(() => {
+    if (route.params?.selectedDate) {
+      setEntryDate(route.params.selectedDate);
+      console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
+    }
+  }, [route.params]);
 
   useEffect(() => {
     requestPermissions();
@@ -188,7 +202,8 @@ const FreeJournalingScreen = () => {
       
       console.log('📦 Prepared image data:', imageData);
       
-      const response = await saveJournalEntry(content, imageData, "freeform");
+      const response = await saveJournalEntry(content, imageData, "freeform", undefined, entryDate);
+      console.log(entryDate)
       
       if (response.error) {
         console.error('❌ Failed to save journal entry:', response.error);
@@ -230,7 +245,8 @@ const FreeJournalingScreen = () => {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={{ flex: 1, backgroundColor: theme.backgroundColor, padding: 20 }}>
+      <View style={{ flex: 1, backgroundColor: theme.backgroundColor}}>
+         <View style={{ flex: 1, padding: 20 }}>
         {/* Journal Entry Section */}
         <View
           style={{
@@ -244,19 +260,27 @@ const FreeJournalingScreen = () => {
             shadowRadius: 5,
             borderWidth: 1,
             borderColor: darkMode ? theme.border : "#DDD",
+            position: 'relative', // Important so that absolute ❌ button stays inside
           }}
         >
-          {/* Clear Draft Icon */}
-          <TouchableOpacity
-            style={{
-              position: 'absolute',
-              top: 10,
-              right: 10,
-              zIndex: 1,
-              padding: 8,
-            }}
-            onPress={() => {
-              if (content.trim() || imageUris.length > 0) {
+
+          {/* 🆕 Clear Entry Button - only shows if needed */}
+          {(content.trim() || imageUris.length > 0) && (
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                backgroundColor: darkMode ? '#404040' : '#e0e0e0',
+                borderRadius: 20,
+                padding: 6,
+                elevation: 4, // Android shadow
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+              }}
+              onPress={() => {
                 Alert.alert(
                   "Clear Entry",
                   "Are you sure you want to clear your current entry?",
@@ -274,12 +298,20 @@ const FreeJournalingScreen = () => {
                     }
                   ]
                 );
-              }
-            }}
-          >
-            <Text style={{ fontSize: 18, color: theme.text }}>❌</Text>
-          </TouchableOpacity>
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ 
+                fontSize: 18, 
+                color: darkMode ? "#fff" : "#333",
+                opacity: 0.8,
+              }}>
+                ✕
+              </Text>
+            </TouchableOpacity>
+          )}
 
+          {/* ✍️ Journal Text Input */}
           <TextInput
             style={{
               flex: 1,
@@ -287,6 +319,7 @@ const FreeJournalingScreen = () => {
               fontSize: 16,
               fontFamily: "serif",
               textAlignVertical: "top",
+              paddingTop: 30, // Extra space at top so typing does not collide with ✕
             }}
             multiline
             placeholder="Write your thoughts... (or tap the mic button on your keyboard)"
@@ -371,7 +404,7 @@ const FreeJournalingScreen = () => {
           </Text>
         ) : null}
         {/* Button Container */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 40, }}>
           {/* Upload Image Button */}
           <TouchableOpacity
             style={{
@@ -458,10 +491,12 @@ const FreeJournalingScreen = () => {
           </View>
         </Modal>
 
-        {/* ✅ Bottom Navigation */}
-        <BottomNavigation activeScreen="FreeJournaling" />
-      </View>
-    </TouchableWithoutFeedback>
+        </View> {/* closes the padding View */}
+          <View>
+            <BottomNavigation activeScreen="FreeJournaling" />
+          </View>
+        </View>
+  </TouchableWithoutFeedback>
   );
 };
 

@@ -106,8 +106,8 @@ logger = logging.getLogger(__name__)
 # In-memory conversation store 
 conversations = {}
 
-# Set up the SageMaker session
-sagemaker_session = sagemaker.Session(default_bucket=S3_BUCKET)
+boto_session = boto3.session.Session(region_name="eu-north-1")
+sagemaker_session = sagemaker.Session(boto_session=boto_session, default_bucket=S3_BUCKET)
 role = "arn:aws:iam::495599763151:role/service-role/AmazonSageMaker-ExecutionRole-20250302T091470"
 
 model_data_location = f's3://{S3_BUCKET}/{BASE_MODEL_TAR_PATH}'

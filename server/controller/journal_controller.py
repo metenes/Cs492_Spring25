@@ -952,6 +952,52 @@ def delete_journal_image():
         return jsonify({"error": "Server error"}), 500
 
 
+@journal_bp.route("/update-lock-code/<entry_id>", methods=["POST"])
+@jwt_required()
+def update_lock_code(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        lock_code = data.get("lockCode")
+        user_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not user_doc:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Find the specific journal entry in the journals array
+        journal_entry = None
+        journals = user_doc.get("journalEntries", [])
+        
+        for journal in journals:
+            if str(journal.get("_id")) == entry_id:
+                journal_entry = journal
+                break
+        if not journal_entry:
+            return jsonify({"error": "Journal entry not found"}), 404
+
+        # if lock_code is empty or None, remove the existing lock code
+        if not lock_code:
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
+                {"$unset": {"journalEntries.$.lockCode": ""}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to remove lock code"}), 500
+            return jsonify({"message": "Lock code removed successfully"}), 200
+                
+        else:
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
+                {"$set": {"journalEntries.$.lockCode": lock_code}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to create lock code"}), 500
+        
+            return jsonify({"message": "Lock code created successfully"}), 200
+    
+    except Exception as e:
+        print(f"❌ Error updating lock code: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # TODO
 @journal_bp.route("/face-photo-analysis", methods=["POST"])
 def upload_image():
