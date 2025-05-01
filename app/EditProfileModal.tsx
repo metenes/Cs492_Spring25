@@ -51,6 +51,7 @@ export default function EditProfileModal({
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const handleSave = async () => {
     try {
@@ -79,6 +80,7 @@ export default function EditProfileModal({
         setPasswordError('');
         setOldPassword('');
         setNewPassword('');
+        setPasswordSuccess(true); 
         Alert.alert('Success', 'Password changed successfully');
       } else {
         setPasswordError(result.message || 'Failed to change password');
@@ -148,6 +150,7 @@ export default function EditProfileModal({
 
           <Text style={[styles.label, { color: theme.textSecondary }]}>Change Password</Text>
           <TextInput
+            testID="oldPasswordInput"
             style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
             placeholder="Old password"
             placeholderTextColor={theme.placeholder}
@@ -156,6 +159,7 @@ export default function EditProfileModal({
             secureTextEntry
           />
           <TextInput
+            testID="newPasswordInput"
             style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
             placeholder="New password"
             placeholderTextColor={theme.placeholder}
@@ -163,14 +167,20 @@ export default function EditProfileModal({
             onChangeText={setNewPassword}
             secureTextEntry
           />
-          {passwordError ? <Text style={[styles.errorText, { color: theme.danger }]}>{passwordError}</Text> : null}
+          {passwordError ? <Text testID="passwordError" style={[styles.errorText, { color: theme.danger }]}>{passwordError}</Text> : null}
           <TouchableOpacity
+            testID="changePasswordButton"
             style={[styles.passwordButton, { backgroundColor: '#000000' }]}
             onPress={handlePasswordChange}
           >
             <Text style={[styles.passwordButtonText, { color: '#FFFFFF' }]}>Change Password</Text>
           </TouchableOpacity>
-
+          {passwordSuccess && (
+  <Text testID="passwordSuccessMessage" style={{ textAlign: 'center', color: 'green', marginTop: 5 }}>
+    Password changed successfully
+  </Text>
+)}
+  
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: '#000000', marginBottom:2 }]}
