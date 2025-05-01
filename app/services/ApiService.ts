@@ -4,7 +4,7 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
 //export const API_URL = "http://192.168.1.16:5000";
-export const API_URL = "http://192.168.0.28:5000"; //kgn
+export const API_URL = "http://172.20.10.3:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
 
 // Define the emotions array to match the backend
@@ -1211,40 +1211,31 @@ export const calculateStreak = (dates: string[]): number => {
 };
 
 
-export const fetchJournalEntriesWithDate = async (
+export async function fetchJournalEntriesWithDate(
   token: string,
-  start_date: string,
-  end_date: string
-) => {
-  try {
-    const params = new URLSearchParams();
-    params.append("start_date", start_date);
-    params.append("end_date", end_date);
-
-    // Updated endpoint to match new data structure
-    const response = await fetch(`${API_URL}/journal/journal-entries-with-date?${params.toString()}`, {
+  startDate: string,   // “YYYY-MM-DD”
+  endDate: string
+) {
+  const resp = await fetch(
+    `${API_URL}/journal/journal-entries-with-date?start_date=${startDate}&end_date=${endDate}`,
+    {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
     }
-
-    // Return the entries array 
-    const data = await response.json();
-    console.log("✅ Received Journal Entries:", data.entries);
-    return data.entries;
-
-  } catch (error) {
-    console.error("Error fetching journal entries:", error);
-    return { error: "Failed to fetch journal entries." };
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => null);
+    throw new Error(err?.error || resp.statusText);
   }
-};
-
+  return resp.json() as Promise<{
+    start_date: string;
+    end_date: string;
+    entries: any[];
+  }>;
+}
 
 export const deleteJournalEntry = async (entryId: string) => {
   try {
