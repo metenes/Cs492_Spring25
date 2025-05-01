@@ -26,6 +26,7 @@ import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount, API_URL
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
 import { useTheme } from './context/ThemeContext';
+import EditProfileModal from './EditProfileModal';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
@@ -33,7 +34,8 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const [isLoading, setIsLoading] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  
+  const [modal_Visible_edit, setModal_Visible_edit] = useState(false);
+
   // Profile data
   const [userId, setUserId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -413,33 +415,36 @@ const ProfileScreen = () => {
     }
   };
 
-  // Save profile changes
   const saveProfileChanges = async () => {
     if (!token) {
       Alert.alert('Error', 'Not authenticated');
-      return;
+      throw new Error('No token');
     }
-
+  
+    setIsLoading(true);
+  
+    const profileData = {
+      name,
+      bio,
+      phone,
+      location,
+    };
+  
     try {
-      setIsLoading(true);
-      
-      const profileData = {
-        name,
-        bio,
-        phone,
-        location
-      };
-
-      await updateProfile(token, profileData); 
-
+      await updateProfile(token, profileData);
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
+  
+  
+  
+  
 
   // Delete account
   const handledeleteAccount = async () => {
@@ -543,7 +548,15 @@ const ProfileScreen = () => {
             <Ionicons name="camera-outline" size={18} color={theme.text} />
           </View>
         </View>
+        <View style={styles.usernameContainer}>
         <Text style={[styles.username, { color: theme.text }]}>{name}</Text>
+         <TouchableOpacity onPress={() => setModal_Visible_edit(true)} style={styles.editButton}>
+            <Ionicons name="pencil-outline" size={20} color={theme.icon} />
+          </TouchableOpacity>
+        </View>
+        
+
+        
         <Text style={[styles.bio, { color: theme.textSecondary }]}>{bio}</Text>
 
         <View style={styles.infoRow}>
@@ -571,52 +584,7 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      {/* Editable Section */}
-      <View style={[styles.editContainer, { backgroundColor: theme.backgroundColor }]}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Edit Profile</Text>
-        
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Name</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Your name"
-          placeholderTextColor={theme.placeholder}
-          value={name}
-          onChangeText={setName}
-        />
-        
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Bio</Text>
-        <TextInput
-          style={[styles.textarea, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Tell us about yourself"
-          placeholderTextColor={theme.placeholder}
-          value={bio}
-          onChangeText={setBio}
-          multiline
-          numberOfLines={3}
-        />
-        
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Phone</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Your phone number"
-          placeholderTextColor={theme.placeholder}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-        
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Location</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
-          placeholder="Your location"
-          placeholderTextColor={theme.placeholder}
-          value={location}
-          onChangeText={setLocation}
-        />
-        
-        <TouchableOpacity style={styles.saveButton} onPress={saveProfileChanges}>
-          <Text style={styles.saveButtonText}>Save Changes</Text>
-        </TouchableOpacity>
+      
         
         <TouchableOpacity 
           style={styles.deleteButton} 
@@ -624,7 +592,6 @@ const ProfileScreen = () => {
         >
           <Text style={styles.deleteButtonText}>Delete Account</Text>
         </TouchableOpacity>
-      </View>
 
       {/* Image Picker Modal */}
       <Modal visible={modalVisible} transparent animationType="fade">
@@ -680,6 +647,22 @@ const ProfileScreen = () => {
       </Modal>
     </ScrollView>
     <BottomNavigation activeScreen="Profile" darkMode={darkMode} />
+    <EditProfileModal
+      modal_Visible_edit={modal_Visible_edit}
+      setModal_Visible_edit={setModal_Visible_edit}
+      onClose={() => setModal_Visible_edit(false)}
+      name={name}
+      setName={setName}
+      bio={bio}
+      setBio={setBio}
+      phone={phone}
+      setPhone={setPhone}
+      location={location}
+      setLocation={setLocation}
+      saveProfileChanges={saveProfileChanges}
+      theme={theme}
+      token={token || ''}
+    />
     </>
   );
 };
@@ -723,6 +706,12 @@ const styles = StyleSheet.create({
     borderRadius: isSmallDevice ? 50 : 60,
     backgroundColor: 'transparent',
   },
+  usernameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '80%',
+  },
   editIcon: {
     position: "absolute",
     bottom: 5,
@@ -764,6 +753,8 @@ const styles = StyleSheet.create({
     padding: 15,
     paddingBottom: 40 
   },
+
+  
   sectionTitle: { 
     fontSize: 16, 
     fontWeight: "bold", 
@@ -888,6 +879,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#E1E9EE',
+  },
+  editButton: {
+    marginLeft: 10,
+    padding: 5,
   },
 });
 
