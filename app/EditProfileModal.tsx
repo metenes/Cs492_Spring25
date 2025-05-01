@@ -179,10 +179,10 @@ export default function EditProfileModal({
               <Text style={[styles.saveText, { color: '#FFFFFF' }]}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.cancelButton, { borderColor: theme.border, marginBottom:2 }]}
+              style={[styles.cancelButton, { backgroundColor: '#000000', marginBottom:2 }]}
               onPress={onClose}
             >
-              <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancel</Text>
+              <Text style={[styles.cancelText, { color: '#FFFFFF' }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
