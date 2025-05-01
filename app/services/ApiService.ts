@@ -3,7 +3,7 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
-export const API_URL = "http://172.20.10.3:5000";
+export const API_URL = "http://192.168.1.16:5000";
 //export const API_URL = "http://192.168.0.28:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
 
@@ -642,40 +642,29 @@ export const registerUser = async (email: string, password: string, dob: string)
     console.log("Register response status:", response.status);
     console.log("Register response headers:", response.headers);
 
-    // Get the raw text first to debug
-    const responseText = await response.text();
-    console.log("Raw response:", responseText.substring(0, 200) + "..."); // Log first 200 chars
-
-    // If it's not valid JSON, don't try to parse it
+    // If the response is not OK, handle error
     if (!response.ok) {
-      if (responseText.includes("<html") || responseText.includes("<!DOCTYPE")) {
-        console.error("Received HTML instead of JSON");
-        throw new Error(`Registration failed: Server returned HTML instead of JSON. Status: ${response.status}`);
-      } else {
-        // Try to parse JSON if it looks like JSON
-        try {
-          const errorData = JSON.parse(responseText);
-          console.log("registerUser() failed response:", errorData);
-          throw new Error(`Registration failed: ${errorData.error || "Unknown error"}`);
-        } catch (parseError) {
-          console.error("Could not parse error response:", parseError);
-          throw new Error(`Registration failed with status ${response.status}. Response could not be parsed.`);
-        }
+      // Try parsing error as JSON
+      try {
+        const errorData = await response.json();
+        console.log("registerUser() failed response:", errorData);
+        throw new Error(`Registration failed: ${errorData.error || "Unknown error"}`);
+      } catch (parseError) {
+        const responseText = await response.text();
+        console.error("Could not parse error response as JSON:", parseError);
+        throw new Error(`Registration failed with status ${response.status}. Raw response: ${responseText}`);
       }
     }
 
-    // If response was ok, try to parse the JSON
-    try {
-      return JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Could not parse successful response:", parseError);
-      throw new Error("Registration succeeded but response was not valid JSON");
-    }
+    // If successful, parse and return JSON
+    const successData = await response.json();
+    return successData;
   } catch (error) {
     console.error("registerUser() error:", error);
     throw error;
   }
 };
+
 
 // **********************************************
 // **Profile API** - Profile Operations
@@ -2004,4 +1993,10 @@ export const facePhotoAnalysis = async (imageUri: string) => {
     console.error('❌ Error in facePhotoAnalysis:', error);
     return { error: 'Photo analysis failed' };
   }
+};
+
+export const checkEmailExists = async (email: string) => {
+  const res = await fetch(`${API_URL}/user/email-exists?email=${email}`);
+  const data = await res.json();
+  return data.exists;
 };

@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { registerUser } from "./services/ApiService";
+import { registerUser, checkEmailExists } from "./services/ApiService"; // ✅ add checkEmailExists
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -24,20 +24,57 @@ const RegisterScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
+  const [emailError, setEmailError] = useState("");
+
   const navigation = useNavigation<RegisterScreenNavigationProp>();
 
+  const handleEmailBlur = async () => {
+    if (!email) return;
+
+    try {
+      const exists = await checkEmailExists(email);
+      if (exists) {
+        setEmailError("Email already in use");
+      } else {
+        setEmailError("");
+      }
+    } catch (err) {
+      console.log("Email check failed", err);
+      setEmailError("Could not verify email");
+    }
+  };
+
   const handleRegister = async () => {
+    setEmailError("");
+
     if (!email || !password || !dob) {
       Alert.alert("Missing Fields", "Please fill out all required fields.");
       return;
     }
 
+    if (emailError) {
+      Alert.alert("Registration Failed", emailError);
+      return;
+    }
+
     try {
-      await registerUser(email, password, dob);
+      const response = await registerUser(email, password, dob);
+
+      if (response.error) {
+        if (response.error.toLowerCase().includes("already")) {
+          setEmailError("Email already in use");
+          Alert.alert("Registration Failed", "Email already in use.");
+        } else {
+          Alert.alert("Registration Failed", response.error);
+        }
+        return;
+      }
+
       Alert.alert("Success", "Registration successful. You can now log in.");
       navigation.navigate("Login");
-    } catch (error) {
-      Alert.alert("Registration Failed", "Please try again.");
+    } catch (error: any) {
+      setEmailError("Something went wrong");
+      Alert.alert("Error", error.message || "Please try again later.");
     }
   };
 
@@ -51,10 +88,15 @@ const RegisterScreen = () => {
         style={styles.input}
         placeholder="email@domain.com"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(text) => {
+          setEmail(text);
+          setEmailError("");
+        }}
+        onBlur={handleEmailBlur} // ✅ live check on blur
         keyboardType="email-address"
         autoCapitalize="none"
       />
+      {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
       <Text style={styles.label}>Password</Text>
       <TextInput
@@ -123,7 +165,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     backgroundColor: "#F4F4F4",
-    marginBottom: height * 0.02,
+    marginBottom: height * 0.015,
+  },
+  errorText: {
+    color: "red",
+    fontSize: width * 0.035,
+    marginBottom: height * 0.015,
+    alignSelf: "flex-start",
+    marginLeft: "5%",
   },
   registerButton: {
     width: "90%",

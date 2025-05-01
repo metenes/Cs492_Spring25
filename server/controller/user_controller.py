@@ -651,3 +651,13 @@ def oauth_callback():
 
     token = create_access_token(identity=str(user["_id"]))
     return jsonify({"token": token, "user": user})
+
+
+@user_bp.route("/email-exists", methods=["GET"])
+def check_email_exists():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    exists = users_collection.find_one({"email": email}) is not None
+    return jsonify({"exists": exists}), 200

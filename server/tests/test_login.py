@@ -2,15 +2,16 @@ import requests
 
 BASE_URL = "http://192.168.1.16:5000"  # or your deployed backend
 
-
 def test_valid_login():
     payload = {
-        "email": "example@gmail.com",
-        "password": "12345678"  # plain-text from CSV
+        "email": "irem.akel@ug.bilkent.edu.tr",
+        "password": "password123"
     }
     r = requests.post(f"{BASE_URL}/user/login", json=payload)
     assert r.status_code == 200
-    assert "token" in r.json()
+    data = r.json()
+    assert "access_token" in data
+
 
 def test_invalid_password():
     payload = {"email": "test@example.com", "password": "wrongpass"}
