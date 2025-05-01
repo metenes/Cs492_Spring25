@@ -54,6 +54,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [verifyPinModalVisible, setVerifyPinModalVisible] = useState(false);
   const [removePinModalVisible, setRemovePinModalVisible] = useState(false);
+  const [pinOptionsModalVisible, setPinOptionsModalVisible] = useState(false);
 
   // Pick a random quote
   const [randomQuote] = useState(() => {
@@ -263,31 +264,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     setSelectedEntry(entry);
     // If entry already has a PIN, ask if they want to remove it
     if (entry.lockCode) {
-      Alert.alert(
-        "PIN Options",
-        "What would you like to do with this journal's PIN?",
-        [
-          {
-            text: "Remove PIN",
-            onPress: () => {
-              setCurrentPin('');
-              setRemovePinModalVisible(true);
-            }
-          },
-          {
-            text: "Change PIN",
-            onPress: () => {
-              setPin('');
-              setConfirmPin('');
-              setPinModalVisible(true);
-            }
-          },
-          {
-            text: "Cancel",
-            style: "cancel"
-          }
-        ]
-      );
+      setPinOptionsModalVisible(true);
     } else {
       // No existing PIN, open modal to create one
       setPin('');
@@ -778,6 +755,64 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       <Modal
         animationType="slide"
         transparent={true}
+        visible={pinOptionsModalVisible}
+        onRequestClose={() => {
+          setPinOptionsModalVisible(false);
+          setSelectedEntry(null);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={[styles.modalView, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              PIN Options
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              What would you like to do with this journal's PIN?
+            </Text>
+
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={[styles.optionButton, { backgroundColor: theme.inputBackground }]}
+                onPress={() => {
+                  setPinOptionsModalVisible(false);
+                  setCurrentPin('');
+                  setRemovePinModalVisible(true);
+                }}
+              >
+                <Icon name="unlock" size={20} color={theme.primary} />
+                <Text style={[styles.optionText, { color: theme.text }]}>Remove PIN</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.optionButton, { backgroundColor: theme.inputBackground }]}
+                onPress={() => {
+                  setPinOptionsModalVisible(false);
+                  setPin('');
+                  setConfirmPin('');
+                  setPinModalVisible(true);
+                }}
+              >
+                <Icon name="edit" size={20} color={theme.primary} />
+                <Text style={[styles.optionText, { color: theme.text }]}>Change PIN</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, styles.buttonCancel, { borderColor: theme.border, marginTop: 16 }]}
+              onPress={() => {
+                setPinOptionsModalVisible(false);
+                setSelectedEntry(null);
+              }}
+            >
+              <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
         visible={verifyPinModalVisible}
         onRequestClose={() => {
           setVerifyPinModalVisible(false);
@@ -1054,6 +1089,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10
+  },
+  optionsContainer: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 12,
   },
   button: {
     borderRadius: 8,
