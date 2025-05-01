@@ -4,14 +4,14 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import Icon from "react-native-vector-icons/Feather";
 import { RootStackParamList } from "./types/types";
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {storeToken} from './auth/AuthContext'
+import { storeToken } from './auth/AuthContext'
 import BottomNavigation from './BottomNavigation';
 import { ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from './context/ThemeContext';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchJournalEntries,  fetchJournalDates, calculateStreak, fetchCheckIn , updateJournalPin } from "./services/ApiService";
+import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
@@ -41,7 +41,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const menuPosition = useState(new Animated.Value(0))[0];
   const rotation = useState(new Animated.Value(0))[0];
   const [streak, setStreak] = useState(0);
-  
+
   // Paging 
   const [limit] = useState(30); // entries per page
   const [hasMore, setHasMore] = useState(true); // disable loading when all loaded
@@ -54,13 +54,36 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [verifyPinModalVisible, setVerifyPinModalVisible] = useState(false);
   const [removePinModalVisible, setRemovePinModalVisible] = useState(false);
+  const [pinOptionsModalVisible, setPinOptionsModalVisible] = useState(false);
 
   // Pick a random quote
   const [randomQuote] = useState(() => {
     const quotes = [
-      '“The unexamined life is not worth living.”\n— Socrates',
-      '“Thoughts disentangle themselves when they pass through the lips and fingertips.”\n— Dawson Trotman',
-      '“You don’t write because you want to say something, you write because you have something to say.”\n— F. Scott Fitzgerald'
+      '"The unexamined life is not worth living."\n— Socrates',
+      '"Thoughts disentangle themselves when they pass through the lips and fingertips."\n— Dawson Trotman',
+      '"You don\'t write because you want to say something, you write because you have something to say."\n— F. Scott Fitzgerald',
+      '"We write to taste life twice, in the moment and in retrospect."\n— Anaïs Nin',
+      '"Fill your paper with the breathings of your heart."\n— William Wordsworth',
+      '"There is no greater agony than bearing an untold story inside you."\n— Maya Angelou',
+      '"Write what should not be forgotten."\n— Isabel Allende',
+      '"The purpose of a writer is to keep civilization from destroying itself."\n— Albert Camus',
+      '"I write to discover what I know."\n— Flannery O\'Connor',
+      '"Writing is the painting of the voice."\n— Voltaire',
+      '"Either write something worth reading or do something worth writing."\n— Benjamin Franklin',
+      '"A word after a word after a word is power."\n— Margaret Atwood',
+      '"The scariest moment is always just before you start."\n— Stephen King',
+      '"Start writing, no matter what. The water does not flow until the faucet is turned on."\n— Louis L\'Amour',
+      '"You can make anything by writing."\n— C.S. Lewis',
+      '"Write what disturbs you, what you fear, what you have not been willing to speak about."\n— Natalie Goldberg',
+      '"The first draft is just you telling yourself the story."\n— Terry Pratchett',
+      '"A writer is someone for whom writing is more difficult than it is for other people."\n— Thomas Mann',
+      '"One day I will find the right words, and they will be simple."\n— Jack Kerouac',
+      '"Writing is an exploration. You start from nothing and learn as you go."\n— E.L. Doctorow',
+      '"The role of a writer is not to say what we all can say, but what we are unable to say."\n— Anaïs Nin',
+      '"Words are a lens to focus one\'s mind."\n— Ayn Rand',
+      '"Writing is the only way I have to explain my own life to myself."\n— Pat Conroy',
+      '"To survive, you must tell stories."\n— Umberto Eco',
+      '"A writer is a world trapped in a person."\n— Victor Hugo'
     ];
     return quotes[Math.floor(Math.random() * quotes.length)];
   });
@@ -79,7 +102,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     "freeform": "freeform",
     "guided": "guided"
   };
-      
+
   // Apply filter function
   const applyFilter = (filter: string) => {
     setActiveFilter(filter);
@@ -88,14 +111,14 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       setFilteredEntries(entries);
       return;
     }
-    
+
     const filtered = entries.filter(entry => entry.category === filterMap[filter]);
     setFilteredEntries(filtered);
   };
 
   const loadData = useCallback(async () => {
     if (!shouldLoadData) return;
-    
+
     try {
       setIsLoadingMore(skip > 0);
       const token = await AsyncStorage.getItem("userToken");
@@ -103,7 +126,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
       // Load entries
       const fetchedEntries = await fetchJournalEntries(token, limit, skip);
-      
+
       const checkInResponse = await fetchCheckIn(token);
 
       let fetchedCheckIns = [];
@@ -111,40 +134,38 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         fetchedCheckIns = checkInResponse.history;
       }
 
-          const formattedCheckIns = fetchedCheckIns.map((checkIn: {
-            date: string;
-            causes: never[];
-            entry_id: any;
-            comments: string | any[];
-            created_at: any;
-            lockCode: String;
-            sentiments: any;
-          }) => ({
+      const formattedCheckIns = fetchedCheckIns.map((checkIn: {
+        date: string;
+        causes: never[];
+        entry_id: any;
+        comments: string | any[];
+        created_at: any;
+        sentiments: any;
+      }) => ({
 
-            _id: checkIn.entry_id,
-            entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments",
-            entryDate: checkIn.date || new Date().toISOString(),
-            createdAt: checkIn.created_at,
-            category: "checkin",
-            images: [],
-            sentiments: checkIn.sentiments || [],
-            causes: checkIn.causes || [],
-            comments: checkIn.comments || [],
-            prompt: "",
-            lockCode: checkIn.lockCode || null,
-          }));
+        _id: checkIn.entry_id,
+        entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments",
+        entryDate: checkIn.date || new Date().toISOString(),
+        createdAt: checkIn.created_at,
+        category: "checkin",
+        images: [],
+        sentiments: checkIn.sentiments || [],
+        causes: checkIn.causes || [],
+        comments: checkIn.comments || [],
+        prompt: ""
+      }));
 
       let allEntries = [...fetchedEntries, ...formattedCheckIns];
       allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-      
+
       // Apply pagination
-      allEntries = allEntries.slice(0, skip + limit);  
+      allEntries = allEntries.slice(0, skip + limit);
 
       // Check if we've reached the end of available data
       setHasMore(allEntries.length >= skip + limit);
-      
+
       setEntries(allEntries);
-      
+
       // Reapply the current filter
       if (activeFilter === "all") {
         setFilteredEntries(allEntries);
@@ -157,7 +178,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       const dates = await fetchJournalDates(token, limit, skip);
       const calculatedStreak = calculateStreak(dates);
       setStreak(calculatedStreak);
-      
+
       // Reset loading flags
       setIsLoadingMore(false);
       setShouldLoadData(false);
@@ -194,10 +215,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       setMenuOpen(false);
       menuPosition.setValue(0);
       rotation.setValue(0);
-      
+
       // Trigger data reload on screen focus
       setShouldLoadData(true);
-      
+
       return () => {
         // Clean up any pending operations if needed
       };
@@ -243,31 +264,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     setSelectedEntry(entry);
     // If entry already has a PIN, ask if they want to remove it
     if (entry.lockCode) {
-      Alert.alert(
-        "PIN Options",
-        "What would you like to do with this journal's PIN?",
-        [
-          {
-            text: "Remove PIN",
-            onPress: () => {
-              setCurrentPin('');
-              setRemovePinModalVisible(true);
-            }
-          },
-          {
-            text: "Change PIN",
-            onPress: () => {
-              setPin('');
-              setConfirmPin('');
-              setPinModalVisible(true);
-            }
-          },
-          {
-            text: "Cancel",
-            style: "cancel"
-          }
-        ]
-      );
+      setPinOptionsModalVisible(true);
     } else {
       // No existing PIN, open modal to create one
       setPin('');
@@ -480,19 +477,20 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             {item.entryContent ? (item.lockCode ? "****** ***** *****" : item.entryContent) : "No content"}
           </Text>
         </View>
-
-        <TouchableOpacity
-          style={styles.lockContainer}
-          onPress={() => handleLockPress(item)}
-        >
-          <Text>
-            <Icon
-              name={item.lockCode ? "lock" : "unlock"}
-              size={18}
-              color={item.lockCode ? theme.icon : theme.textSecondary}
-            />
-          </Text>
-        </TouchableOpacity>
+        {item.category === "freeform" && (
+          <TouchableOpacity
+            style={styles.lockContainer}
+            onPress={() => handleLockPress(item)}
+          >
+            <Text>
+              <Icon
+                name={item.lockCode ? "lock" : "unlock"}
+                size={18}
+                color={item.lockCode ? theme.icon : theme.textSecondary}
+              />
+            </Text>
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     );
   };
@@ -515,7 +513,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       setShouldLoadData(true);
     }
   };
-  
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
       <SafeAreaView
@@ -620,7 +618,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 style={styles.menuItem}
                 onPress={() => {
                   setMenuOpen(false);
-                  navigation.navigate("FreeJournaling", {selectedDate : new Date().toISOString()});
+                  navigation.navigate("FreeJournaling", { selectedDate: new Date().toISOString() });
                 }}
               >
                 <Text>
@@ -750,6 +748,64 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Save</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={pinOptionsModalVisible}
+        onRequestClose={() => {
+          setPinOptionsModalVisible(false);
+          setSelectedEntry(null);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={[styles.modalView, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              PIN Options
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              What would you like to do with this journal's PIN?
+            </Text>
+
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={[styles.optionButton, { backgroundColor: theme.inputBackground }]}
+                onPress={() => {
+                  setPinOptionsModalVisible(false);
+                  setCurrentPin('');
+                  setRemovePinModalVisible(true);
+                }}
+              >
+                <Icon name="unlock" size={20} color={theme.primary} />
+                <Text style={[styles.optionText, { color: theme.text }]}>Remove PIN</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.optionButton, { backgroundColor: theme.inputBackground }]}
+                onPress={() => {
+                  setPinOptionsModalVisible(false);
+                  setPin('');
+                  setConfirmPin('');
+                  setPinModalVisible(true);
+                }}
+              >
+                <Icon name="edit" size={20} color={theme.primary} />
+                <Text style={[styles.optionText, { color: theme.text }]}>Change PIN</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, styles.buttonCancel, { borderColor: theme.border, marginTop: 16 }]}
+              onPress={() => {
+                setPinOptionsModalVisible(false);
+                setSelectedEntry(null);
+              }}
+            >
+              <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1033,6 +1089,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10
+  },
+  optionsContainer: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 12,
   },
   button: {
     borderRadius: 8,

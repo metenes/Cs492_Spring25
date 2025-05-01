@@ -343,121 +343,83 @@ def save_guided_journal():
 @jwt_required()
 def journal_entries_with_date():
     try:
-        # Get the user ID from the JWT token and validate it.
-        user_id = get_jwt_identity()
-        if not ObjectId.is_valid(user_id):
+        # 1) User ID
+        user_id_str = get_jwt_identity()
+        if not ObjectId.is_valid(user_id_str):
             return jsonify({"error": "Invalid user ID"}), 400
-        user_id = ObjectId(user_id)
+        user_id = ObjectId(user_id_str)
 
-        # Retrieve and validate query parameters.
-        start_date_str = request.args.get("start_date")
-        end_date_str = request.args.get("end_date")
-        if not start_date_str or not end_date_str:
+        # 2) Parse dates
+        sd = request.args.get("start_date")
+        ed = request.args.get("end_date")
+        if not sd or not ed:
             return jsonify({"error": "start_date and end_date are required"}), 400
+        start_date = datetime.strptime(sd, "%Y-%m-%d")
+        end_date   = datetime.strptime(ed, "%Y-%m-%d").replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
 
-        # Parse the start and end dates.
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-        # Adjust the end date to include the entire day.
-        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-        # Build the aggregation pipeline for journal entries:
-        journal_pipeline = [
-            # Match the user's document using _id
+        # 3) New aggregation pipeline
+        pipeline = [
             {"$match": {"_id": user_id}},
-            # Unwind the journalEntries array
             {"$unwind": "$journalEntries"},
-            # Filter entries by entryDate within the given period
-            {"$match": {
-                "journalEntries.entryDate": {
-                    "$gte": start_date,
-                    "$lte": end_date
+
+            # Convert entryDate string → real Date
+            {"$addFields": {
+                "journalEntries.parsedEntryDate": {
+                    "$dateFromString": {
+                        "dateString": "$journalEntries.entryDate",
+                        "timezone": "UTC"
+                    }
                 }
             }},
-            # Project only the needed fields
+
+            # Filter where either parsedEntryDate or timestamp is in range
+            {"$match": {
+                "$or": [
+                    {"journalEntries.parsedEntryDate": {"$gte": start_date, "$lte": end_date}},
+                    {"journalEntries.timestamp":       {"$gte": start_date, "$lte": end_date}}
+                ]
+            }},
+
+            # Project & normalize fields
             {"$project": {
                 "_id": "$journalEntries._id",
                 "entryContent": "$journalEntries.entryContent",
-                "entryDate": "$journalEntries.entryDate",
+                "entryDate": {"$ifNull": [
+                    "$journalEntries.parsedEntryDate",
+                    "$journalEntries.timestamp"
+                ]},
                 "images": "$journalEntries.images",
                 "journalSentiments": "$journalEntries.journalSentiments",
-                "createdAt": "$journalEntries.createdAt",
                 "category": "$journalEntries.category",
                 "prompt": "$journalEntries.prompt",
-                "type": "journal"
+                "type": "$journalEntries.type"
             }},
-            # Sort by date descending (newest first)
+
+            # Sort newest first
             {"$sort": {"entryDate": -1}}
         ]
 
-        # Build the aggregation pipeline for check-in entries:
-        checkin_pipeline = [
-            # Match using userId
-            {"$match": {"userId": str(user_id)}},
-            # Filter by date range
-            {"$match": {
-                "timestamp": {
-                    "$gte": start_date,
-                    "$lte": end_date
-                }
-            }},
-            # Project only the needed fields
-            {"$project": {
-                "_id": "$_id",
-                "entryContent": {"$cond": {
-                    "if": {"$gt": [{"$size": "$comments"}, 0]},
-                    "then": {"$arrayElemAt": ["$comments", 0]},
-                    "else": "No comments"
-                }},
-                "entryDate": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
-                "images": [],
-                "journalSentiments": {
-                    "$map": {
-                        "input": "$sentiments",
-                        "as": "sentiment",
-                        "in": {
-                            "emotion": {"$toLower": "$$sentiment"},
-                            "percentage": 1.0
-                        }
-                    }
-                },
-                "createdAt": "$timestamp",
-                "category": "checkin",
-                "prompt": "",
-                "type": "checkin"
-            }},
-            # Sort by date descending (newest first)
-            {"$sort": {"entryDate": -1}}
-        ]
+        raw = journal_entries_collection.aggregate(pipeline)
+        entries = []
+        for d in raw:
+            entries.append({
+                **{k: (v.isoformat() if isinstance(v, datetime) else v)
+                    for k, v in d.items()},
+                "_id": str(d["_id"])
+            })
 
-        # Execute both pipelines
-        journal_entries = list(journal_entries_collection.aggregate(journal_pipeline))
-        checkin_entries = list(check_in_collection.aggregate(checkin_pipeline))
-
-        # Combine and sort all entries
-        all_entries = journal_entries + checkin_entries
-        all_entries.sort(key=lambda x: x.get("entryDate", ""), reverse=True)
-
-        # Convert ObjectId to string in the response
-        for entry in all_entries:
-            if "_id" in entry:
-                entry["_id"] = str(entry["_id"])
-
-        response_data = {
-            "start_date": start_date_str,
-            "end_date": end_date_str,
-            "entries": all_entries
-        }
-        
-        print(f"Found {len(all_entries)} entries for user {user_id}")
-        return jsonify(response_data), 200
+        return jsonify({
+            "start_date": sd,
+            "end_date":   ed,
+            "entries":    entries
+        }), 200
 
     except Exception as e:
-        print(f"Error in journal_entries_endpoint: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
+    
 @journal_bp.route("/api/sentiment-analysis", methods=["GET"])
 @jwt_required()
 def sentiment_analysis():

@@ -3,8 +3,8 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
-export const API_URL = "http://192.168.1.16:5000";
-//export const API_URL = "http://192.168.0.28:5000"; //kgn
+//export const API_URL = "http://192.168.1.16:5000";
+export const API_URL = "http://172.20.10.3:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
 
 // Define the emotions array to match the backend
@@ -207,7 +207,7 @@ export const sendMessageChat = async (message: string, chat_id: string) => {
     if (!data.reply && !data.response) {
       throw new Error("Invalid response format");
     }
-    return data.reply || data.response; 
+    return data.reply || data.response;
 
   } catch (error) {
     console.error("Error sending message:", error);
@@ -238,7 +238,7 @@ export const clearHistoryChat = async(chat_id : string)  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -268,7 +268,7 @@ export const clearHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -299,7 +299,7 @@ export const deleteHistoryChat = async(chat_id : string)  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -329,7 +329,7 @@ export const deleteHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -361,7 +361,7 @@ export const getHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data; // return the chatbot response
+    return data; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -378,7 +378,7 @@ export const getHistoryChat = async(chat_id: string) => {
         "Content-Type": "application/json",
       }
     });
-    
+
     // Check if response is OK before parsing
     if (!response.ok) {
       if(response.status == 404){
@@ -389,10 +389,10 @@ export const getHistoryChat = async(chat_id: string) => {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
     }
-    
+
     const data = await response.json();
     console.log("Data received from History: ", data);
-    
+
     if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
@@ -407,12 +407,12 @@ export const getHistoryChat = async(chat_id: string) => {
 export const startNewChat = async() => {
   try {
     const token = await AsyncStorage.getItem("userToken");
-    
+
     // Check if token exists
     if (!token) {
       throw new Error("Authentication token not found");
     }
-    
+
     const response = await fetch(`${API_URL}/chat/new`, {
       method: "GET",
       headers: {
@@ -420,7 +420,7 @@ export const startNewChat = async() => {
         "Content-Type": "application/json",
       },
     });
-    
+
     // Check response status before trying to parse
     if (!response.ok) {
       // Get response text to debug the issue
@@ -428,7 +428,7 @@ export const startNewChat = async() => {
       console.error("API Error Response:", errorText);
       throw new Error(`API returned ${response.status}: ${response.statusText}`);
     }
-    
+
     // Check content type to ensure we're receiving JSON
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -436,10 +436,10 @@ export const startNewChat = async() => {
       console.error("Non-JSON response:", errorText);
       throw new Error("API didn't return JSON. Received: " + contentType);
     }
-    
+
     const data = await response.json();
     console.log("Data received from API:", data);
-    
+
     if (!data || !data.chat_id) {
       throw new Error("Invalid response format: missing chat_id");
     }
@@ -462,14 +462,14 @@ export const getChatList = async() => {
         "Content-Type": "application/json",
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     console.log("Chats received:", data);
-    
+
     // The API returns an array of chat objects with chat_id and title
     if (!Array.isArray(data)) {
       throw new Error("Invalid response format - expected array");
@@ -479,7 +479,7 @@ export const getChatList = async() => {
       id: chat.chat_id,
       title: chat.title || "Untitled Chat"
     }));
-    
+
   } catch (error) {
     console.error("Error fetching chat list:", error);
     return [];
@@ -494,20 +494,20 @@ export const renameChat = async(chat_id: string, name: string) => {
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-      }, 
+      },
       body: JSON.stringify({
         "name" : name
       }),
     });
-    
+
     // Check if response is OK before parsing
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("Data received from rename: ", data);
-    
+
     if (!data || !data.title) {
       throw new Error("Invalid response format");
     }
@@ -524,20 +524,20 @@ export const saveChat = async(chat_id: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     const response = await fetch(`${API_URL}/chat/save-chat/${chat_id}`, {
-      method: "GET", 
+      method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("Data received from save chat: ", data);
-    
+
     if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
@@ -558,7 +558,7 @@ export const getEmotionalTrendInsight = async (token: string) => {
       Authorization: `Bearer ${token}`,
     },
   });
-  
+
   if (!response.ok) {
     throw new Error("Failed to fetch emotional trend insight");
   }
@@ -1105,8 +1105,8 @@ export const fetchJournalEntries = async (token: string, limit : Int32, skip : I
     // params.append("limit", limit.toString());
     // params.append("skip", skip.toString());
 
-   // const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
-  const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
+    // const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
+    const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1165,12 +1165,12 @@ export const fetchJournalDates = async (token: string, limit : Int32, skip : Int
     // Handle both array and object responses
     if (Array.isArray(data)) {
       return data;
-    } 
+    }
     else if (typeof data === 'object' && data !== null) {
       // If the response is an object, try to extract an array from it
       if (Array.isArray(data.dates)) {
         return data.dates;
-      } 
+      }
       else if (Array.isArray(data.entries)) {
         return data.entries.map((entry: any) => entry.entryDate);
       }
@@ -1211,40 +1211,31 @@ export const calculateStreak = (dates: string[]): number => {
 };
 
 
-export const fetchJournalEntriesWithDate = async (
+export async function fetchJournalEntriesWithDate(
   token: string,
-  start_date: string,
-  end_date: string
-) => {
-  try {
-    const params = new URLSearchParams();
-    params.append("start_date", start_date);
-    params.append("end_date", end_date);
-
-    // Updated endpoint to match new data structure
-    const response = await fetch(`${API_URL}/journal/journal-entries-with-date?${params.toString()}`, {
+  startDate: string,   // “YYYY-MM-DD”
+  endDate: string
+) {
+  const resp = await fetch(
+    `${API_URL}/journal/journal-entries-with-date?start_date=${startDate}&end_date=${endDate}`,
+    {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
     }
-
-    // Return the entries array 
-    const data = await response.json();
-    console.log("✅ Received Journal Entries:", data.entries);
-    return data.entries;
-
-  } catch (error) {
-    console.error("Error fetching journal entries:", error);
-    return { error: "Failed to fetch journal entries." };
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => null);
+    throw new Error(err?.error || resp.statusText);
   }
-};
-
+  return resp.json() as Promise<{
+    start_date: string;
+    end_date: string;
+    entries: any[];
+  }>;
+}
 
 export const deleteJournalEntry = async (entryId: string) => {
   try {
@@ -1278,7 +1269,7 @@ export const deleteJournalEntry = async (entryId: string) => {
   }
 };
 
- 
+
 // **********************************************
 // ** Homepage API ** - Entry 
 // **********************************************
@@ -1521,7 +1512,7 @@ export const deleteCheckIn = async (entry : any) => {
     if (!token) {
       throw new Error('Authentication required');
     }
-    
+
     const response = await fetch(`${API_URL}/check-in/delete/${entry._id}`, {
       method: 'DELETE',
       headers: {
@@ -1629,7 +1620,7 @@ export const updateNotificationFrequency = async (frequency: string) => {
       console.error("Error response data:", data);
       return { message: data.error, status: response.status };
     }
-  
+
     return { message: data.message, status: response.status }; // success
   } catch (error) {
     console.error("Error updating notification frequency:", error);
@@ -1872,7 +1863,7 @@ export const updateJournalEntry = async (
     // First get the raw response text
     const responseText = await response.text();
     console.log('Raw server response:', responseText);
-    
+
     // Try to parse as JSON, but handle cases where it's not JSON
     let responseData;
     try {
@@ -1903,26 +1894,15 @@ export const updateJournalEntry = async (
 export const updateJournalPin = async (journalId: string, pin: string, token: string, type: string) => {
   try {
     let response = null;
-    if(type === "checkin"){ // todo
-      response = await fetch(`${API_URL}/check-in/create-lock-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lockCode: pin ? pin : null, journalId })
-      });
-    }
-    else if (type === "journal"){
-      response = await fetch(`${API_URL}/journal/update-lock-code/${journalId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lockCode: pin ? pin : null })
-      });
-    }
+    response = await fetch(`${API_URL}/journal/update-lock-code/${journalId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ lockCode: pin ? pin : null })
+    });
+
     if (!response?.ok) {
       throw new Error('Failed to update PIN');
     }
