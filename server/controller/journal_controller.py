@@ -13,6 +13,11 @@ import time
 import random
 import string
 from transformers import pipeline
+from collections import defaultdict
+
+# Temporary in-memory counter for uploaded images per user
+image_upload_counter = defaultdict(int)
+
 
 # Define emotions array to match client-side
 EMOTIONS = [
@@ -122,7 +127,11 @@ def save_journal_entry():
             print(f"✅ Created new document. Inserted ID: {result.inserted_id}")
         
         print(f"✅ MongoDB operation successful")
-        
+
+        # ✅ Reset image upload counter after successful save
+        if user_id in image_upload_counter:
+            del image_upload_counter[user_id]
+
         return jsonify({
             "message": "Journal entry saved successfully",
             "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
@@ -840,73 +849,52 @@ def upload_journal_image():
     try:
         user_id = get_jwt_identity()
         print(f"🔍 Uploading journal image for user: {user_id}")
-        
-        # Debug: log request headers and parts
-        print("📝 Request Content-Type:", request.content_type)
-        print("📝 Request Form Data:", request.form)
-        print("📝 Request Files:", request.files)
-        
+
+        # ✅ Check current upload count
+        if image_upload_counter[user_id] >= 5:
+            print("❌ Upload limit reached (in-memory): 5 images")
+            return jsonify({"error": "Maximum image upload limit (5) reached."}), 400
+
         if 'image' not in request.files:
-            print("❌ No image file found in request")
             return jsonify({"error": "No image provided"}), 400
-        
+
         file = request.files['image']
         if not file:
-            print("❌ No file data found")
             return jsonify({"error": "No image provided"}), 400
 
-        print(f"📁 File received: filename={file.filename}, content_type={file.content_type}")
-
-        # Generate a unique filename with timestamp, random string, and original filename
         timestamp = int(time.time())
         random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
         original_filename = secure_filename(file.filename)
-        # Use the original filename in the S3 key
         filename = f"journal-images/{user_id}/{timestamp}_{random_string}_{original_filename}"
 
-        print(f"📝 Generated S3 filename: {filename}")
-        
-        # Upload to S3
-        try:
-            print(f"📤 Attempting to upload to S3: bucket={S3_BUCKET}, filename={filename}")
-            s3_client.upload_fileobj(
-                file.stream,
-                S3_BUCKET,
-                filename,
-                ExtraArgs={
-                    'ContentType': file.content_type or 'image/jpeg'
-                }
-            )
-            print("✅ S3 upload successful")
+        s3_client.upload_fileobj(
+            file.stream,
+            S3_BUCKET,
+            filename,
+            ExtraArgs={'ContentType': file.content_type or 'image/jpeg'}
+        )
 
-            # Generate the signed URL for the uploaded image
-            signed_url = s3_client.generate_presigned_url(
-                'get_object',
-                Params={
-                    'Bucket': S3_BUCKET,
-                    'Key': filename
-                },
-                ExpiresIn=3600  # URL expires in 1 hour
-            )
-            print(f"🔗 Generated signed URL: {signed_url}")
-            
-            return jsonify({
-                "message": "Journal image uploaded successfully",
-                "signedUrl": signed_url
-            }), 200
+        signed_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': filename},
+            ExpiresIn=3600
+        )
 
-        except ClientError as e:
-            error_message = e.response.get('Error', {}).get('Message', str(e))
-            print(f"❌ Error uploading to S3: {error_message}")
-            print(f"❌ Error code: {e.response.get('Error', {}).get('Code', 'Unknown')}")
-            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
-            return jsonify({"error": f"Failed to upload image: {error_message}"}), 500
+        # ✅ Increment upload count
+        image_upload_counter[user_id] += 1
+        print(f"✅ Upload count for {user_id}: {image_upload_counter[user_id]}")
+
+        return jsonify({
+            "message": "Journal image uploaded successfully",
+            "signedUrl": signed_url
+        }), 200
 
     except Exception as e:
         import traceback
-        print(f"❌ Error in upload_journal_image: {str(e)}")
-        traceback.print_exc()  # Print the full stack trace
+        traceback.print_exc()
         return jsonify({"error": "Server error"}), 500
+
+
 
 @journal_bp.route("/delete-image", methods=["DELETE"])
 @jwt_required()
