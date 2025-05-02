@@ -10,7 +10,7 @@ import {
   ActivityIndicator 
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { resetPassword } from "./services/ApiService";
+import { verifyResetCode, resetPassword } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -26,51 +26,53 @@ const ResetPasswordScreen = () => {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute<ResetPasswordRouteProp>();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
 
   useEffect(() => {
-    if (route.params && route.params.token) {
-      // Ensure we're setting a string
-      const tokenValue = String(route.params.token);
-
-      setToken(tokenValue);
-      console.log("Token retrieved from route params:", tokenValue);
+    if (route.params?.email && route.params?.code) {
+      setEmail(route.params.email);
+      setCode(route.params.code);
+      setToken(route.params.token);
+      console.log("📩 Got reset code + email:", route.params.code, route.params.email);
     } else {
-      // Handle case where token is not provided
       Alert.alert(
-        "Error", 
-        "Invalid reset link. Please request a new password reset.",
+        "Error",
+        "Missing verification details. Please try again.",
         [{ text: "OK", onPress: () => navigation.navigate("Login") }]
       );
     }
   }, []);
 
   const handleResetPassword = async () => {
-    if (!token) {
-      Alert.alert("Error", "Invalid reset token. Please request a new password reset.");
+    if (!email || !code || !token) {
+      Alert.alert("Error", "Missing verification details.");
       return;
     }
-
+  
+    console.log("ARE WE THERE YET");
+  
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
     }
-
+  
     if (newPassword.length < 6) {
       Alert.alert("Error", "Password must be at least 6 characters long.");
       return;
     }
-
+  
     if (newPassword !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
-      await resetPassword(token, newPassword);
+      await resetPassword(token, newPassword);  // ✅ use the token directly
       Alert.alert(
-        "Success", 
+        "Success",
         "Your password has been reset successfully!",
         [{ text: "OK", onPress: () => navigation.navigate("Login") }]
       );
@@ -78,7 +80,7 @@ const ResetPasswordScreen = () => {
       let errorMessage = "An unknown error occurred.";
       if (error instanceof Error) {
         errorMessage = error.message.includes("400") || error.message.includes("401")
-          ? "Invalid or expired reset token. Please request a new password reset."
+          ? "Invalid or expired reset token. Please request a new one."
           : error.message;
       }
       Alert.alert("Error", errorMessage);
@@ -86,6 +88,8 @@ const ResetPasswordScreen = () => {
       setLoading(false);
     }
   };
+  
+  
 
   return (
     <View style={styles.container}>
@@ -111,9 +115,9 @@ const ResetPasswordScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.resetButton, (loading || !token) && styles.disabledButton]} 
+        style={[styles.resetButton, (loading || !newPassword || !confirmPassword) && styles.disabledButton]} 
         onPress={handleResetPassword}
-        disabled={loading || !token}
+        disabled={loading || !newPassword || !confirmPassword}
         testID="submit-reset-button"
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Reset Password</Text>}
@@ -165,7 +169,7 @@ const styles = StyleSheet.create({
     paddingVertical: height * 0.018,
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: height * 0.025,
+    marginBottom: height * 0.3,// used to be 0.025 but keyboard almost covered textbox
   },
   resetButtonText: {
     color: "#FFFFFF",

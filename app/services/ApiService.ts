@@ -4,8 +4,9 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
 //export const API_URL = "http://192.168.1.16:5000";
-export const API_URL = "http://172.20.10.3:5000"; //kgn
+//export const API_URL = "http://172.20.10.3:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
+export const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
 /* 
@@ -579,15 +580,16 @@ export const loginUser = async (email: string, password: string) => {
       body: JSON.stringify({ email, password }),
     });
 
+    const responseData = await response.json(); // ✅ Read response body once
+
     console.log("loginUser() response.ok: ", response.ok);
     console.log("loginUser() response.status: ", response.status);
     console.log("loginUser() response.headers: ", response.headers);
-
-    const responseData = await response.json(); // Await JSON parsing
     console.log("loginUser() response data: ", responseData);
 
     if (!response.ok) {
-      throw new Error(responseData.message || "Invalid email or password");
+      // If locked or failed login, return the error message provided by backend
+      throw new Error(responseData.error || "Login failed");
     }
 
     if (!responseData.access_token) {
@@ -597,24 +599,26 @@ export const loginUser = async (email: string, password: string) => {
 
     console.log("✅ Login successful. Token received:", responseData.access_token);
 
+    // Save token to AsyncStorage
     await AsyncStorage.setItem("userToken", responseData.access_token);
     console.log("🔹 Token successfully saved to AsyncStorage!");
 
+    // Handle push token sync if exists
     const expoPushToken = await AsyncStorage.getItem("expoPushToken");
-    if (!expoPushToken) {
-      console.warn("No Expo push token saved locally.");
-    } else {
+    if (expoPushToken) {
       const pushTokenResponse = await fetch(`${API_URL}/notification/update-push-token-user`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${responseData.access_token}`
+          "Authorization": `Bearer ${responseData.access_token}`,
         },
-        body: JSON.stringify({ token: expoPushToken })
+        body: JSON.stringify({ token: expoPushToken }),
       });
 
       const pushResponseData = await pushTokenResponse.json();
-      console.log("Push token update response:", pushResponseData);
+      console.log("📲 Push token update response:", pushResponseData);
+    } else {
+      console.warn("⚠️ No Expo push token found locally.");
     }
 
     return responseData;
@@ -623,6 +627,7 @@ export const loginUser = async (email: string, password: string) => {
     throw error;
   }
 };
+
 
 // **********************************************
 // **Login&Register API** - Register
@@ -909,7 +914,7 @@ export const updatePassword = async (token: string, newPassword: string) => {
 };
 
 
-export const requestPasswordReset = async (token : string, email: string) => {
+/* export const requestPasswordReset = async (token : string, email: string) => {
   console.log("api:", API_URL)
   const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
@@ -927,23 +932,127 @@ export const requestPasswordReset = async (token : string, email: string) => {
   }
 
   return await response.json(); // Expecting { token: "some-reset-token" }
-};
+}; */
+/* export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, API_URL }),
+    });
+
+    //const text = await response.text();  // 🔍 Capture raw response
+    
+    const data = await response.json();
+    console.log("📨 Raw reset password response:", data);
+
+
+    if (!response.ok) {
+      throw new Error(data.error || "Password reset request failed");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting password reset:", error);
+    throw error;
+  }
+}; */
 
 export const resetPassword = async (token: string, newPassword: string) => {
-  const response = await fetch(`${API_URL}/user/reset-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ token, newPassword }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/user/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    console.log("HERE IN RESET PASSWORD")
 
-  if (!response.ok) {
-    throw new Error(`Failed to reset password: ${response.statusText}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to reset password");
+    }
+
+    return data;
+  } catch (err) {
+    console.error("❌ Error resetting password:", err);
+    throw err;
   }
-
-  return await response.json(); // Expecting success message
 };
+
+
+// **********************************************
+// ** password reset with verification code
+// **********************************************
+
+export const requestVerificationCode = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email })
+    });
+
+    console.log("HERE IN REQUEST VERIFICATION CODE")
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to send code");
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting code:", error);
+    throw error;
+  }
+};
+
+/* export const verifyCodeAndResetPassword = async (
+  email: string,
+  code: string,
+  newPassword: string
+) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to reset password");
+    return data;
+  } catch (error) {
+    console.error("❌ Error resetting password:", error);
+    throw error;
+  }
+}; */
+export const verifyResetCode = async (email: string, code: string, token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, token }),
+    });
+
+    console.log("HERE IN VERIFY RESET CODE")
+
+    const data = await response.json();
+    console.log(data)
+    if (!response.ok) {
+      throw new Error(data.error || "Verification failed");
+    }
+    console.log(data.token)
+
+    return data.token;
+  } catch (err) {
+    console.error("❌ Error verifying reset code:", err);
+    throw err;
+  }
+};
+
+
 
 // **********************************************
 // ** Homepage API ** - FreeJournal & Guided Journal
@@ -952,6 +1061,10 @@ export const resetPassword = async (token: string, newPassword: string) => {
 export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
   const start = Date.now();    
   try {
+    if (!content || !content.trim()) {
+      throw new Error("Journal content cannot be empty.");
+    }
+    
       
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
@@ -987,11 +1100,6 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
       percentage: emotion.score,
     }));
 
-    console.log("Final mapped sentiments:", mappedSentiments);
-    console.log("CATEGORY : " , category)
-
-    console.log("HEEEEEEEEEEEEEEEEEEELPPPPP*******")
-    console.log(entryDate)
 
     const entryData = {
       entryContent: content,
@@ -1030,13 +1138,13 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
     console.log(`🕒 saveJournalEntry took ${duration}ms`);
     if (duration > 2000) {
       console.warn(`⚠️ saveJournalEntry exceeded 2s (took ${duration}ms)!`);
-      // optionally: throw new Error(`Save took too long: ${duration}ms`);
     }
   }
 };
 
 export const editJournalEntry = async (entryId: string, newContent: string, images?: string[], category?: string, prompt?: string) => {
   try {
+    
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
