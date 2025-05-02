@@ -1059,11 +1059,13 @@ export const verifyResetCode = async (email: string, code: string, token: string
 // **********************************************
 
 export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
+  const start = Date.now();    
   try {
     if (!content || !content.trim()) {
       throw new Error("Journal content cannot be empty.");
     }
     
+      
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
@@ -1098,11 +1100,6 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
       percentage: emotion.score,
     }));
 
-    console.log("Final mapped sentiments:", mappedSentiments);
-    console.log("CATEGORY : " , category)
-
-    console.log("HEEEEEEEEEEEEEEEEEEELPPPPP*******")
-    console.log(entryDate)
 
     const entryData = {
       entryContent: content,
@@ -1135,6 +1132,13 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
   } catch (error) {
     console.error("❌ Error in saveJournalEntry:", error);
     throw error;
+  }
+  finally {
+    const duration = Date.now() - start;  // ← stop timer
+    console.log(`🕒 saveJournalEntry took ${duration}ms`);
+    if (duration > 2000) {
+      console.warn(`⚠️ saveJournalEntry exceeded 2s (took ${duration}ms)!`);
+    }
   }
 };
 
