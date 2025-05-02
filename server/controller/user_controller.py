@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, create_refresh_token
 from datetime import datetime, timedelta
 from models.user import User  # Import the User model
 from utils.database import users_collection
@@ -50,6 +50,66 @@ from flask_dance.contrib.google import make_google_blueprint
   "role": "user" // user, admin
 }
 """
+
+# Sample FAQs
+FAQ_LIST = [
+    {
+        "question": "How do I reset my password?",
+        "answer": "Go to Settings > Account > Reset Password. You'll receive an email with a secure link to create a new password."
+    },
+    {
+        "question": "How is my data secured?",
+        "answer": "We use AES-256 encryption for data at rest and TLS 1.3 for data in transit. All data is stored in secure AWS servers with regular security audits."
+    },
+    {
+        "question": "Can I use this app anonymously?",
+        "answer": "Yes. You can skip personal info during registration and use a pseudonym. We never require identifiable information."
+    },
+    {
+        "question": "How are emotions detected in my entries?",
+        "answer": "Our AI uses advanced NLP (Natural Language Processing) to analyze sentiment, emotional tone, and recurring themes while respecting your privacy."
+    },
+    {
+        "question": "Can I export my journal entries?",
+        "answer": "Yes. Go to Settings > Data > Export to download all your entries in PDF, TXT, or JSON format."
+    },
+    {
+        "question": "Is there a limit to entry length?",
+        "answer": "You can write up to 10,000 characters per entry. For longer reflections, consider breaking them into multiple entries."
+    },
+    {
+        "question": "How often should I journal?",
+        "answer": "We recommend writing daily, but even weekly reflections show benefits. The app will suggest prompts if you're stuck."
+    },
+    {
+        "question": "Can I add images or voice notes?",
+        "answer": "Currently we support text only, but multimedia features are coming in our next update."
+    },
+    {
+        "question": "What happens if I forget my encryption passphrase?",
+        "answer": "We cannot recover it (by design for security). You'll need to create a new account and manually transfer old entries."
+    },
+    {
+        "question": "Do you offer therapy or mental health advice?",
+        "answer": "No. While journaling has therapeutic benefits, we're not a substitute for professional care. See our Resources section for crisis hotlines."
+    },
+    {
+        "question": "How does the streak counter work?",
+        "answer": "Your streak increases with consecutive days of journaling. A 12-hour grace period is allowed between entries."
+    },
+    {
+        "question": "Can I use markdown formatting?",
+        "answer": "Yes! Basic markdown like **bold**, *italics*, and bullet points are supported. Use the help icon (?) for formatting tips."
+    },
+    {
+        "question": "Why can't I delete my account from the app?",
+        "answer": "For security, account deletion requires email verification. Contact support@journalapp.com from your registered email."
+    },
+    {
+        "question": "Are my entries used to train AI?",
+        "answer": "Never. Your data remains private unless you explicitly opt-in to our (fully anonymized) research program."
+    }
+]
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID")
@@ -215,7 +275,7 @@ def login():
             return jsonify({"error": "Invalid credentials"}), 401
 
         # Generate JWT token
-        access_token = create_access_token(identity=str(user["_id"]))  # You can pass user ID as string
+        access_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))  # You can pass user ID as string
         print(f"LOGIN {access_token}")
 
         return jsonify({"access_token": access_token}), 200
@@ -456,7 +516,6 @@ def delete_user(user_id):
 # ---------------------------------------
 #  **Forgot Password & Check mail **
 # ---------------------------------------
-
 @user_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
     try:
@@ -523,6 +582,69 @@ def forgot_password():
         traceback.print_exc()  
         return jsonify({"error": str(e)}), 500
 
+
+# ---------------------------------------
+#  **Support mail **
+# ---------------------------------------
+
+@user_bp.route("/support/contact", methods=["POST"])
+def send_support_email():
+    try:
+        data = request.json
+        user_email = data.get("email")
+        subject = data.get("subject")
+        message = data.get("message")
+
+        if not user_email or not subject or not message:
+            return jsonify({"error": "Email, subject, and message are required"}), 400
+
+        # Create a more descriptive email
+        msg = Message(
+            "Password Reset Request for Your Account", 
+            subject=f"[Support] {subject}",
+            sender=("Sentio Support", current_app.config["MAIL_USERNAME"]), 
+            recipients=[ current_app.config["MAIL_USERNAME"]],  # ✅ same mail adress send 
+            body=f"From: {user_email}\n\nMessage:\n{message}"
+
+        )
+        
+        # HTML body for better formatting
+        msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+            <h2 style="color: #333;">Sentio App Support Mail</h2>
+            <p>You recently requested to reset your password for your account. Use the button below to reset it.</p>
+            <p>This password reset link is only valid for the next 15 minutes.</p>
+            <p>If you did not request a password reset, please ignore this email or contact support if you have questions.</p>
+            <p>Regards,<br>The Sentio Team</p>
+        </div>
+        """
+        
+        # Plain text alternative for email clients that don't support HTML
+        msg.body = f"""
+        Sentio App Support Request - Mail #{ObjectId()} 
+
+        From User : {user_email}
+
+        Subject : {subject} 
+        
+        Message : {message}
+        
+        This support mail produced automatically, do not response the mail. 
+                
+        Regards,
+        The Sentio Team
+        """
+        
+        mail.send(msg)
+        return jsonify({"message": "Your email was sent successfully"}), 200
+
+    except Exception as e:
+        print(f"Email error: {e}")
+        return jsonify({"error": "Failed to send email"}), 500
+
+@user_bp.route("/support/faqs", methods=["POST"])
+def get_faqs():
+    return jsonify({"faqs": FAQ_LIST}), 200
 
 # ---------------------------------------
 #  **Reset Password**

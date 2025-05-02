@@ -1,30 +1,69 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
-// const API_URL = "http://192.168.1.103:5000"; // Bilkent Dorms - LAN 
-// const API_URL = "http://192.168.1.16:5000";
-// const API_URL = "http://10.203.122.69:5000";
-// const API_URL = "http://192.168.1.82:5000"; // Melisa's API - LAN
-//const API_URL = "http://192.168.0.28:5000"; //kgn
-const API_URL = "http://192.168.1.104:5000";
+import {API_URL} from "../config"; // Dynamic cast API_URL
 
-// Define the emotions array to match the backend
-/* 
-const EMOTIONS = [
-  // Free Journaling Emotions (28)
-  "admiration", "amusement", "anger", "annoyance", "approval", "caring",
-  "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
-  "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
-  "nervousness", "optimism", "pride", "realization", "relief", "remorse",
-  "sadness", "surprise", "neutral",
-  
-  // Guided Journaling Emotions (5)
-  "reflection", "insight", "clarity", "growth", "acceptance",
-  
-  // Check-in Emotions (5)
-  "energy", "focus", "motivation", "stress", "balance"
-];
-*/
+// const API_URL = "http://192.168.1.104:5000";
 
+// **********************************************
+// ** Activity API** 
+// **********************************************
+
+export const fetchActivities = async (token: string) => {
+  const response = await fetch(`${API_URL}/activity/get-activity`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  return response.json();
+};
+
+export const logActivity = async (token: string, activity: string) => {
+  const response = await fetch(`${API_URL}/activity/log-activity`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ activity }),
+  });
+  return response.json();
+};
+
+export const fetchGeneralEmotion = async (token: string) => {
+  const response = await fetch(`${API_URL}/activity/emotion-distribution`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = response.json(); 
+  if (!response.ok) {
+    throw new Error("Failed to fetch emotional trend insight");
+  }
+  console.log("Emotional Insight " )
+  return response.json();
+
+};
+
+export const fetchByKeybordEmotion = async (token: string, keyword : string) => {
+  const response = await fetch(`${API_URL}/activity/emotion-by-keyword?q=${keyword}`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = response.json(); 
+  if (!response.ok) {
+    throw new Error("Failed to fetch emotional trend insight");
+  }
+  console.log("Emotional Insight " )
+  return response.json();
+};
+
+// **********************************************
+// **Sentiment API** - 
+// **********************************************
 export const analyzeSentiment = async (text: string) => {
   try {
     console.log("🚀 Starting analyzeSentiment with text:", text.substring(0, 50) + "...");
@@ -70,26 +109,7 @@ export const analyzeSentiment = async (text: string) => {
   }
 };
 
-export const logoutDB = async () => {
-  try {
-    const token = await AsyncStorage.getItem("userToken");
-
-    if (token) {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-    }
-  } catch (error) {
-    console.error("❌ Logout failed:", error);
-  }
-};
-
-// **********************************************
-// **Sentiment API** - 
-// **********************************************
-
-export const fetchSentimentAnalysis = async (
+export const fetchJournalSentimentAnalysis = async (
   start_date: string,
   end_date: string,
   interval: string = "monthly",
@@ -142,7 +162,6 @@ export const fetchSentimentAnalysis = async (
   }
 };
 
-
 export const fetchEmotionalRecommendations = async () => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -175,6 +194,45 @@ export const fetchEmotionalRecommendations = async () => {
 };
 
 
+// Fetch sentiment data for a given timeframe (day/week/month)
+export const fetchSentimentData = async (token: string, timeframe: string) => {
+  const response = await fetch(`${API_URL}/sentiment/${timeframe}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData?.error || "Failed to fetch emotional trend insight");
+  }
+
+  const data = await response.json();
+  console.log("Emotional Trend Insight:", data);
+  return data;
+};
+
+// Fetch the user's current overall mood
+export const fetchCurrentSentimentMood = async (token: string) => {
+  const response = await fetch(`${API_URL}/sentiment/current`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData?.error || "Failed to fetch current emotional state");
+  }
+
+  const data = await response.json();
+  console.log("Current Emotional Insight:", data);
+  return data;
+};
 
 
 // **********************************************
@@ -549,28 +607,10 @@ export const saveChat = async(chat_id: string) => {
   }
 }
 
-// **********************************************
-// ** Emotinal Trends Insight API** 
-// **********************************************
-export const getEmotionalTrendInsight = async (token: string) => {
-  const response = await fetch(`${API_URL}/sentiment/insights`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error("Failed to fetch emotional trend insight");
-  }
-
-  return response.json();
-};
-
 
 // **********************************************
-// **Login&Register API** - Login
+// **User API** 
 // **********************************************
-
 export const loginUser = async (email: string, password: string) => {
   try {
     const response = await fetch(`${API_URL}/user/login`, {
@@ -624,9 +664,105 @@ export const loginUser = async (email: string, password: string) => {
   }
 };
 
-// **********************************************
-// **Login&Register API** - Register
-// **********************************************
+export const logoutUser = async () => {
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    if (token) {
+      await fetch(`${API_URL}/user/logout`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+    }
+  } catch (error) {
+    console.error("❌ Logout failed:", error);
+  }
+};
+
+// Token expire 
+export const fetchWithAuth = async (url: string, options: any = {}) => {
+  let token = await AsyncStorage.getItem("accessToken");
+  options.headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  let response = await fetch(url, options);
+
+  // If expired, attempt refresh
+  if (response.status === 401) {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    const refreshRes = await fetch(`${API_URL}/user/refresh-token`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${refreshToken}` }
+    });
+
+    if (refreshRes.ok) {
+      const data = await refreshRes.json();
+      await AsyncStorage.setItem("accessToken", data.access_token);
+      options.headers.Authorization = `Bearer ${data.access_token}`;
+      return await fetch(url, options); // Retry original
+    } else {
+      throw new Error("Token expired, please log in again.");
+    }
+  }
+
+  return response;
+};
+
+export const sendSupportMail = async (email: string, subject: string, message: string, token: string | null) => {
+    if (!email || !subject || !message || !token) {
+      console.log("Missing Fields", "Please complete all fields.");
+      throw new Error("Missing Fields.");
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/user/support/contact`, {
+        method: "POST",
+        headers: {        
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, subject, message }),
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        console.log("✅ Sent", result.message);
+        return JSON.parse(result.text);
+      } else {
+        console.log("❌ Error", result.error || "Failed to send message.");
+        throw new Error("Failed to send message.");
+      }
+    } catch (error) {
+      console.log("❌ Network Error", "Could not send the email.");
+      throw new Error("Could not send the email.");
+ 
+    }
+}
+
+export const fetchFAQ = async (token: string ) => {
+  const response = await fetch(`${API_URL}/user/support/faqs`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ }),
+  });
+
+  const data = await response.json();
+  console.log("Data received from save chat: ", data);
+  
+  if (!response.ok || !data || !data.faqs) {
+    console.error("Error response data:", data);
+    throw new Error("Invalid response format");
+  }
+
+  return data;
+};
+
 
 export const registerUser = async (email: string, password: string, dob: string) => {
   console.log("registerUser() email, password, dob:", email, password, dob);
@@ -676,10 +812,6 @@ export const registerUser = async (email: string, password: string, dob: string)
     throw error;
   }
 };
-
-// **********************************************
-// **Profile API** - Profile Operations
-// **********************************************
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
@@ -836,29 +968,6 @@ export const uploadProfileImage = async (token: string, imageFile: File) => {
   return await response.json();
 };
 
-// **********************************************
-// **Profile API** - Activity - TODO 
-// **********************************************
-
-export const fetchActivities = async (token: string) => {
-  const response = await fetch(`${API_URL}/activity`, {
-    method: "GET",
-    headers: { "Authorization": `Bearer ${token}` },
-  });
-  return response.json();
-};
-
-export const logActivity = async (token: string, activity: string) => {
-  const response = await fetch(`${API_URL}/activity`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ activity }),
-  });
-  return response.json();
-};
 
 // Delete user account
 export const deleteAccount = async (token: string) => {
@@ -906,7 +1015,7 @@ export const updatePassword = async (token: string, newPassword: string) => {
   const response = await fetch(`${API_URL}/update-password`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`, // Include the JWT token in the Authorization header
+      "Authorization": `Bearer ${token}`, // Include the JWT token in the Authorization header
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ password: newPassword }), // Send the new password in the request body
@@ -999,7 +1108,7 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
     console.log("Final mapped sentiments:", mappedSentiments);
     console.log("CATEGORY : " , category)
 
-    console.log("HEEEEEEEEEEEEEEEEEEELPPPPP*******")
+    console.log("*******")
     console.log(entryDate)
 
     const entryData = {

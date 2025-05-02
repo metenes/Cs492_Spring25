@@ -415,7 +415,7 @@ const ChatbotScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? theme.background : "#f9f9fb" }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? theme.backgroundColor : "#f9f9fb" }]}>
       <View style={[styles.header, { 
         backgroundColor: darkMode ? theme.cardBackground : "#fff",
         borderBottomColor: darkMode ? '#333' : '#eaecef'
@@ -448,7 +448,7 @@ const ChatbotScreen = () => {
         {renderSidebar()}
         {renderEditModal()}
         
-        <View style={[styles.chatContainer, { backgroundColor: darkMode ? theme.background : 'transparent' }]}>
+        <View style={[styles.chatContainer, { backgroundColor: darkMode ? theme.backgroundColor : 'transparent' }]}>
           {!activeConversation && conversations.length === 0 ? (
             <View style={styles.welcomeContainer}>
               <Text style={[styles.welcomeTitle, { color: theme.text }]}>Welcome to Sentio ChatBot</Text>

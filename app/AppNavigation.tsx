@@ -42,6 +42,8 @@ import PaymentMethodHistory from  "./PaymentMethodHistoryScreen"
 import PaymentMethodSettingScreen from "./PaymentMethodSettingScreen";
 import Dashboard from "./screens/Dashboard";
 
+import CommunityInsightsScreen from "./CommunityInsightsScreen";
+import ContactSupportScreen from "./ContactSupportScreen";
 
 import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 import { useTheme } from './context/ThemeContext';
@@ -170,10 +172,13 @@ const AppNavigation = () => {
           <Stack.Screen name="BottomNavigation" component={BottomNavigation} />
          
           <Stack.Screen name="PaymentMethodAddScreen" component={PaymentMethodAddScreen} />
-          <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
+          <Stack.Screen name="PaymentMethodHistoryScreen" component={PaymentMethodHistory} />
           <Stack.Screen name="PaymentMethodSettingScreen" component={PaymentMethodSettingScreen} />
 
           <Stack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
+          <Stack.Screen name="CommunityInsight" component={CommunityInsightsScreen} />
+          <Stack.Screen name="ContactSupport" component={ContactSupportScreen} />
+
         </Stack.Navigator>
       </NavigationContainer>
     </>

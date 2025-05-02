@@ -66,8 +66,7 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "13.60.245.250" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
-# ssh -i SentioKeyPair.pem ec2-user@16.171.239.130
+E2C_IP = "16.16.217.210" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
 
 # Define the emotion labels - Local 
 emotion_labels = [
@@ -397,10 +396,13 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
                 # Update the paylod for multiple chat_id 
                 payload = {
                     "user_id": user_id,
-                    "message": prompt,
+                    "message": prompt, # 
                     "chat_id": context.get("chat_id", "1")
                 }
-                ec2_url = f"http://{E2C_IP}:8080/predict"  # Send to cloud like this
+                print("payload is sent : " , payload)
+                ec2_url = f"http://{E2C_IP}:8080/analyze"  # Send to cloud like this
+
+                # ec2_url = f"http://{E2C_IP}:8080/predict"  # Send to cloud like this
                 logger.info(f"Connecting to E2C Distance Servre: {E2C_IP} to {ec2_url}\nSending payload :{payload}")
 
                 async with aiohttp.ClientSession() as session:

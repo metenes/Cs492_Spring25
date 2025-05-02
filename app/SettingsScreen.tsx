@@ -3,7 +3,7 @@ import { View, Text, Switch, TouchableOpacity, StyleSheet, TextInput, Modal } fr
 import { useNavigation } from "@react-navigation/native";
 import BottomNavigation from "./BottomNavigation";
 import { useAuth } from "./auth/AuthContext";
-import { logoutDB, changePassword } from "./services/ApiService";
+import { logoutUser, changePassword } from "./services/ApiService";
 import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -29,7 +29,7 @@ const SettingsScreen = () => {
   const { theme, darkMode } = useTheme();
 
   const handleLogout = () => {
-    logoutDB();
+    logoutUser();
     logout();
     navigation.navigate("Login");
   };
@@ -83,6 +83,14 @@ const SettingsScreen = () => {
           onPress={() => navigation.navigate("NotificationSettingsScreen")}
         >
           <Text style={[styles.settingText, { color: theme.text }]}>Notification Settings</Text>
+          <Text style={[styles.arrow, { color: theme.placeholder }]}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.settingRow, { borderBottomColor: theme.border }]}
+          onPress={() => navigation.navigate("ContactSupport")}
+        >
+          <Text style={[styles.settingText, { color: theme.text }]}>FAQ & Support</Text>
           <Text style={[styles.arrow, { color: theme.placeholder }]}>›</Text>
         </TouchableOpacity>
 

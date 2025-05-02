@@ -6,7 +6,6 @@ from flask_bcrypt import Bcrypt
 from flask_apscheduler import APScheduler
 from datetime import timedelta
 
-
 # importing the controller blueprints
 from controller.user_controller import user_bp
 from controller.sentiments_controller import sentiments_bp

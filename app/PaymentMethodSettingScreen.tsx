@@ -61,7 +61,7 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
           {/* Navigation to Payment History */}
           <TouchableOpacity 
             style={[styles.viewHistoryButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
-            onPress={() => navigation.navigate("PaymentMethodHistory")}
+            onPress={() => navigation.navigate("PaymentMethodHistoryScreen")}
           >
             <Text style={styles.viewHistoryText}>View Payment History</Text>
           </TouchableOpacity>

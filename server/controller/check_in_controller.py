@@ -18,11 +18,10 @@ def submit_check_in():
         user_id = get_jwt_identity()
         data = request.get_json()
         
-
         sentiments = data.get("sentiments", [])
         causes = data.get("causes", [])
         comments = data.get("comments", [])
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now()
 
         if not sentiments or not causes:
             return jsonify({"error": "Sentiments and causes are required."}), 400
@@ -61,58 +60,11 @@ def fetch_check_ins():
                 "comments": entry.get("comments", []),
             })
 
-        
-
         return jsonify({"history": result}), 200
     except Exception as e:
         print("❌ Error fetching check-ins:", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
-
-# Route to submit a new check-in entry using PyMongo
-""" @check_bp.route('/submit', methods=['POST'])
-def create_check_in():
-    try:
-        data = request.get_json()
-        print("*******SUBMIT FROM CONTROLLER********")
-        
-        # Ensure required fields exist
-        if not data.get('user_id') or not data.get('sentiments') or not data.get('causes'):
-            return jsonify({"error": "Missing required fields"}), 400
-        
-        # Validate user exists
-        user = users_collection.find_one({"_id": ObjectId(data['user_id'])})
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        # Get the last entry_id and increment
-        last_entry = check_in_collection.find_one(sort=[("entry_id", -1)])
-        new_entry_id = 1 if not last_entry else last_entry['entry_id'] + 1
-        
-        # Store sentiments and causes as plain text
-        new_check_in = {
-            "entry_id": new_entry_id,
-            "user_id": ObjectId(data["user_id"]),
-            "sentiments": data["sentiments"],  # Store as list of strings
-            "causes": data["causes"],  # Store as list of strings
-            "comments": data.get("comments", []),
-            "created_at": datetime.utcnow()
-        }
-        
-        # Insert check-in into MongoDB
-        check_in_collection.insert_one(new_check_in)
-
-        return jsonify({
-            "success": True,
-            "message": "Check-in submitted successfully",
-            "entry_id": new_entry_id
-        }), 201
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
- """
 @check_bp.route('/history/<user_id>', methods=['GET'])
 @jwt_required()
 def get_check_in_history(user_id):

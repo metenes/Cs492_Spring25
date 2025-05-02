@@ -11,10 +11,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SentimentChart } from "../utils/SentimentChart"; // Adjust path if needed
-import { fetchJournalEntriesWithDate, 
-  fetchSentimentAnalysis, 
-  getEmotionalTrendInsight, 
-  fetchEmotionalRecommendations } from "../services/ApiService"; // Our new function
+import { fetchJournalEntriesWithDate, fetchEmotionalRecommendations } from "../services/ApiService"; // Our new function
 import BottomNavigation from "@/BottomNavigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '../context/ThemeContext';

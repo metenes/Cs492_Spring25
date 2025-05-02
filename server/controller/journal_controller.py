@@ -260,45 +260,6 @@ def get_journal_dates():
         print("❌ Error fetching journal dates:", str(e))
         return jsonify({"error": "Internal server error"}), 500
     
-""" 
-@journal_bp.route('/get-journal-dates', methods=['GET'])
-@jwt_required()
-def get_journal_dates():
-    try:
-        user_id = get_jwt_identity()
-        print(f"🔍 Fetching journal dates for user_id: {user_id}")
-
-        entry_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        if not entry_doc or "journalEntries" not in entry_doc:
-            print("ℹ️ No entries found for user")
-            return jsonify([]), 200
-
-        dates = set()
-        for entry in entry_doc["journalEntries"]:
-            raw_date = entry.get("entryDate")
-            if not raw_date:
-                continue
-
-            if isinstance(raw_date, str):
-                date_str = raw_date.split("T")[0]
-            else:
-                date_str = raw_date.strftime("%Y-%m-%d")
-            dates.add(date_str)
-        
-         # Fetch check-in entry dates -- ???? Niye ? 
-        checkins = check_in_collection.find({"userId": user_id})
-        for entry in checkins:
-            ts = entry.get("timestamp")
-            if ts:
-                dates.add(ts.strftime("%Y-%m-%d"))
-
-        print("✅ Final list of journal dates:", dates)
-        return jsonify(list(dates)), 200
-
-    except Exception as e:
-        print("❌ Error fetching journal dates:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
-"""
 
 @journal_bp.route("/guided", methods=["POST"])
 @jwt_required()
@@ -625,47 +586,6 @@ def sentiment_analysis():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-"""
-@journal_bp.route("/update-journal-entry/<entry_id>", methods=["PUT"])
-@jwt_required()
-def update_journal_entry(entry_id):
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json()
-        print(f"🔄 Updating entry: {entry_id} for user: {user_id}")
-        print(f"📦 Data: {data}")
-
-        if not ObjectId.is_valid(entry_id):
-            return jsonify({"error": "Invalid entry ID"}), 400
-
-        update_data = {
-            "journalEntries.$.entryContent": data["entryContent"],
-            "journalEntries.$.images": data.get("images", []),
-            "journalEntries.$.journalSentiments": data.get("journalSentiments", []),
-            "journalEntries.$.category": data.get("category"),
-            "journalEntries.$.prompt": data.get("prompt"),
-            "journalEntries.$.createdAt": datetime.now()
-        }
-
-        result = journal_entries_collection.update_one(
-            {
-                "_id": ObjectId(user_id),
-                "journalEntries._id": ObjectId(entry_id)
-            },
-            {
-                "$set": update_data
-            }
-        )
-
-        if result.matched_count == 0:
-            return jsonify({"error": "Entry not found or unauthorized"}), 404
-
-        return jsonify({"message": "Journal entry updated successfully"}), 200
-
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-"""
 
 @journal_bp.route("/<entry_id>", methods=["PUT"])
 @jwt_required()
@@ -766,29 +686,6 @@ def update_journal_entry(entry_id):
         return jsonify({"error": str(e)}), 500
 
 
-
-""" 
-@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
-@jwt_required()
-def delete_journal_entry(entry_id):
-    try:
-        user_id = get_jwt_identity()
-
-        if not ObjectId.is_valid(entry_id):
-            return jsonify({"error": "Invalid journal entry ID"}), 400
-
-        result = journal_entries_collection.update_one(
-            {"_id": ObjectId(user_id)},
-            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "Journal entry not found or unauthorized"}), 404
-
-        return jsonify({"message": "Journal entry deleted successfully"}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500 """
 
 @journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
 @jwt_required()

@@ -646,13 +646,13 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
                 style={styles.menuItem}
                 onPress={() => {
                   setMenuOpen(false);
-                  navigation.navigate("FaceEmotion");
+                  navigation.navigate("CommunityInsight");
                 }}
               >
                 <Text>
                   <Icon name="smile" size={20} color={theme.text} />
                 </Text>
-                <Text style={[styles.menuText, { color: theme.text }]}>Face Analysis</Text>
+                <Text style={[styles.menuText, { color: theme.text }]}> Insights </Text>
               </TouchableOpacity>
             </Animated.View>
           )}

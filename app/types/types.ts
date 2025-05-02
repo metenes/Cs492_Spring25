@@ -26,5 +26,8 @@ export type RootStackParamList = {
     PromptSelection : undefined;
     EntryDetail: { entry: Entry };
     EditCheckIn: { entry: Entry };
+    BottomNavigation : undefined;
+    CommunityInsight : undefined;
+    ContactSupport : undefined; 
   };
   

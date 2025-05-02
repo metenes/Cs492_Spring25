@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Dimensions, Text, View, StyleSheet, Animated } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { fetchSentimentAnalysis } from "../services/ApiService";
+import { fetchJournalSentimentAnalysis } from "../services/ApiService";
 
 // Replace the styles object with static styles
 const styles = StyleSheet.create({
@@ -422,7 +422,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetchSentimentAnalysis(startDate, endDate, interval);
+        const response = await fetchJournalSentimentAnalysis(startDate, endDate, interval);
         console.log("API response in SentimentChart:", response);
         
         if (response.error) {

@@ -59,14 +59,3 @@ def token_required(f):
 
     return decorator
 
-# ---------------------------------------
-# Function to create a JWT token
-# ---------------------------------------
-
-#def create_access_token(user_id):
-#    payload = {
-#        'user_id': user_id,
-#        'exp': datetime.utcnow() + timedelta(hours=1)  # Token expiration time (1 hour)
-#    }
-#    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-#    return token

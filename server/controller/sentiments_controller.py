@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from collections import Counter, defaultdict
 
+
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
 
@@ -144,7 +145,7 @@ def get_sentiment_data(timeframe):
             return jsonify({"error": "Invalid user ID"}), 400
 
         user_id = ObjectId(user_id)
-        now = datetime.utcnow()
+        now = datetime.now()
 
         # Determine the time range
         if timeframe == 'day':
@@ -225,39 +226,35 @@ def get_current_mood():
         return jsonify({"error": str(e)}), 500
     
 
-#sentiment trends and insights
-
 @sentiments_bp.route("/insights", methods=["GET"])
 @jwt_required()
 def get_emotional_insights():
-    from collections import Counter
-
     try:
         user_id = get_jwt_identity()
         if not user_id:
             return jsonify({"error": "Missing user_id"}), 400
 
-        # 🔍 Fetch journal entries with emotions
+        # 🔍 Fetch journal entries
         journal_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
         journal_entries = journal_doc.get("journalEntries", []) if journal_doc else []
 
-        # 🔍 Fetch check-in entries with emotions
+        # 🔍 Fetch check-in entries
         checkins = list(check_in_collection.find({"userId": user_id}))
 
         # 🧠 Collect all emotions
         all_emotions = []
-
         for entry in journal_entries:
             for s in entry.get("journalSentiments", []):
                 if isinstance(s, dict):
                     all_emotions.append(s.get("emotion"))
-                elif isinstance(s, str):
+                elif isinstance(s, str) or isinstance(s, int):
                     all_emotions.append(s)
 
         for entry in checkins:
             for s in entry.get("sentiments", []):
-                all_emotions.append(s)
-        
+                if isinstance(s, str) or isinstance(s, int):
+                    all_emotions.append(s)
+
         if not all_emotions:
             return jsonify({
                 "insight": "No emotional data found. Start journaling or check in to build your insights!",
@@ -271,32 +268,20 @@ def get_emotional_insights():
         emotion_counts = Counter(all_emotions)
         top_emotions_raw = emotion_counts.most_common(3)
 
-        # Convert int codes to emotion labels if necessary
         top_emotions = []
         top_emotion_labels = []
         for emotion, count in top_emotions_raw:
-            label = EMOTIONS[emotion] if isinstance(emotion, int) else emotion.lower()
+            label = EMOTIONS.get(emotion, str(emotion).lower())
             top_emotions.append((label, count))
             top_emotion_labels.append(label)
 
-        # Top causes linked with top emotions
-        aggregated = get_top_causes_by_emotion(user_id)
-        emotion_cause_links = {}
-
-        for record in aggregated:
-            emotion = record["emotion"]
-            if isinstance(emotion, int):
-                emotion = EMOTIONS[emotion]
-            emotion = emotion.lower()
-            if emotion in top_emotion_labels:
-                emotion_cause_links[emotion] = record["topCauses"]
-
-        """ emotion_to_causes = defaultdict(list)
+        # 📊 Causes mapping
+        emotion_to_causes = defaultdict(list)
         for entry in checkins:
             sentiments = entry.get("sentiments", [])
             causes = entry.get("causes", [])
             for s in sentiments:
-                label = EMOTIONS[s] if isinstance(s, int) else s
+                label = EMOTIONS.get(s, str(s).lower())
                 if label in top_emotion_labels:
                     emotion_to_causes[label].extend(causes)
 
@@ -304,9 +289,8 @@ def get_emotional_insights():
         for emotion in top_emotion_labels:
             cause_counter = Counter(emotion_to_causes[emotion])
             emotion_cause_links[emotion] = cause_counter.most_common(3)
- """
 
-        # 📚 Science-backed combinations and mental states
+        # 📚 Science-backed mental state combos
         combos_map = {
             frozenset(["curiosity", "fear"]): {
                 "mental_state": "Navigating uncertainty",
@@ -338,7 +322,7 @@ def get_emotional_insights():
 
         if matched_combo:
             matched_data = combos_map[matched_combo]
-            insight = f"You’ve recently felt {', '.join(matched_combo)}—a unique emotional state known as **{matched_data['mental_state']}**."
+            insight = f"You’ve recently felt {', '.join(matched_combo)} — a unique emotional state known as **{matched_data['mental_state']}**."
             return jsonify({
                 "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
                 "insight": insight,
@@ -347,7 +331,7 @@ def get_emotional_insights():
                 "emotion_cause_links": emotion_cause_links
             })
 
-        # Fallback: generic message
+        # 🧠 Fallback: per-emotion recommendations
         emotion_recommendations = {
             "joy": ["Celebrate the good moments by sharing them in your journal."],
             "sadness": ["Try writing a letter to yourself expressing compassion."],
@@ -359,23 +343,20 @@ def get_emotional_insights():
             "curiosity": ["Let your curiosity guide your writing today—ask 'why' and explore."],
             "neutral": ["Neutral states are valid too. Journaling can help add intention or direction."]
         }
+
         individual_recs = []
         for e in top_emotion_labels:
-            if e in emotion_recommendations:
-                individual_recs.extend(emotion_recommendations[e])
+            individual_recs.extend(emotion_recommendations.get(e, []))
 
-        fallback_insight = f"You’ve been feeling {', '.join([e[0].lower() for e in top_emotions])} more often lately. Keep an eye on your emotional patterns!"
+        fallback_insight = f"You’ve been feeling {', '.join(top_emotion_labels)} more often lately. Keep an eye on your emotional patterns!"
 
-        print("********** SO SAD ************")
-        print(emotion_cause_links)
         return jsonify({
             "top_emotions": [{"label": e[0], "count": e[1]} for e in top_emotions],
             "insight": fallback_insight,
             "mental_state": None,
-            "recommendation": individual_recs if individual_recs else ["Keep journaling to better understand your emotional patterns."],
+            "recommendation": individual_recs or ["Keep journaling to better understand your emotional patterns."],
             "emotion_cause_links": emotion_cause_links
         })
-    
 
     except Exception as e:
         print("❌ Error generating insights:", e)
@@ -383,7 +364,6 @@ def get_emotional_insights():
 
 
 def get_top_causes_by_emotion(user_id):
-
     print("Running aggregation for user:", user_id)
     checkin_docs = list(check_in_collection.find({"userId": user_id}))
     print(f"📦 Found {len(checkin_docs)} check-in entries for aggregation")
