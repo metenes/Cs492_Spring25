@@ -35,6 +35,16 @@ def decode_token(token):
         return {"error": "Token has expired"}
     except jwt.InvalidTokenError:
         return {"error": "Invalid token"}
+    
+def decode_token_full(token):
+    try:
+        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return decoded_token
+    except jwt.ExpiredSignatureError:
+        return {"error": "Token has expired"}
+    except jwt.InvalidTokenError:
+        return {"error": "Invalid token"}
+    
 
 # Middleware to verify JWT in routes (alternative to @jwt_required())
 # Middleware to verify token

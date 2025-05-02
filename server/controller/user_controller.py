@@ -687,7 +687,7 @@ def get_faqs():
 # ---------------------------------------
 
 @user_bp.route("/reset-password", methods=["POST"])
-def reset_password(reset_token):
+def reset_password():
     try:
         data = request.get_json()
         token = data.get("token")

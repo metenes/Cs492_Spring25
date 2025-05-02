@@ -20,7 +20,7 @@ type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackPara
 type ResetPasswordRouteProp = RouteProp<RootStackParamList, "ResetPassword">;
 
 const ResetPasswordScreen = () => {
-  //const [token, setToken] = useState("");
+  const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +33,7 @@ const ResetPasswordScreen = () => {
     if (route.params?.email && route.params?.code) {
       setEmail(route.params.email);
       setCode(route.params.code);
+      setToken(route.params.token);
       console.log("📩 Got reset code + email:", route.params.code, route.params.email);
     } else {
       Alert.alert(
@@ -44,8 +45,8 @@ const ResetPasswordScreen = () => {
   }, []);
 
   const handleResetPassword = async () => {
-    if (!email || !code) {
-      Alert.alert("Error", "Missing verification code or email.");
+    if (!email || !code || !token) {
+      Alert.alert("Error", "Missing verification details.");
       return;
     }
   
@@ -67,10 +68,7 @@ const ResetPasswordScreen = () => {
     setLoading(true);
   
     try {
-      const token = await verifyResetCode(email, code);
-      console.log("✅ Token obtained:", token);
-      await resetPassword(token, newPassword);
-  
+      await resetPassword(token, newPassword);  // ✅ use the token directly
       Alert.alert(
         "Success",
         "Your password has been reset successfully!",
@@ -80,7 +78,7 @@ const ResetPasswordScreen = () => {
       let errorMessage = "An unknown error occurred.";
       if (error instanceof Error) {
         errorMessage = error.message.includes("400") || error.message.includes("401")
-          ? "Invalid or expired reset code. Please request a new one."
+          ? "Invalid or expired reset token. Please request a new one."
           : error.message;
       }
       Alert.alert("Error", errorMessage);
@@ -89,15 +87,17 @@ const ResetPasswordScreen = () => {
     }
   };
   
+  
 
   return (
     <View style={styles.container}>
       <Text style={styles.appTitle}>Sentio</Text>
-      <Text style={styles.subtitle}>Set a New Password</Text>
+      <Text style={styles.subtitle}>Set a new password</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="New Password"
+        placeholder="Password"
+        placeholderTextColor="#999"
         value={newPassword}
         onChangeText={setNewPassword}
         secureTextEntry
@@ -106,7 +106,8 @@ const ResetPasswordScreen = () => {
 
       <TextInput
         style={styles.input}
-        placeholder="Confirm New Password"
+        placeholder="Confirm password"
+        placeholderTextColor="#999"
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
@@ -114,9 +115,9 @@ const ResetPasswordScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.resetButton, (loading || !token) && styles.disabledButton]} 
+        style={[styles.resetButton, (loading || !newPassword || !confirmPassword) && styles.disabledButton]} 
         onPress={handleResetPassword}
-        disabled={loading || !token}
+        disabled={loading || !newPassword || !confirmPassword}
         testID="submit-reset-button"
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Reset Password</Text>}
@@ -163,12 +164,12 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   resetButton: {
-    width: "90%",
+    width: "75%",
     backgroundColor: "#000000",
     paddingVertical: height * 0.018,
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: height * 0.025,
+    marginBottom: height * 0.08,// used to be 0.025 but keyboard almost covered textbox
   },
   resetButtonText: {
     color: "#FFFFFF",
@@ -178,6 +179,12 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#555",
   },
+  backToLoginText: {
+    color: "#4A90E2",
+    fontSize: 16,
+    //marginTop: 20
+    marginBottom: height*0.15,
+  }
 });
 
 export default ResetPasswordScreen;

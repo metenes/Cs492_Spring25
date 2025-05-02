@@ -53,7 +53,7 @@ const ForgotPasswordScreen = () => {
       let errorMessage = "An unknown error occurred";
       if (error instanceof Error) {
         if (error.message.includes("404")) {
-          errorMessage = "Email not registered.";
+          errorMessage = "This email address is not registered.";
         } else {
           errorMessage = error.message;
         }
@@ -69,7 +69,7 @@ const ForgotPasswordScreen = () => {
       <Text style={styles.appTitle}>Sentio</Text>
       <Text style={styles.subtitle}>Forgot Your Password?</Text>
       <Text style={styles.instructions}>
-        Enter your email, and we will send you a link to reset your password.
+        Enter your email, and we will send you a verification code to reset your password.
       </Text>
 
       <TextInput
@@ -83,12 +83,12 @@ const ForgotPasswordScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.resetButton, loading && styles.disabledButton]} 
+        style={[styles.resetButton, (loading || !email ) && styles.disabledButton]} 
         onPress={handleForgotPassword}
-        disabled={loading}
+        disabled={loading || !email }
         testID="forgot-password-button"
       >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Send Reset Link</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Send Reset Verification Code</Text>}
       </TouchableOpacity>
 
       <Text style={styles.backToLoginText} onPress={() => navigation.navigate("Login")} testID="back-to-login">
@@ -110,19 +110,19 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 30,
-    color: "#4A90E2"
+    color: "#000"
   },
   subtitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
-    color: "#333"
+    color: "#000"
   },
   instructions: {
     fontSize: 16,
     textAlign: "center",
     marginBottom: 30,
-    color: "#666",
+    color: "#000",
     width: "90%"
   },
   input: {
@@ -138,14 +138,20 @@ const styles = StyleSheet.create({
   resetButton: {
     width: width * 0.85,
     height: 50,
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#000",//"#4A90E2",
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 5, // For Android shadow
   },
   disabledButton: {
-    backgroundColor: "#A9CBEE"
+    backgroundColor: "#111",
+    opacity: 0.6, // Make it a little more visibly inactive
   },
   resetButtonText: {
     color: "#fff",
@@ -155,7 +161,8 @@ const styles = StyleSheet.create({
   backToLoginText: {
     color: "#4A90E2",
     fontSize: 16,
-    marginTop: 20
+    //marginTop: 20
+    marginBottom: height*0.15,
   }
 });
 
