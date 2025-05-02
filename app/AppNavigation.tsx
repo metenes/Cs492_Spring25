@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar, Platform } from "react-native";
 import { RootStackParamList } from "./types/types"; // Import the route types
+//import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 
 // Bottom Navigator
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -141,7 +142,7 @@ const AppNavigation = () => {
           <Stack.Screen 
             name="Home" 
             component={HomeScreen} 
-            options={{ headerShown: false }}
+            options={{ headerShown: false, gestureEnabled: true, animation: 'slide_from_left',  }}
           />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -153,11 +154,23 @@ const AppNavigation = () => {
           <Stack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ headerShown: false }}/>
           <Stack.Screen name="EditCheckIn" component={EditCheckInScreen} options={{ headerShown: false }}/>
 
+          {/* <Stack.Screen 
+            name="DiaryMain" 
+            component={DiaryMainScreen} 
+            options={{ headerTitle: 'Calendar', headerShown: false, }} 
+          /> */}
+
           <Stack.Screen 
             name="DiaryMain" 
             component={DiaryMainScreen} 
-            options={{ headerTitle: 'Calendar', headerShown: false }} 
+            options={{
+              headerTitle: 'Calendar',
+              headerShown: false,
+              /* gestureEnabled: true,
+              animation: 'slide_from_left',  */
+            }} 
           />
+
           
           <Stack.Screen name="Dashboard" component={Dashboard} />
           <Stack.Screen name="FreeJournaling" component={FreeJournalingScreen} />
