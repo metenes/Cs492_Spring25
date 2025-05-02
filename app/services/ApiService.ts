@@ -950,7 +950,9 @@ export const resetPassword = async (token: string, newPassword: string) => {
 // **********************************************
 
 export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
+  const start = Date.now();    
   try {
+      
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
@@ -1022,6 +1024,14 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
   } catch (error) {
     console.error("❌ Error in saveJournalEntry:", error);
     throw error;
+  }
+  finally {
+    const duration = Date.now() - start;  // ← stop timer
+    console.log(`🕒 saveJournalEntry took ${duration}ms`);
+    if (duration > 2000) {
+      console.warn(`⚠️ saveJournalEntry exceeded 2s (took ${duration}ms)!`);
+      // optionally: throw new Error(`Save took too long: ${duration}ms`);
+    }
   }
 };
 
