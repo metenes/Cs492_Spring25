@@ -10,7 +10,7 @@ import {
   ActivityIndicator 
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { resetPassword } from "./services/ApiService";
+import { verifyResetCode, resetPassword } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -20,57 +20,59 @@ type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackPara
 type ResetPasswordRouteProp = RouteProp<RootStackParamList, "ResetPassword">;
 
 const ResetPasswordScreen = () => {
-  const [token, setToken] = useState("");
+  //const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute<ResetPasswordRouteProp>();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
 
   useEffect(() => {
-    if (route.params && route.params.token) {
-      // Ensure we're setting a string
-      const tokenValue = String(route.params.token);
-
-      setToken(tokenValue);
-      console.log("Token retrieved from route params:", tokenValue);
+    if (route.params?.email && route.params?.code) {
+      setEmail(route.params.email);
+      setCode(route.params.code);
+      console.log("📩 Got reset code + email:", route.params.code, route.params.email);
     } else {
-      // Handle case where token is not provided
       Alert.alert(
-        "Error", 
-        "Invalid reset link. Please request a new password reset.",
+        "Error",
+        "Missing verification details. Please try again.",
         [{ text: "OK", onPress: () => navigation.navigate("Login") }]
       );
     }
   }, []);
 
   const handleResetPassword = async () => {
-    if (!token) {
-      Alert.alert("Error", "Invalid reset token. Please request a new password reset.");
+    if (!email || !code) {
+      Alert.alert("Error", "Missing verification code or email.");
       return;
     }
-
+  
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
     }
-
+  
     if (newPassword.length < 6) {
       Alert.alert("Error", "Password must be at least 6 characters long.");
       return;
     }
-
+  
     if (newPassword !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
+      const token = await verifyResetCode(email, code);
+      console.log("✅ Token obtained:", token);
       await resetPassword(token, newPassword);
+  
       Alert.alert(
-        "Success", 
+        "Success",
         "Your password has been reset successfully!",
         [{ text: "OK", onPress: () => navigation.navigate("Login") }]
       );
@@ -78,7 +80,7 @@ const ResetPasswordScreen = () => {
       let errorMessage = "An unknown error occurred.";
       if (error instanceof Error) {
         errorMessage = error.message.includes("400") || error.message.includes("401")
-          ? "Invalid or expired reset token. Please request a new password reset."
+          ? "Invalid or expired reset code. Please request a new one."
           : error.message;
       }
       Alert.alert("Error", errorMessage);
@@ -86,6 +88,7 @@ const ResetPasswordScreen = () => {
       setLoading(false);
     }
   };
+  
 
   return (
     <View style={styles.container}>

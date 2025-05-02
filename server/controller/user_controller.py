@@ -1,3 +1,4 @@
+import random
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import create_access_token, create_refresh_token
@@ -224,7 +225,10 @@ def register():
                 "language": "en"
             },
             "account_status": "active",  # active, suspended, deactivated
-            "role": "user"               # user, admin
+            "role": "user",               # user, admin
+            "failed_login_attempts": 0,
+            "lockout_until": None,
+
         }
         users_collection.insert_one(new_user)
 
@@ -260,26 +264,55 @@ def login():
         email = data.get("email")
         password = data.get("password")
 
-        print(f"🔹 Login Attempt: email={email}, password={password}")
+        print(f"🔹 Login Attempt: email={email}")
 
         if not email or not password:
             return jsonify({"error": "Email and password are required"}), 400
 
-        # Fetch user from MongoDB
         user = users_collection.find_one({"email": email})
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
 
+        # Check if locked out
+        lockout_until = user.get("lockout_until")
+        if lockout_until and datetime.now() < lockout_until:
+            return jsonify({
+                "error": f"Account locked. Please try again after {lockout_until.strftime('%H:%M:%S')}."
+            }), 403
+
         # Check password
         if not bcrypt.check_password_hash(user["password"], password):
-            return jsonify({"error": "Invalid credentials"}), 401
+            failed_attempts = user.get("failed_login_attempts", 0) + 1
+
+            if failed_attempts >= 5:
+                lockout_time = datetime.now() + timedelta(minutes=5)
+                users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {
+                        "lockout_until": lockout_time,
+                        "failed_login_attempts": 0  # reset after lock
+                    }}
+                )
+                return jsonify({
+                    "error": "Too many failed login attempts. Your account is locked for 5 minutes."
+                }), 403
+
+            else:
+                users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"failed_login_attempts": failed_attempts}}
+                )
+                return jsonify({"error": "Invalid credentials"}), 401
 
         # Generate JWT token
         access_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))  # You can pass user ID as string
         print(f"LOGIN {access_token}")
 
         return jsonify({"access_token": access_token}), 200
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -530,7 +563,13 @@ def forgot_password():
             print("❌ User not found in DB")
             return jsonify({"error": "User not found"}), 404
 
-        reset_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))
+        import random
+        verification_code = str(random.randint(100000, 999999))
+
+        reset_token = create_access_token(
+                identity=str(user["_id"]),
+                expires_delta=timedelta(minutes=15),
+                additional_claims={"reset_code": verification_code})
 
         reset_link = f"{api}/user/reset-password?token={reset_token}"
 
@@ -545,15 +584,11 @@ def forgot_password():
         
         # HTML body for better formatting
         msg.html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-            <h2 style="color: #333;">Password Reset Request</h2>
-            <p>You recently requested to reset your password for your account. Use the button below to reset it.</p>
-            <p style="margin: 25px 0;">
-                <a href="{reset_link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Your Password</a>
-            </p>
-            <p>This password reset link is only valid for the next 15 minutes.</p>
-            <p>If you did not request a password reset, please ignore this email or contact support if you have questions.</p>
-            <p>Regards,<br>The Sentio Team</p>
+        <div style="font-family: Arial, sans-serif; padding: 20px; border-radius: 5px;">
+            <h2>Sentio Password Reset</h2>
+            <p>Use the code below to reset your password. It will expire in 15 minutes.</p>
+            <p style="font-size: 24px; font-weight: bold;">{verification_code}</p>
+            <p>If you didn't request this, ignore this email.</p>
         </div>
         """
         
@@ -562,8 +597,10 @@ def forgot_password():
         Password Reset Request for Your Account
         
         You recently requested to reset your password for your account. Click the link below to reset it:
-        
-        {reset_link}
+
+        Your code is: {verification_code}
+
+        Your reset link : {reset_link}
         
         This password reset link is only valid for the next 15 minutes.
         
@@ -581,7 +618,6 @@ def forgot_password():
         import traceback
         traceback.print_exc()  
         return jsonify({"error": str(e)}), 500
-
 
 # ---------------------------------------
 #  **Support mail **
@@ -649,20 +685,21 @@ def get_faqs():
 # ---------------------------------------
 #  **Reset Password**
 # ---------------------------------------
-@user_bp.route("/reset-password?token={reset_token}", methods=["POST"])
+
+@user_bp.route("/reset-password", methods=["POST"])
 def reset_password(reset_token):
     try:
         data = request.get_json()
         token = data.get("token")
-        if(token is None) :
-          token = reset_token    
+        """ if(token is None) :
+          token = reset_token     """
         new_password = data.get("newPassword")
 
         if not token or not new_password:
             return jsonify({"error": "Invalid request"}), 400
 
         try:
-            decoded_token = decode_token(token)
+            decoded_token = decode_token_full(token)
             user_id = decoded_token.get("sub")
         except Exception as token_error:
             print(f"Token validation error: {token_error}")
@@ -687,6 +724,102 @@ def reset_password(reset_token):
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------
+#  **Password reset with verification code**
+# ---------------------------------------
+@user_bp.route("/request-reset-code", methods=["POST"])
+def request_reset_code():
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
+        user = users_collection.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        code = str(random.randint(100000, 999999))
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"reset_code": code, "code_expiry": datetime.utcnow() + timedelta(minutes=15)}}
+        )
+
+        msg = Message("Your Sentio Reset Code", recipients=[email])
+        msg.body = f"Your password reset code is: {code}"
+        mail.send(msg)
+
+        return jsonify({"message": "Reset code sent to email"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@user_bp.route("/verify-reset-code", methods=["POST"])
+def verify_reset_code():
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        code = data.get("code")
+        token = data.get("token")
+        print(code)
+        print(token)
+
+        if not code or not token:
+            return jsonify({"error": "Missing code or token"}), 400
+
+        # Decode the token
+        try:
+            decoded_token = decode_token_full(token)
+            print("DECODED TOKEN")
+            print(decoded_token)
+            original_code = decoded_token.get("reset_code")
+            print("ORIGINAL CODE")
+            print(original_code)
+            user_id = decoded_token.get("sub")
+            print("SUB???????????????")
+            print(user_id)
+        except Exception as e:
+            print("❌ Token decoding error:", e)
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": "Invalid or expired token"}), 401
+
+        if not original_code:
+            return jsonify({"error": "Token is missing required fields"}), 400
+
+        if code != original_code:
+            return jsonify({"error": "Invalid code"}), 400
+
+        # All good – issue a short-lived password reset token
+        """ password_reset_token = create_access_token(
+            identity=email,
+            expires_delta=timedelta(minutes=10)
+        ) """
+        # Find the user again (you already have the email)
+        user = users_collection.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        user_id = str(user["_id"])  # 🆗 convert ObjectId to string
+        print("USER ID")
+        print(user_id)
+
+        password_reset_token = create_access_token(
+            identity=user_id,
+            expires_delta=timedelta(minutes=10)
+        )
+
+
+        return jsonify({
+            "message": "Code verified",
+            "token": password_reset_token
+        }), 200
+
+    except Exception as e:
+        print("❌ Exception in verify_reset_code:", e)
+        return jsonify({"error": str(e)}), 500
+
     
 # ---------------------------------------
 #  **Trend Analysis**
@@ -773,3 +906,13 @@ def oauth_callback():
 
     token = create_access_token(identity=str(user["_id"]))
     return jsonify({"token": token, "user": user})
+
+
+@user_bp.route("/email-exists", methods=["GET"])
+def check_email_exists():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    exists = users_collection.find_one({"email": email}) is not None
+    return jsonify({"exists": exists}), 200

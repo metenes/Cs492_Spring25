@@ -13,6 +13,11 @@ import time
 import random
 import string
 from transformers import pipeline
+from collections import defaultdict
+
+# Temporary in-memory counter for uploaded images per user
+image_upload_counter = defaultdict(int)
+
 
 # Define emotions array to match client-side
 EMOTIONS = [
@@ -122,7 +127,11 @@ def save_journal_entry():
             print(f"✅ Created new document. Inserted ID: {result.inserted_id}")
         
         print(f"✅ MongoDB operation successful")
-        
+
+        # ✅ Reset image upload counter after successful save
+        if user_id in image_upload_counter:
+            del image_upload_counter[user_id]
+
         return jsonify({
             "message": "Journal entry saved successfully",
             "entry": {**new_entry, "_id": str(new_entry["_id"])}  # Convert ObjectId to string
@@ -410,6 +419,323 @@ def journal_entries_with_date():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@journal_bp.route("/<entry_id>", methods=["PUT"])
+@jwt_required()
+def update_journal_entry(entry_id):
+    try:
+        print("🔵 Starting update_journal_entry function")
+        user_id = get_jwt_identity()
+        print(f"🔹 User ID: {user_id}, Entry ID: {entry_id}")
+        
+        # Validate IDs
+        try:
+            user_object_id = ObjectId(user_id)
+            entry_object_id = ObjectId(entry_id)
+        except:
+            print("❌ Invalid ID format")
+            return jsonify({"error": "Invalid ID format"}), 400
+        
+        data = request.get_json()
+        print(f"🔹 Received update data: {data}")
+        
+        # Extract only allowed fields from request
+        entry_content = data.get('entryContent')
+        entry_date = data.get('entryDate')
+        images = data.get('images')
+        journal_sentiments = data.get('journalSentiments', [])
+        
+        # Find the user's document
+        user_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not user_doc:
+            print("❌ User document not found")
+            return jsonify({"error": "User not found"}), 404
+        
+        # Find the specific entry
+        entry_index = None
+        for i, entry in enumerate(user_doc.get("journalEntries", [])):
+            if str(entry["_id"]) == entry_id:
+                entry_index = i
+                break
+        
+        if entry_index is None:
+            print("❌ Entry not found")
+            return jsonify({"error": "Entry not found"}), 404
+        
+        # Prepare update fields - only include allowed fields
+        update_fields = {
+            "updatedAt": datetime.now()
+        }
+        
+        if entry_content is not None:
+            update_fields["entryContent"] = entry_content
+        
+        # Only update sentiments if they were provided in the request
+        if journal_sentiments:
+            update_fields["journalSentiments"] = journal_sentiments
+        
+        if entry_date is not None:
+            update_fields["entryDate"] = entry_date
+
+        if images is not None:
+            update_fields["images"] = images
+        
+        # Update the specific entry
+        update_operation = {"$set": {}}
+        for k, v in update_fields.items():
+            if k == "journalSentiments":
+                # Ensure journalSentiments is properly formatted as an array
+                update_operation["$set"]["journalEntries.$.journalSentiments"] = v
+            else:
+                update_operation["$set"][f"journalEntries.$.{k}"] = v
+        
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id, "journalEntries._id": entry_object_id},
+            update_operation
+        )
+        
+        if result.modified_count == 0:
+            print("❌ No changes made to the entry")
+            return jsonify({"error": "Failed to update entry"}), 400
+        
+        print("✅ Journal entry updated successfully")
+        
+        # Fetch the updated entry
+        updated_doc = journal_entries_collection.find_one(
+            {"_id": user_object_id},
+            {"journalEntries": {"$elemMatch": {"_id": entry_object_id}}}
+        )
+        updated_entry = updated_doc["journalEntries"][0] if updated_doc and "journalEntries" in updated_doc else None
+        
+        return jsonify({
+            "message": "Journal entry updated successfully",
+            "entry": {**updated_entry, "_id": str(updated_entry["_id"])}
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error updating journal entry: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+
+@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
+@jwt_required()
+def delete_journal_entry(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        user_object_id = ObjectId(user_id)
+
+        # Find the user's journal document
+        journal_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not journal_doc:
+            return jsonify({"error": "No journal entries found for user"}), 404
+
+        # Find the entry by _id
+        target_entry = None
+        for entry in journal_doc.get("journalEntries", []):
+            if str(entry.get("_id")) == entry_id:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            return jsonify({"error": "Entry not found"}), 404
+
+        # Remove images from S3
+        for image in target_entry.get("images", []):
+            s3_key = image.get("fileName", "")
+            if s3_key:
+                s3.delete_object(Bucket="sentiobucket", Key=s3_key)
+
+        # Remove entry from array
+        result = journal_entries_collection.update_one(
+            {"_id": user_object_id},
+            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
+        )
+
+        if result.modified_count == 0:
+            return jsonify({"error": "Failed to delete entry"}), 500
+
+        return jsonify({"message": "Journal entry deleted successfully"}), 200
+
+    except Exception as e:
+        print("❌ Error deleting journal entry:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@journal_bp.route("/upload-image", methods=["POST"])
+@jwt_required()
+def upload_journal_image():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Uploading journal image for user: {user_id}")
+
+        # ✅ Check current upload count
+        if image_upload_counter[user_id] >= 5:
+            print("❌ Upload limit reached (in-memory): 5 images")
+            return jsonify({"error": "Maximum image upload limit (5) reached."}), 400
+
+        if 'image' not in request.files:
+            return jsonify({"error": "No image provided"}), 400
+
+        file = request.files['image']
+        if not file:
+            return jsonify({"error": "No image provided"}), 400
+
+        timestamp = int(time.time())
+        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        original_filename = secure_filename(file.filename)
+        filename = f"journal-images/{user_id}/{timestamp}_{random_string}_{original_filename}"
+
+        s3_client.upload_fileobj(
+            file.stream,
+            S3_BUCKET,
+            filename,
+            ExtraArgs={'ContentType': file.content_type or 'image/jpeg'}
+        )
+
+        signed_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': filename},
+            ExpiresIn=3600
+        )
+
+        # ✅ Increment upload count
+        image_upload_counter[user_id] += 1
+        print(f"✅ Upload count for {user_id}: {image_upload_counter[user_id]}")
+
+        return jsonify({
+            "message": "Journal image uploaded successfully",
+            "signedUrl": signed_url
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Server error"}), 500
+
+
+
+@journal_bp.route("/delete-image", methods=["DELETE"])
+@jwt_required()
+def delete_journal_image():
+    try:
+        user_id = get_jwt_identity()
+        print(f"🔍 Deleting journal image for user: {user_id}")
+        
+        data = request.get_json()
+        if not data or 's3Key' not in data:
+            print("❌ Missing s3Key in request data")
+            return jsonify({"error": "S3 key is required"}), 400
+            
+        key = data['s3Key']
+        print(f"🗑️ Deleting S3 object with key: {key}")
+        
+        # Delete from S3
+        try:
+            s3_client.delete_object(
+                Bucket=S3_BUCKET,
+                Key=key
+            )
+            print(f"✅ Successfully deleted image from S3: {key}")
+            
+            return jsonify({
+                "message": "Image deleted successfully"
+            }), 200
+            
+        except ClientError as e:
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            print(f"❌ Error deleting image from S3: {error_message}")
+            print(f"❌ Error code: {error_code}")
+            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
+            print(f"❌ S3 Key: {key}")
+            print(f"❌ Bucket: {S3_BUCKET}")
+            return jsonify({"error": f"Failed to delete image: {error_message}"}), 500
+            
+    except Exception as e:
+        print(f"❌ Error in delete_journal_image: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Server error"}), 500
+
+@journal_bp.route("/update-lock-code/<entry_id>", methods=["POST"])
+@jwt_required()
+def update_lock_code(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        lock_code = data.get("lockCode")
+        user_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
+        if not user_doc:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Find the specific journal entry in the journals array
+        journal_entry = None
+        journals = user_doc.get("journalEntries", [])
+        
+        for journal in journals:
+            if str(journal.get("_id")) == entry_id:
+                journal_entry = journal
+                break
+        if not journal_entry:
+            return jsonify({"error": "Journal entry not found"}), 404
+
+        # if lock_code is empty or None, remove the existing lock code
+        if not lock_code:
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
+                {"$unset": {"journalEntries.$.lockCode": ""}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to remove lock code"}), 500
+            return jsonify({"message": "Lock code removed successfully"}), 200
+                
+        else:
+            result = journal_entries_collection.update_one(
+                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
+                {"$set": {"journalEntries.$.lockCode": lock_code}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to create lock code"}), 500
+        
+            return jsonify({"message": "Lock code created successfully"}), 200
+    
+    except Exception as e:
+        print(f"❌ Error updating lock code: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# TODO
+@journal_bp.route("/face-photo-analysis", methods=["POST"])
+def upload_image():
+    if "image" not in request.files:
+        return jsonify({"error": "No image provided"}), 400
+
+    file = request.files["image"]
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+
+    # Run AI model inference on the image (optional)
+    image_bytes = file.read()
+    file.seek(0)  # Reset file pointer
+    emotion_result = predict_emotion(image_bytes)  # This is your model's output
+
+    # Optional: Upload to S3
+    try:
+        s3_filename = f"users/images/{datetime.now()}_{filename}"
+        s3_client.upload_fileobj(file, S3_BUCKET, s3_filename)
+        s3_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_filename}"
+    except Exception  as e:
+        return jsonify({"error": "S3 credentials error" }), 500
+
+    return jsonify({
+        "message": "Image uploaded and processed",
+        "emotion_result": emotion_result,
+        "s3_url": s3_url
+    })
+
+"""    
 @journal_bp.route("/api/sentiment-analysis", methods=["GET"])
 @jwt_required()
 def sentiment_analysis():
@@ -585,342 +911,4 @@ def sentiment_analysis():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
-@journal_bp.route("/<entry_id>", methods=["PUT"])
-@jwt_required()
-def update_journal_entry(entry_id):
-    try:
-        print("🔵 Starting update_journal_entry function")
-        user_id = get_jwt_identity()
-        print(f"🔹 User ID: {user_id}, Entry ID: {entry_id}")
-        
-        # Validate IDs
-        try:
-            user_object_id = ObjectId(user_id)
-            entry_object_id = ObjectId(entry_id)
-        except:
-            print("❌ Invalid ID format")
-            return jsonify({"error": "Invalid ID format"}), 400
-        
-        data = request.get_json()
-        print(f"🔹 Received update data: {data}")
-        
-        # Extract only allowed fields from request
-        entry_content = data.get('entryContent')
-        entry_date = data.get('entryDate')
-        images = data.get('images')
-        journal_sentiments = data.get('journalSentiments', [])
-        
-        # Find the user's document
-        user_doc = journal_entries_collection.find_one({"_id": user_object_id})
-        if not user_doc:
-            print("❌ User document not found")
-            return jsonify({"error": "User not found"}), 404
-        
-        # Find the specific entry
-        entry_index = None
-        for i, entry in enumerate(user_doc.get("journalEntries", [])):
-            if str(entry["_id"]) == entry_id:
-                entry_index = i
-                break
-        
-        if entry_index is None:
-            print("❌ Entry not found")
-            return jsonify({"error": "Entry not found"}), 404
-        
-        # Prepare update fields - only include allowed fields
-        update_fields = {
-            "updatedAt": datetime.now()
-        }
-        
-        if entry_content is not None:
-            update_fields["entryContent"] = entry_content
-        
-        # Only update sentiments if they were provided in the request
-        if journal_sentiments:
-            update_fields["journalSentiments"] = journal_sentiments
-        
-        if entry_date is not None:
-            update_fields["entryDate"] = entry_date
-
-        if images is not None:
-            update_fields["images"] = images
-        
-        # Update the specific entry
-        update_operation = {"$set": {}}
-        for k, v in update_fields.items():
-            if k == "journalSentiments":
-                # Ensure journalSentiments is properly formatted as an array
-                update_operation["$set"]["journalEntries.$.journalSentiments"] = v
-            else:
-                update_operation["$set"][f"journalEntries.$.{k}"] = v
-        
-        result = journal_entries_collection.update_one(
-            {"_id": user_object_id, "journalEntries._id": entry_object_id},
-            update_operation
-        )
-        
-        if result.modified_count == 0:
-            print("❌ No changes made to the entry")
-            return jsonify({"error": "Failed to update entry"}), 400
-        
-        print("✅ Journal entry updated successfully")
-        
-        # Fetch the updated entry
-        updated_doc = journal_entries_collection.find_one(
-            {"_id": user_object_id},
-            {"journalEntries": {"$elemMatch": {"_id": entry_object_id}}}
-        )
-        updated_entry = updated_doc["journalEntries"][0] if updated_doc and "journalEntries" in updated_doc else None
-        
-        return jsonify({
-            "message": "Journal entry updated successfully",
-            "entry": {**updated_entry, "_id": str(updated_entry["_id"])}
-        }), 200
-        
-    except Exception as e:
-        print(f"❌ Error updating journal entry: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-
-
-@journal_bp.route("/delete-journal-entry/<entry_id>", methods=["DELETE"])
-@jwt_required()
-def delete_journal_entry(entry_id):
-    try:
-        user_id = get_jwt_identity()
-        user_object_id = ObjectId(user_id)
-
-        # Find the user's journal document
-        journal_doc = journal_entries_collection.find_one({"_id": user_object_id})
-        if not journal_doc:
-            return jsonify({"error": "No journal entries found for user"}), 404
-
-        # Find the entry by _id
-        target_entry = None
-        for entry in journal_doc.get("journalEntries", []):
-            if str(entry.get("_id")) == entry_id:
-                target_entry = entry
-                break
-
-        if not target_entry:
-            return jsonify({"error": "Entry not found"}), 404
-
-        # Remove images from S3
-        for image in target_entry.get("images", []):
-            s3_key = image.get("fileName", "")
-            if s3_key:
-                s3.delete_object(Bucket="sentiobucket", Key=s3_key)
-
-        # Remove entry from array
-        result = journal_entries_collection.update_one(
-            {"_id": user_object_id},
-            {"$pull": {"journalEntries": {"_id": ObjectId(entry_id)}}}
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "Failed to delete entry"}), 500
-
-        return jsonify({"message": "Journal entry deleted successfully"}), 200
-
-    except Exception as e:
-        print("❌ Error deleting journal entry:", e)
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@journal_bp.route("/upload-image", methods=["POST"])
-@jwt_required()
-def upload_journal_image():
-    try:
-        user_id = get_jwt_identity()
-        print(f"🔍 Uploading journal image for user: {user_id}")
-        
-        # Debug: log request headers and parts
-        print("📝 Request Content-Type:", request.content_type)
-        print("📝 Request Form Data:", request.form)
-        print("📝 Request Files:", request.files)
-        
-        if 'image' not in request.files:
-            print("❌ No image file found in request")
-            return jsonify({"error": "No image provided"}), 400
-        
-        file = request.files['image']
-        if not file:
-            print("❌ No file data found")
-            return jsonify({"error": "No image provided"}), 400
-
-        print(f"📁 File received: filename={file.filename}, content_type={file.content_type}")
-
-        # Generate a unique filename with timestamp, random string, and original filename
-        timestamp = int(time.time())
-        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        original_filename = secure_filename(file.filename)
-        # Use the original filename in the S3 key
-        filename = f"journal-images/{user_id}/{timestamp}_{random_string}_{original_filename}"
-
-        print(f"📝 Generated S3 filename: {filename}")
-        
-        # Upload to S3
-        try:
-            print(f"📤 Attempting to upload to S3: bucket={S3_BUCKET}, filename={filename}")
-            s3_client.upload_fileobj(
-                file.stream,
-                S3_BUCKET,
-                filename,
-                ExtraArgs={
-                    'ContentType': file.content_type or 'image/jpeg'
-                }
-            )
-            print("✅ S3 upload successful")
-
-            # Generate the signed URL for the uploaded image
-            signed_url = s3_client.generate_presigned_url(
-                'get_object',
-                Params={
-                    'Bucket': S3_BUCKET,
-                    'Key': filename
-                },
-                ExpiresIn=3600  # URL expires in 1 hour
-            )
-            print(f"🔗 Generated signed URL: {signed_url}")
-            
-            return jsonify({
-                "message": "Journal image uploaded successfully",
-                "signedUrl": signed_url
-            }), 200
-
-        except ClientError as e:
-            error_message = e.response.get('Error', {}).get('Message', str(e))
-            print(f"❌ Error uploading to S3: {error_message}")
-            print(f"❌ Error code: {e.response.get('Error', {}).get('Code', 'Unknown')}")
-            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
-            return jsonify({"error": f"Failed to upload image: {error_message}"}), 500
-
-    except Exception as e:
-        import traceback
-        print(f"❌ Error in upload_journal_image: {str(e)}")
-        traceback.print_exc()  # Print the full stack trace
-        return jsonify({"error": "Server error"}), 500
-
-@journal_bp.route("/delete-image", methods=["DELETE"])
-@jwt_required()
-def delete_journal_image():
-    try:
-        user_id = get_jwt_identity()
-        print(f"🔍 Deleting journal image for user: {user_id}")
-        
-        data = request.get_json()
-        if not data or 's3Key' not in data:
-            print("❌ Missing s3Key in request data")
-            return jsonify({"error": "S3 key is required"}), 400
-            
-        key = data['s3Key']
-        print(f"🗑️ Deleting S3 object with key: {key}")
-        
-        # Delete from S3
-        try:
-            s3_client.delete_object(
-                Bucket=S3_BUCKET,
-                Key=key
-            )
-            print(f"✅ Successfully deleted image from S3: {key}")
-            
-            return jsonify({
-                "message": "Image deleted successfully"
-            }), 200
-            
-        except ClientError as e:
-            error_message = e.response.get('Error', {}).get('Message', str(e))
-            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-            print(f"❌ Error deleting image from S3: {error_message}")
-            print(f"❌ Error code: {error_code}")
-            print(f"❌ Request ID: {e.response.get('ResponseMetadata', {}).get('RequestId', 'Unknown')}")
-            print(f"❌ S3 Key: {key}")
-            print(f"❌ Bucket: {S3_BUCKET}")
-            return jsonify({"error": f"Failed to delete image: {error_message}"}), 500
-            
-    except Exception as e:
-        print(f"❌ Error in delete_journal_image: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": "Server error"}), 500
-
-
-@journal_bp.route("/update-lock-code/<entry_id>", methods=["POST"])
-@jwt_required()
-def update_lock_code(entry_id):
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json()
-        lock_code = data.get("lockCode")
-        user_doc = journal_entries_collection.find_one({"_id": ObjectId(user_id)})
-        if not user_doc:
-            return jsonify({"error": "User not found"}), 404
-        
-        # Find the specific journal entry in the journals array
-        journal_entry = None
-        journals = user_doc.get("journalEntries", [])
-        
-        for journal in journals:
-            if str(journal.get("_id")) == entry_id:
-                journal_entry = journal
-                break
-        if not journal_entry:
-            return jsonify({"error": "Journal entry not found"}), 404
-
-        # if lock_code is empty or None, remove the existing lock code
-        if not lock_code:
-            result = journal_entries_collection.update_one(
-                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
-                {"$unset": {"journalEntries.$.lockCode": ""}}
-            )
-            if result.modified_count == 0:
-                return jsonify({"error": "Failed to remove lock code"}), 500
-            return jsonify({"message": "Lock code removed successfully"}), 200
-                
-        else:
-            result = journal_entries_collection.update_one(
-                {"_id": ObjectId(user_id), "journalEntries._id": ObjectId(entry_id)},
-                {"$set": {"journalEntries.$.lockCode": lock_code}}
-            )
-            if result.modified_count == 0:
-                return jsonify({"error": "Failed to create lock code"}), 500
-        
-            return jsonify({"message": "Lock code created successfully"}), 200
-    
-    except Exception as e:
-        print(f"❌ Error updating lock code: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# TODO
-@journal_bp.route("/face-photo-analysis", methods=["POST"])
-def upload_image():
-    if "image" not in request.files:
-        return jsonify({"error": "No image provided"}), 400
-
-    file = request.files["image"]
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
-
-    # Run AI model inference on the image (optional)
-    image_bytes = file.read()
-    file.seek(0)  # Reset file pointer
-    emotion_result = predict_emotion(image_bytes)  # This is your model's output
-
-    # Optional: Upload to S3
-    try:
-        s3_filename = f"users/images/{datetime.now()}_{filename}"
-        s3_client.upload_fileobj(file, S3_BUCKET, s3_filename)
-        s3_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_filename}"
-    except Exception  as e:
-        return jsonify({"error": "S3 credentials error" }), 500
-
-    return jsonify({
-        "message": "Image uploaded and processed",
-        "emotion_result": emotion_result,
-        "s3_url": s3_url
-    })
+""" 

@@ -131,12 +131,8 @@ const SentimentAnalysisPage: React.FC = () => {
         }
         const startDateStr = toLocalDateString(selectedStartDate);
         const endDateStr = toLocalDateString(selectedEndDate);
-        const data = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        setJournalEntries(data || []);
-        console.log("Initial entries:", data);
+        const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
+        setJournalEntries(entries);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -157,10 +153,9 @@ const SentimentAnalysisPage: React.FC = () => {
       }
       const startDateStr = toLocalDateString(selectedStartDate);
       const endDateStr = toLocalDateString(selectedEndDate);
-      const data = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
-      if (data.error) throw new Error(data.error);
-      setJournalEntries(data || []);
-      console.log("Weekly entries:", data);
+      const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
+      setJournalEntries(entries);
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -169,8 +164,30 @@ const SentimentAnalysisPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchWeeklyData();
-  }, [selectedStartDate, selectedEndDate]);
+    
+    const fetchEntries = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = await AsyncStorage.getItem("userToken")
+        if (!token) throw new Error("Missing token")
+        const start = toLocalDateString(selectedStartDate)
+        const end   = toLocalDateString(selectedEndDate)
+        console.log("Fetching entries for", start, end)     // ← debug
+        const { entries } = await fetchJournalEntriesWithDate(token, start, end)
+        setJournalEntries(entries)
+        console.log("Fetched entries:", entries)          // ← debug
+      } catch (err: any) {
+        console.error("Fetch failed:", err)
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+  
+    fetchEntries()
+  }, [selectedStartDate, selectedEndDate])
+  
 
   // Date picker handlers
   const handleStartDateChange = (event: any, isWeekly: boolean, date?: Date) => {

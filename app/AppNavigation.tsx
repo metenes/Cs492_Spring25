@@ -22,6 +22,7 @@ import RegisterScreen from "./RegisterScreen";
 import ForgotPasswordScreen from "./ForgotPasswordScreen";
 import ChatbotScreen from "./ChatbotScreen";
 import ResetPasswordScreen from "./ResetPasswordScreen";
+import VerifyResetCodeScreen from "./VerifyResetCodeScreen";
 import DiaryMainScreen from "./DiaryMainScreen";
 import CheckInScreen from "./CheckInScreen";
 import FaceEmotionScreen from "./FaceEmotionScreen";
@@ -167,6 +168,7 @@ const AppNavigation = () => {
           <Stack.Screen name="Journal" component={JournalScreen} />
           <Stack.Screen name="CheckIn" component={CheckInScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen name="VerifyResetCode" component={VerifyResetCodeScreen} />
 
           <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
           <Stack.Screen name="BottomNavigation" component={BottomNavigation} />

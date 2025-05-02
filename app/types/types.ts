@@ -1,8 +1,9 @@
 // types.ts
-import { Entry } from './EntryDetailScreen';
+import { Entry } from '../HomeScreen';
 
 export type RootStackParamList = {
     Login: undefined;
+    VerifyResetCode : undefined;
     Register: undefined;
     ForgotPassword: undefined;
     Home: undefined;

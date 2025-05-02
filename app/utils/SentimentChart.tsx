@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Dimensions, Text, View, StyleSheet, Animated } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { fetchJournalSentimentAnalysis } from "../services/ApiService";
+import { fetchJournalEntriesWithDate } from "../services/ApiService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Replace the styles object with static styles
 const styles = StyleSheet.create({
@@ -153,36 +154,51 @@ const getGroupKey = (entryDate: string, interval: string): string => {
  */
 const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment[] => {
   const aggregation: Record<string, Record<number, { total_percentage: number; entry_count: number }>> = {};
+
   entries.forEach(entry => {
     const groupKey = getGroupKey(entry.entryDate, interval);
     if (!aggregation[groupKey]) {
       aggregation[groupKey] = {};
     }
     (entry.journalSentiments || []).forEach((sentiment: any) => {
-      const emotion = sentiment.emotion;
-      if (!aggregation[groupKey][emotion]) {
-        aggregation[groupKey][emotion] = { total_percentage: 0, entry_count: 0 };
+      // 1) Normalize to a numeric code
+      let code: number | undefined;
+      if (typeof sentiment.emotion === 'number') {
+        code = sentiment.emotion;
+      } else {
+        code = reverseEmotionMap[sentiment.emotion.toLowerCase()];
       }
-      aggregation[groupKey][emotion].total_percentage += sentiment.percentage;
-      aggregation[groupKey][emotion].entry_count += 1;
+      if (typeof code !== 'number') return;  // skip if we can't map it
+
+      // 2) Initialize bucket if needed
+      if (!aggregation[groupKey][code]) {
+        aggregation[groupKey][code] = { total_percentage: 0, entry_count: 0 };
+      }
+
+      // 3) Accumulate
+      aggregation[groupKey][code].total_percentage += sentiment.percentage;
+      aggregation[groupKey][code].entry_count += 1;
     });
   });
+
+  // 4) Flatten into RawSentiment[]
   const result: RawSentiment[] = [];
-  for (const groupKey in aggregation) {
-    for (const emotion in aggregation[groupKey]) {
+  Object.entries(aggregation).forEach(([time_period, emotionsMap]) => {
+    Object.entries(emotionsMap).forEach(([emotionKey, { total_percentage, entry_count }]) => {
       result.push({
-        time_period: groupKey,
-        emotion: parseInt(emotion),
-        total_percentage: aggregation[groupKey][emotion].total_percentage,
-        percentage: aggregation[groupKey][emotion].total_percentage,
-        entry_count: aggregation[groupKey][emotion].entry_count,
-        count: 0,
+        time_period,
+        emotion: Number(emotionKey),
+        total_percentage,
+        percentage: total_percentage,
+        entry_count,
+        count: entry_count,
       });
-    }
-  }
-  console.log("Aggregated journal entries:", result);
+    });
+  });
+
   return result;
 };
+
 
 /**
  * Processes raw aggregated data into a structure for the chart.
@@ -409,55 +425,55 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [labels, setLabels] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Skip fetching if no emotions are selected
-      if (selectedEmotions.length === 0) {
-        setChartData(null);
-        setError("empty");
-        setLabels([]);
-        return;
-      }
 
+  useEffect(() => {
+    // If no emotion selected, skip
+    if (!selectedEmotions.length) {
+      setChartData(null);
+      setError("empty");
+      setLabels([]);
+      return;
+    }
+  
+    const loadAndAggregate = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetchJournalSentimentAnalysis(startDate, endDate, interval);
-        console.log("API response in SentimentChart:", response);
-        
-        if (response.error) {
-          throw new Error(response.error);
-        }
-        
-        const rawData: RawSentiment[] = response.emotion_analysis || [];
-        
-        if (!rawData || rawData.length === 0) {
+        // 1) get token
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) throw new Error("Missing auth token");
+  
+        // 2) fetch all journal + checkin entries in this date range
+        const { entries } = await fetchJournalEntriesWithDate(
+          token,
+          startDate,
+          endDate
+        );
+      console.log("Fetched journal entries:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", entries);
+        // 3) aggregate client-side into the same RawSentiment shape
+        const raw: RawSentiment[] = aggregateJournalEntries(entries, interval);
+  
+        if (!raw.length) {
           setError("empty");
           setChartData(null);
           setLabels([]);
-          return;
-        }
-
-        let processed = processData(rawData, selectedEmotions);
-        setLabels(processed.labels);
-        
-        if (processed.datasets.length === 0) {
-          setError("empty");
-          setChartData(null);
         } else {
+          const processed = processData(raw, selectedEmotions);
+          setLabels(processed.labels);
           setChartData(processed);
         }
       } catch (err: any) {
-        console.error("Error in SentimentChart fetch:", err);
+        console.error("Chart load error:", err);
         setError(err.message);
         setChartData(null);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+  
+    loadAndAggregate();
   }, [startDate, endDate, interval, selectedEmotions]);
-
+  
   // If no emotion is selected, show a placeholder with fixed height.
   if (selectedEmotions.length === 0) {
     return (
@@ -575,11 +591,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     marginVertical: 8,
   }}
 />
-
-
-
-
-
 
     </View>
   );

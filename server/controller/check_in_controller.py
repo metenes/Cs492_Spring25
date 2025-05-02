@@ -31,7 +31,8 @@ def submit_check_in():
             "sentiments": sentiments,
             "causes": causes,
             "comments": comments,
-            "timestamp": timestamp
+            "timestamp": timestamp, 
+            "lockCode" : "" # No based pin 
         }
 
         check_in_collection.insert_one(new_check_in)
@@ -52,12 +53,14 @@ def fetch_check_ins():
         for entry in entries:
             result.append({
                 "entry_id": str(entry["_id"]),
+                "user_id": str(entry["userId"]),
                 "created_at": entry["timestamp"].isoformat(),
                 "type": "checkin",
                 "date": entry["timestamp"].strftime("%Y-%m-%d"),
                 "sentiments": entry.get("sentiments", []),
                 "causes": entry.get("causes", []),
                 "comments": entry.get("comments", []),
+                "lockCode": entry.get("lockCode", "") # for locking logic
             })
 
         return jsonify({"history": result}), 200
@@ -74,7 +77,7 @@ def get_check_in_history(user_id):
             return jsonify({"error": "User not found"}), 404
         
         # Convert cursor to a list before checking length
-        entries = list(check_in_collection.find({"user_id": ObjectId(user_id)}))
+        entries = list(check_in_collection.find({"userId": user_id}))
 
         if not entries:  # Corrected check
             print("here")
@@ -84,11 +87,12 @@ def get_check_in_history(user_id):
         history = [
             {
                 "entry_id": str(entry["_id"]),
-                "user_id": str(entry["user_id"]),
+                "user_id": str(entry["userId"]),
                 "sentiments": entry["sentiments"],  
                 "causes": entry["causes"],
                 "comments": entry.get("comments", []),
-                "created_at": entry.get("created_at") if entry.get("created_at") else None
+                "created_at": entry.get("created_at") if entry.get("created_at") else None,
+                "lockCode" : entry.get("lockCode", ""), 
             }
             for entry in entries
         ]
@@ -98,22 +102,61 @@ def get_check_in_history(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@check_bp.route('/history', methods=['GET'])
+@jwt_required()
+def get_check_in_history_all():
+    try:
+
+        user_id = get_jwt_identity()
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Convert cursor to a list before checking length
+        entries = list(check_in_collection.find({"userId": user_id}))
+
+        if not entries:  # Corrected check
+            print("here")
+            return jsonify({"error": "No check-in entries found"}), 404
+
+        # Convert entries to JSON format
+        history = [
+            {
+                "entry_id": str(entry["_id"]),
+                "user_id": str(entry["userId"]),
+                "sentiments": entry["sentiments"],  
+                "causes": entry["causes"],
+                "comments": entry.get("comments", []),
+                "created_at": entry.get("created_at") if entry.get("created_at") else None,
+                "lockCode" : entry.get("lockCode", ""), 
+            }
+            for entry in entries
+        ]
+
+        return jsonify({"history": history}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
 # Route to get a specific check-in entry
 @check_bp.route('/<int:entry_id>', methods=['GET'])
 @jwt_required()
 def get_check_in_entry(entry_id):
     try:
-        entry = check_in_collection.find_one({"entry_id": entry_id})
+        entry = check_in_collection.find_one({"_id": entry_id})
         if not entry:
             return jsonify({"error": "Check-in entry not found"}), 404
         
         entry_data = {
-            "entry_id": entry["entry_id"],
-            "user_id": str(entry["user_id"]),
+            "entry_id": entry["_id"],
+            "user_id": str(entry["userId"]),
             "sentiments": entry["sentiments"],
             "causes": entry["causes"],
             "comments": entry.get("comments", []),
-            "created_at": entry.get("created_at") if entry.get("created_at") else None
+            "created_at": entry.get("created_at") if entry.get("created_at") else None,
+            "lockCode" : entry.get("lockCode", ""), 
         }
 
         return jsonify(entry_data), 200
@@ -136,9 +179,10 @@ def edit_checkin(entry_id):
             "sentiments": data["sentiments"],
             "causes": data["causes"],
             "comments": data.get("comments", []),
+            "lockCode" : data.get("lockCode", ""),
         }
 
-        result = check_in_collection.update_one({"_id": ObjectId(entry_id), "user_id": user_id}, {"$set": update_data})
+        result = check_in_collection.update_one({"_id": ObjectId(entry_id), "userId": user_id}, {"$set": update_data})
 
         if result.matched_count == 0:
             return jsonify({"error": "Entry not found or unauthorized"}), 404
@@ -159,7 +203,7 @@ def delete_checkin(entry_id):
         if not user_id:
             return jsonify({"error": "Unauthorized"}), 401
 
-        result = check_in_collection.delete_one({"_id": ObjectId(entry_id), "user_id": user_id})
+        result = check_in_collection.delete_one({"_id": ObjectId(entry_id), "userId": user_id})
 
         if result.deleted_count == 0:
             return jsonify({"error": "Entry not found or unauthorized"}), 404
@@ -170,7 +214,6 @@ def delete_checkin(entry_id):
         return jsonify({"error": str(e)}), 500
         
     
-
 @check_bp.route("/delete/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_checkin_entry(entry_id):
@@ -204,13 +247,60 @@ def delete_checkin_entry(entry_id):
         print("❌ Error deleting check-in:", str(e))
         return jsonify({"error": "Failed to delete check-in"}), 500
 
+@check_bp.route("/update-lock-code/<entry_id>", methods=["POST"]) # /check-in/update-lock-code/
+@jwt_required()
+def update_lock_code(entry_id):
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        new_lock_code = data.get("lockCode")
+        print(user_id)
+        check_in = None
+        check_in = check_in_collection.find_one({"_id": ObjectId(entry_id), "userId": user_id})
+        print("user id", user_id)
+
+        print("Check-in : ",check_in)
+        if not check_in:
+            return jsonify({"error": "User not found"}), 404
+        
+        lock_code = check_in.get("lockCode")
+        # if lock_code is empty or None, remove the existing lock code
+        if not lock_code:
+            print("NOT LOCK_CODE")
+
+            result = check_in_collection.update_one(
+                {"_id": ObjectId(entry_id), "userId": user_id},
+                {"$set": {"lockCode": new_lock_code}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to remove lock code"}), 500
+            return jsonify({"message": "Lock code removed successfully"}), 200
+                
+        else:
+            print(" LOCK_CODE")
+            if(lock_code == new_lock_code): 
+                result = check_in_collection.update_one(
+                    {"_id": ObjectId(entry_id), "userId": user_id},
+                    {"$unset": {"lockCode": ""}}
+                )
+                if result.modified_count == 0:
+                    return jsonify({"error": "Failed to create lock code"}), 500
+            
+                return jsonify({"message": "Lock code created successfully"}), 200
+            else: 
+                return jsonify({"error": "Wrong lock code"}), 500
+
+    except Exception as e:
+        print(f"❌ Error updating lock code: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @check_bp.route("/<entry_id>", methods=["PUT"])
 @jwt_required()
 def update_check_in(entry_id):
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
-        
+        print("entry id :" , entry_id )
         # Validate entry_id
         if not ObjectId.is_valid(entry_id):
             return jsonify({"error": "Invalid check-in ID"}), 400
@@ -229,7 +319,8 @@ def update_check_in(entry_id):
             "sentiments": data.get("sentiments", check_in.get("sentiments", [])),
             "causes": data.get("causes", check_in.get("causes", [])),
             "comments": data.get("comments", check_in.get("comments", [])),
-            "updatedAt": datetime.utcnow()
+            "lockCode" : data.get("lockCode", check_in.get("lockCode", "")),
+            "updatedAt": datetime.now()
         }
 
         # Validate required fields
@@ -251,7 +342,8 @@ def update_check_in(entry_id):
                 "id": str(check_in["_id"]),
                 "sentiments": update_data["sentiments"],
                 "causes": update_data["causes"],
-                "comments": update_data["comments"]
+                "comments": update_data["comments"], 
+                "lockCode" :  update_data["lockCode"]
             }
         }), 200
 

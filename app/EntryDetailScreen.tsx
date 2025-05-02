@@ -6,10 +6,11 @@ import {
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Added missing import
 import { RootStackParamList } from "./types/types";
 import { deleteJournalEntry, editJournalEntry, editCheckIn, deleteCheckIn } from "./services/ApiService"; // ✅ Import both delete & update functions
 import { format } from "date-fns";
-import { deleteEntry, uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory, updateJournalEntry} from "./services/ApiService";
+import { uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory, updateJournalEntry} from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from './context/ThemeContext';
 import { Feather as FeatherIcon } from "@expo/vector-icons"; // for emotion and reason icons
@@ -162,7 +163,8 @@ const EntryDetail = () => {
           }
 
           const data = await getCheckInHistory(token);
-          const updatedEntry = data.history.find((e: any) => e.entry_id === entry.entry_id);
+          console.log("ENTRY ID: ", entry._id)
+          const updatedEntry = data.history.find((e: any) => e.entry_id === entry._id);
           
           if (updatedEntry) {
             setEntry({
@@ -178,7 +180,7 @@ const EntryDetail = () => {
       };
 
       fetchUpdatedEntry();
-    }, [entry.entry_id])
+    }, [entry._id])
   );
   
   // State for editing mode and image selection
@@ -210,7 +212,7 @@ const EntryDetail = () => {
       ]}
       onPress={() => toggleSelection(item, state, setState)}
     >
-      <Feather name={item.icon} size={24} color="#000" />
+      <Feather name={item.icon as keyof typeof Feather.glyphMap} size={24} color="#000" />
       <Text>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -225,16 +227,6 @@ const EntryDetail = () => {
   } catch (error) {
     console.log("Error formatting date:", error);
   }
-
-/*
-      if (entry.category === "Check-in") {
-        await editCheckIn(entry._id, entry.journalSentiments, [], [editedContent]);
-      } else {
-        await editJournalEntry(entry._id, editedContent, entry.images, entry.category, entry.prompt);
-      }
-
-*/ 
-
 
   const handleSaveEntry = async () => {
     try {
@@ -310,11 +302,11 @@ const EntryDetail = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              if(entry.type == "Check-In") {
-                  deleteCheckIn(entry)
+              if(entry.category === "checkin") {  // Fixed: use entry.category instead of entry.type
+                await deleteCheckIn(entry._id);  // Fixed: pass only the ID
               }
               else{
-                  deleteJournalEntry(entry._id)
+                await deleteJournalEntry(entry._id);
               }
               Alert.alert("Deleted", "Entry deleted successfully");
               navigation.navigate("Home");
@@ -327,33 +319,6 @@ const EntryDetail = () => {
       ]
     );
   };
-  
-  
-  /* const handleDeleteEntry = async () => {
-    Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to delete this entry? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (entry.category === "Check-in") {
-                await deleteCheckIn(entry._id);
-              } else {
-                await deleteJournalEntry(entry._id);
-              }
-              navigation.goBack(); // Navigate back after deletion
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete entry.");
-            }
-          }
-        }
-      ]
-    );
-  }; */
 
   // Handle editing check-in
   const handleEditCheckIn = () => {
@@ -487,7 +452,7 @@ const EntryDetail = () => {
                           }
                         }}
                       >
-                        <Feather name={emotion.icon} size={20} color={theme.icon} />
+                        <Feather name={emotion.icon as keyof typeof Feather.glyphMap} size={20} color={theme.icon} />
                         <Text style={[styles.gridLabel, { color: theme.text }]}>{emotion.name}</Text>
                       </TouchableOpacity>
                     ))}
@@ -513,7 +478,7 @@ const EntryDetail = () => {
                           }
                         }}
                       >
-                        <Feather name={reason.icon} size={20} color={theme.icon} />
+                        <Feather name={reason.icon as keyof typeof Feather.glyphMap} size={20} color={theme.icon} />
                         <Text style={[styles.gridLabel, { color: theme.text }]}>{reason.name}</Text>
                       </TouchableOpacity>
                     ))}
@@ -523,7 +488,7 @@ const EntryDetail = () => {
                 <View style={[styles.detailBlock, { backgroundColor: 'transparent' }]}>
                   <Text style={[styles.detailLabel, { color: theme.text }]}>Comments:</Text>
                   <TextInput
-                    style={[styles.commentInput, { 
+                    style={[styles.commentInputField, { 
                       backgroundColor: theme.inputBackground,
                       borderColor: theme.border,
                       color: theme.text
@@ -652,25 +617,29 @@ const EntryDetail = () => {
                       ))}
                     </View>
                   ) : (
-                    images.map((image: { signedUrl: string }, index: number) => (
-                      <View key={index} style={styles.imageWrapper}>
-                        <TouchableOpacity onPress={() => setSelectedImage(image.signedUrl)}>
-                          <Image
-                            source={{ uri: image.signedUrl }}
-                            style={styles.entryImage}
-                            resizeMode="cover"
-                          />
-                        </TouchableOpacity>
-                        {isEditing && (
-                          <TouchableOpacity 
-                            style={[styles.deleteImageButton, { backgroundColor: theme.cardBackground }]}
-                            onPress={() => handleDeleteImage(image)}
-                          >
-                            <Feather name="x" size={24} color={theme.text} />
+                    images && images.length > 0 ? (
+                      images.map((image: { signedUrl: string }, index: number) => (
+                        <View key={index} style={styles.imageWrapper}>
+                          <TouchableOpacity onPress={() => setSelectedImage(image.signedUrl)}>
+                            <Image
+                              source={{ uri: image.signedUrl }}
+                              style={styles.entryImage}
+                              resizeMode="cover"
+                            />
                           </TouchableOpacity>
-                        )}
-                      </View>
-                    ))
+                          {isEditing && (
+                            <TouchableOpacity 
+                              style={[styles.deleteImageButton, { backgroundColor: theme.cardBackground }]}
+                              onPress={() => handleDeleteImage(image)}
+                            >
+                              <Feather name="x" size={24} color={theme.text} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={{ color: theme.textSecondary }}>No images added yet.</Text>
+                    )
                   )}
                 </ScrollView>
               </View>

@@ -80,12 +80,13 @@ export const analyzeSentiment = async (text: string) => {
       throw new Error(`Error: ${response.statusText}`);
     }
 
-    const rawText = await response.text();
-    console.log("📡 Raw response text:", rawText);
+    // const rawText = await response.text();
+    // console.log("📡 Raw response text:", rawText);
 
-    const data = JSON.parse(rawText);
+    // const data = JSON.parse(rawText);
+    // console.log("🔍 Parsed sentiment data:", JSON.stringify(data, null, 2));
+    const data = await response.json();
     console.log("🔍 Parsed sentiment data:", JSON.stringify(data, null, 2));
-
     // Verify emotions array
     if (!data.emotions || !Array.isArray(data.emotions)) {
       console.error("❌ Invalid emotions data:", data);
@@ -265,7 +266,7 @@ export const sendMessageChat = async (message: string, chat_id: string) => {
     if (!data.reply && !data.response) {
       throw new Error("Invalid response format");
     }
-    return data.reply || data.response; 
+    return data.reply || data.response;
 
   } catch (error) {
     console.error("Error sending message:", error);
@@ -296,7 +297,7 @@ export const clearHistoryChat = async(chat_id : string)  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -326,7 +327,7 @@ export const clearHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -357,7 +358,7 @@ export const deleteHistoryChat = async(chat_id : string)  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -387,7 +388,7 @@ export const deleteHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data.message; // return the chatbot response
+    return data.message; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -419,7 +420,7 @@ export const getHistoryAllChat = async()  => {
       throw new Error("Invalid response format");
     }
 
-  return data; // return the chatbot response
+    return data; // return the chatbot response
   } catch (error) {
     console.error("Error sending message:", error);
     return "Sorry, something went wrong.";
@@ -436,7 +437,7 @@ export const getHistoryChat = async(chat_id: string) => {
         "Content-Type": "application/json",
       }
     });
-    
+
     // Check if response is OK before parsing
     if (!response.ok) {
       if(response.status == 404){
@@ -447,10 +448,10 @@ export const getHistoryChat = async(chat_id: string) => {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
     }
-    
+
     const data = await response.json();
     console.log("Data received from History: ", data);
-    
+
     if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
@@ -465,12 +466,12 @@ export const getHistoryChat = async(chat_id: string) => {
 export const startNewChat = async() => {
   try {
     const token = await AsyncStorage.getItem("userToken");
-    
+
     // Check if token exists
     if (!token) {
       throw new Error("Authentication token not found");
     }
-    
+
     const response = await fetch(`${API_URL}/chat/new`, {
       method: "GET",
       headers: {
@@ -478,7 +479,7 @@ export const startNewChat = async() => {
         "Content-Type": "application/json",
       },
     });
-    
+
     // Check response status before trying to parse
     if (!response.ok) {
       // Get response text to debug the issue
@@ -486,7 +487,7 @@ export const startNewChat = async() => {
       console.error("API Error Response:", errorText);
       throw new Error(`API returned ${response.status}: ${response.statusText}`);
     }
-    
+
     // Check content type to ensure we're receiving JSON
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -494,10 +495,10 @@ export const startNewChat = async() => {
       console.error("Non-JSON response:", errorText);
       throw new Error("API didn't return JSON. Received: " + contentType);
     }
-    
+
     const data = await response.json();
     console.log("Data received from API:", data);
-    
+
     if (!data || !data.chat_id) {
       throw new Error("Invalid response format: missing chat_id");
     }
@@ -520,14 +521,14 @@ export const getChatList = async() => {
         "Content-Type": "application/json",
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     console.log("Chats received:", data);
-    
+
     // The API returns an array of chat objects with chat_id and title
     if (!Array.isArray(data)) {
       throw new Error("Invalid response format - expected array");
@@ -537,7 +538,7 @@ export const getChatList = async() => {
       id: chat.chat_id,
       title: chat.title || "Untitled Chat"
     }));
-    
+
   } catch (error) {
     console.error("Error fetching chat list:", error);
     return [];
@@ -552,20 +553,20 @@ export const renameChat = async(chat_id: string, name: string) => {
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-      }, 
+      },
       body: JSON.stringify({
         "name" : name
       }),
     });
-    
+
     // Check if response is OK before parsing
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("Data received from rename: ", data);
-    
+
     if (!data || !data.title) {
       throw new Error("Invalid response format");
     }
@@ -582,20 +583,20 @@ export const saveChat = async(chat_id: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
     const response = await fetch(`${API_URL}/chat/save-chat/${chat_id}`, {
-      method: "GET", 
+      method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log("Data received from save chat: ", data);
-    
+
     if (!data || !data.message) {
       throw new Error("Invalid response format");
     }
@@ -619,15 +620,16 @@ export const loginUser = async (email: string, password: string) => {
       body: JSON.stringify({ email, password }),
     });
 
+    const responseData = await response.json(); // ✅ Read response body once
+
     console.log("loginUser() response.ok: ", response.ok);
     console.log("loginUser() response.status: ", response.status);
     console.log("loginUser() response.headers: ", response.headers);
-
-    const responseData = await response.json(); // Await JSON parsing
     console.log("loginUser() response data: ", responseData);
 
     if (!response.ok) {
-      throw new Error(responseData.message || "Invalid email or password");
+      // If locked or failed login, return the error message provided by backend
+      throw new Error(responseData.error || "Login failed");
     }
 
     if (!responseData.access_token) {
@@ -637,24 +639,26 @@ export const loginUser = async (email: string, password: string) => {
 
     console.log("✅ Login successful. Token received:", responseData.access_token);
 
+    // Save token to AsyncStorage
     await AsyncStorage.setItem("userToken", responseData.access_token);
     console.log("🔹 Token successfully saved to AsyncStorage!");
 
+    // Handle push token sync if exists
     const expoPushToken = await AsyncStorage.getItem("expoPushToken");
-    if (!expoPushToken) {
-      console.warn("No Expo push token saved locally.");
-    } else {
+    if (expoPushToken) {
       const pushTokenResponse = await fetch(`${API_URL}/notification/update-push-token-user`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${responseData.access_token}`
+          "Authorization": `Bearer ${responseData.access_token}`,
         },
-        body: JSON.stringify({ token: expoPushToken })
+        body: JSON.stringify({ token: expoPushToken }),
       });
 
       const pushResponseData = await pushTokenResponse.json();
-      console.log("Push token update response:", pushResponseData);
+      console.log("📲 Push token update response:", pushResponseData);
+    } else {
+      console.warn("⚠️ No Expo push token found locally.");
     }
 
     return responseData;
@@ -663,6 +667,7 @@ export const loginUser = async (email: string, password: string) => {
     throw error;
   }
 };
+
 
 export const logoutUser = async () => {
   try {
@@ -778,40 +783,29 @@ export const registerUser = async (email: string, password: string, dob: string)
     console.log("Register response status:", response.status);
     console.log("Register response headers:", response.headers);
 
-    // Get the raw text first to debug
-    const responseText = await response.text();
-    console.log("Raw response:", responseText.substring(0, 200) + "..."); // Log first 200 chars
-
-    // If it's not valid JSON, don't try to parse it
+    // If the response is not OK, handle error
     if (!response.ok) {
-      if (responseText.includes("<html") || responseText.includes("<!DOCTYPE")) {
-        console.error("Received HTML instead of JSON");
-        throw new Error(`Registration failed: Server returned HTML instead of JSON. Status: ${response.status}`);
-      } else {
-        // Try to parse JSON if it looks like JSON
-        try {
-          const errorData = JSON.parse(responseText);
-          console.log("registerUser() failed response:", errorData);
-          throw new Error(`Registration failed: ${errorData.error || "Unknown error"}`);
-        } catch (parseError) {
-          console.error("Could not parse error response:", parseError);
-          throw new Error(`Registration failed with status ${response.status}. Response could not be parsed.`);
-        }
+      // Try parsing error as JSON
+      try {
+        const errorData = await response.json();
+        console.log("registerUser() failed response:", errorData);
+        throw new Error(`Registration failed: ${errorData.error || "Unknown error"}`);
+      } catch (parseError) {
+        const responseText = await response.text();
+        console.error("Could not parse error response as JSON:", parseError);
+        throw new Error(`Registration failed with status ${response.status}. Raw response: ${responseText}`);
       }
     }
 
-    // If response was ok, try to parse the JSON
-    try {
-      return JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Could not parse successful response:", parseError);
-      throw new Error("Registration succeeded but response was not valid JSON");
-    }
+    // If successful, parse and return JSON
+    const successData = await response.json();
+    return successData;
   } catch (error) {
     console.error("registerUser() error:", error);
     throw error;
   }
 };
+
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
@@ -1029,7 +1023,7 @@ export const updatePassword = async (token: string, newPassword: string) => {
 };
 
 
-export const requestPasswordReset = async (token : string, email: string) => {
+/* export const requestPasswordReset = async (token : string, email: string) => {
   console.log("api:", API_URL)
   const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
@@ -1047,23 +1041,127 @@ export const requestPasswordReset = async (token : string, email: string) => {
   }
 
   return await response.json(); // Expecting { token: "some-reset-token" }
-};
+}; */
+/* export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, API_URL }),
+    });
+
+    //const text = await response.text();  // 🔍 Capture raw response
+    
+    const data = await response.json();
+    console.log("📨 Raw reset password response:", data);
+
+
+    if (!response.ok) {
+      throw new Error(data.error || "Password reset request failed");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting password reset:", error);
+    throw error;
+  }
+}; */
 
 export const resetPassword = async (token: string, newPassword: string) => {
-  const response = await fetch(`${API_URL}/user/reset-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ token, newPassword }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/user/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    console.log("HERE IN RESET PASSWORD")
 
-  if (!response.ok) {
-    throw new Error(`Failed to reset password: ${response.statusText}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to reset password");
+    }
+
+    return data;
+  } catch (err) {
+    console.error("❌ Error resetting password:", err);
+    throw err;
   }
-
-  return await response.json(); // Expecting success message
 };
+
+
+// **********************************************
+// ** password reset with verification code
+// **********************************************
+
+export const requestVerificationCode = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email })
+    });
+
+    console.log("HERE IN REQUEST VERIFICATION CODE")
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to send code");
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting code:", error);
+    throw error;
+  }
+};
+
+/* export const verifyCodeAndResetPassword = async (
+  email: string,
+  code: string,
+  newPassword: string
+) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to reset password");
+    return data;
+  } catch (error) {
+    console.error("❌ Error resetting password:", error);
+    throw error;
+  }
+}; */
+export const verifyResetCode = async (email: string, code: string, token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, token }),
+    });
+
+    console.log("HERE IN VERIFY RESET CODE")
+
+    const data = await response.json();
+    console.log(data)
+    if (!response.ok) {
+      throw new Error(data.error || "Verification failed");
+    }
+    console.log(data.token)
+
+    return data.token;
+  } catch (err) {
+    console.error("❌ Error verifying reset code:", err);
+    throw err;
+  }
+};
+
+
 
 // **********************************************
 // ** Homepage API ** - FreeJournal & Guided Journal
@@ -1071,6 +1169,10 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 export const saveJournalEntry = async (content: string, images?: { fileName: string; signedUrl: string }[], category?: string, promt?: string, entryDate?: string) => {
   try {
+    if (!content || !content.trim()) {
+      throw new Error("Journal content cannot be empty.");
+    }
+    
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
@@ -1147,6 +1249,7 @@ export const saveJournalEntry = async (content: string, images?: { fileName: str
 
 export const editJournalEntry = async (entryId: string, newContent: string, images?: string[], category?: string, prompt?: string) => {
   try {
+    
     const token = await AsyncStorage.getItem("userToken");
     if (!token) throw new Error("No token found");
 
@@ -1225,8 +1328,8 @@ export const fetchJournalEntries = async (token: string, limit : Int32, skip : I
     // params.append("limit", limit.toString());
     // params.append("skip", skip.toString());
 
-   // const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
-  const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
+    // const response = await fetch(`${API_URL}/journal/get-journal-entries?${params.toString()}`, {
+    const response = await fetch(`${API_URL}/journal/get-journal-entries`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1285,12 +1388,12 @@ export const fetchJournalDates = async (token: string, limit : Int32, skip : Int
     // Handle both array and object responses
     if (Array.isArray(data)) {
       return data;
-    } 
+    }
     else if (typeof data === 'object' && data !== null) {
       // If the response is an object, try to extract an array from it
       if (Array.isArray(data.dates)) {
         return data.dates;
-      } 
+      }
       else if (Array.isArray(data.entries)) {
         return data.entries.map((entry: any) => entry.entryDate);
       }
@@ -1331,40 +1434,31 @@ export const calculateStreak = (dates: string[]): number => {
 };
 
 
-export const fetchJournalEntriesWithDate = async (
+export async function fetchJournalEntriesWithDate(
   token: string,
-  start_date: string,
-  end_date: string
-) => {
-  try {
-    const params = new URLSearchParams();
-    params.append("start_date", start_date);
-    params.append("end_date", end_date);
-
-    // Updated endpoint to match new data structure
-    const response = await fetch(`${API_URL}/journal/journal-entries-with-date?${params.toString()}`, {
+  startDate: string,   // “YYYY-MM-DD”
+  endDate: string
+) {
+  const resp = await fetch(
+    `${API_URL}/journal/journal-entries-with-date?start_date=${startDate}&end_date=${endDate}`,
+    {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
     }
-
-    // Return the entries array 
-    const data = await response.json();
-    console.log("✅ Received Journal Entries:", data.entries);
-    return data.entries;
-
-  } catch (error) {
-    console.error("Error fetching journal entries:", error);
-    return { error: "Failed to fetch journal entries." };
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => null);
+    throw new Error(err?.error || resp.statusText);
   }
-};
-
+  return resp.json() as Promise<{
+    start_date: string;
+    end_date: string;
+    entries: any[];
+  }>;
+}
 
 export const deleteJournalEntry = async (entryId: string) => {
   try {
@@ -1398,7 +1492,7 @@ export const deleteJournalEntry = async (entryId: string) => {
   }
 };
 
- 
+
 // **********************************************
 // ** Homepage API ** - Entry 
 // **********************************************
@@ -1641,7 +1735,7 @@ export const deleteCheckIn = async (entry : any) => {
     if (!token) {
       throw new Error('Authentication required');
     }
-    
+
     const response = await fetch(`${API_URL}/check-in/delete/${entry._id}`, {
       method: 'DELETE',
       headers: {
@@ -1662,10 +1756,26 @@ export const deleteCheckIn = async (entry : any) => {
   }
 };
 
-// **********************************************
-// ** CheckIn  API **
-// **********************************************
+export const getCheckInHistory = async (token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/check-in/history`, {
+      method: "GET",
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
+    if (!response.ok) {
+      throw new Error(`Failed to save notification token: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error saving getCheckInHistory:", error);
+    throw error;
+  }
+}
 
 // Check-in draft functions
 export const saveCheckInDraft = async (checkInData: any) => {
@@ -1749,7 +1859,7 @@ export const updateNotificationFrequency = async (frequency: string) => {
       console.error("Error response data:", data);
       return { message: data.error, status: response.status };
     }
-  
+
     return { message: data.message, status: response.status }; // success
   } catch (error) {
     console.error("Error updating notification frequency:", error);
@@ -1992,7 +2102,7 @@ export const updateJournalEntry = async (
     // First get the raw response text
     const responseText = await response.text();
     console.log('Raw server response:', responseText);
-    
+
     // Try to parse as JSON, but handle cases where it's not JSON
     let responseData;
     try {
@@ -2021,19 +2131,37 @@ export const updateJournalEntry = async (
 
 // Function to update journal PIN
 export const updateJournalPin = async (journalId: string, pin: string, token: string, type: string) => {
-  try {
-    let response = null;
-    if(type === "checkin"){ // todo
-      response = await fetch(`${API_URL}/check-in/create-lock-code`, {
+  if(type == "checkin") {
+    // check-in 
+    console.log("Check-in Pin Chagne ", journalId)
+    try {
+      let response = null;
+      response = await fetch(`${API_URL}/check-in/update-lock-code/${journalId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ lockCode: pin ? pin : null, journalId })
+        body: JSON.stringify({ lockCode: pin ? pin : null })
       });
+
+      if (!response?.ok) {
+        throw new Error('Failed to update PIN');
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      console.error('Error updating PIN for check-in:', error);
+      throw error;
     }
-    else if (type === "journal"){
+
+  }
+  else{
+    console.log("Journal Pin Chagne ")
+    // journal, guided or free
+    try {
+      let response = null;
       response = await fetch(`${API_URL}/journal/update-lock-code/${journalId}`, {
         method: 'POST',
         headers: {
@@ -2042,16 +2170,18 @@ export const updateJournalPin = async (journalId: string, pin: string, token: st
         },
         body: JSON.stringify({ lockCode: pin ? pin : null })
       });
-    }
-    if (!response?.ok) {
-      throw new Error('Failed to update PIN');
+
+      if (!response?.ok) {
+        throw new Error('Failed to update PIN for journal');
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      console.error('Error updating PIN for journal:', error);
+      throw error;
     }
 
-    return await response.json();
-
-  } catch (error) {
-    console.error('Error updating PIN:', error);
-    throw error;
   }
 };
 
@@ -2113,4 +2243,10 @@ export const facePhotoAnalysis = async (imageUri: string) => {
     console.error('❌ Error in facePhotoAnalysis:', error);
     return { error: 'Photo analysis failed' };
   }
+};
+
+export const checkEmailExists = async (email: string) => {
+  const res = await fetch(`${API_URL}/user/email-exists?email=${email}`);
+  const data = await res.json();
+  return data.exists;
 };
