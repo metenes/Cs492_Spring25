@@ -4,8 +4,9 @@ import { Int32 } from "react-native/Libraries/Types/CodegenTypes";
 // export const API_URL = "http://192.168.1.16:5000";
 // export const API_URL = "http://10.203.122.69:5000";
 //export const API_URL = "http://192.168.1.16:5000";
-export const API_URL = "http://172.20.10.3:5000"; //kgn
+//export const API_URL = "http://172.20.10.3:5000"; //kgn
 //export const API_URL = "http://192.168.1.104:5000";
+export const API_URL = "http://192.168.1.29:5000";
 
 // Define the emotions array to match the backend
 /* 
@@ -909,7 +910,7 @@ export const updatePassword = async (token: string, newPassword: string) => {
 };
 
 
-export const requestPasswordReset = async (token : string, email: string) => {
+/* export const requestPasswordReset = async (token : string, email: string) => {
   console.log("api:", API_URL)
   const response = await fetch(`${API_URL}/user/forgot-password`, {
     method: "POST",
@@ -927,23 +928,127 @@ export const requestPasswordReset = async (token : string, email: string) => {
   }
 
   return await response.json(); // Expecting { token: "some-reset-token" }
-};
+}; */
+/* export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, API_URL }),
+    });
+
+    //const text = await response.text();  // 🔍 Capture raw response
+    
+    const data = await response.json();
+    console.log("📨 Raw reset password response:", data);
+
+
+    if (!response.ok) {
+      throw new Error(data.error || "Password reset request failed");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting password reset:", error);
+    throw error;
+  }
+}; */
 
 export const resetPassword = async (token: string, newPassword: string) => {
-  const response = await fetch(`${API_URL}/user/reset-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ token, newPassword }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/user/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    console.log("HERE IN RESET PASSWORD")
 
-  if (!response.ok) {
-    throw new Error(`Failed to reset password: ${response.statusText}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to reset password");
+    }
+
+    return data;
+  } catch (err) {
+    console.error("❌ Error resetting password:", err);
+    throw err;
   }
-
-  return await response.json(); // Expecting success message
 };
+
+
+// **********************************************
+// ** password reset with verification code
+// **********************************************
+
+export const requestVerificationCode = async (email: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email })
+    });
+
+    console.log("HERE IN REQUEST VERIFICATION CODE")
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to send code");
+    return data;
+  } catch (error) {
+    console.error("❌ Error requesting code:", error);
+    throw error;
+  }
+};
+
+/* export const verifyCodeAndResetPassword = async (
+  email: string,
+  code: string,
+  newPassword: string
+) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to reset password");
+    return data;
+  } catch (error) {
+    console.error("❌ Error resetting password:", error);
+    throw error;
+  }
+}; */
+export const verifyResetCode = async (email: string, code: string, token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/verify-reset-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, token }),
+    });
+
+    console.log("HERE IN VERIFY RESET CODE")
+
+    const data = await response.json();
+    console.log(data)
+    if (!response.ok) {
+      throw new Error(data.error || "Verification failed");
+    }
+    console.log(data.token)
+
+    return data.token;
+  } catch (err) {
+    console.error("❌ Error verifying reset code:", err);
+    throw err;
+  }
+};
+
+
 
 // **********************************************
 // ** Homepage API ** - FreeJournal & Guided Journal

@@ -10,7 +10,7 @@ import {
   ActivityIndicator 
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { requestPasswordReset  } from "./services/ApiService";
+import { requestVerificationCode  } from "./services/ApiService";
 import { RootStackParamList } from "./types/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -32,14 +32,19 @@ const ForgotPasswordScreen = () => {
   
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      /* const token = await AsyncStorage.getItem("userToken");
       if(!token){
         throw new Error("Token error ");
       }
-      const response = await requestPasswordReset(token, email);
+      const response = await requestPasswordReset(token, email); */
+      const response = await requestVerificationCode(email);
+      //navigation.navigate("ResetPassword", { email });
+
       if (response.message) {
-        Alert.alert("Success", "A password reset link has been sent to your email.");
-        navigation.navigate("ResetPassword", { token: response.token });
+        Alert.alert("Success", "A verification code has been sent to your email.");
+        //navigation.navigate("ResetPassword", { token: response.token });
+        navigation.navigate("VerifyResetCode", { email, token: response.reset_token  });
+
       } else {
         Alert.alert("Error", "Something went wrong. Please try again.");
         throw new Error("Something went wrong. Please try again");

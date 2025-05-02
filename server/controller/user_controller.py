@@ -7,7 +7,7 @@ from utils.database import users_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_mail import Message
 from utils.mail_config import mail
-from utils.jwt_config import decode_token
+from utils.jwt_config import decode_token, decode_token_full
 import uuid
 from pymongo import MongoClient
 
@@ -471,11 +471,21 @@ def forgot_password():
             print("❌ User not found in DB")
             return jsonify({"error": "User not found"}), 404
 
-        reset_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))
+        import random
+        verification_code = str(random.randint(100000, 999999))
 
-        reset_link = f"{api}/user/reset-password?token={reset_token}"
-
-        print(f"✅ Reset link: {reset_link}")
+        # Save it temporarily in the DB (you can store it in the user doc, or in a separate collection if preferred)
+        """ users_collection.update_one({"email": email}, {"$set": {
+            "resetCode": verification_code,
+            "resetCodeCreatedAt": datetime.utcnow()
+        }}) """
+        # ⏳ Create token valid for 15 mins
+        reset_token = create_access_token(
+            identity=str(user["_id"]),
+            expires_delta=timedelta(minutes=15),
+            additional_claims={"reset_code": verification_code}
+)
+        #print(f"✅ Reset link: {reset_link}")
 
         # Create a more descriptive email
         msg = Message(
@@ -486,37 +496,29 @@ def forgot_password():
         
         # HTML body for better formatting
         msg.html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-            <h2 style="color: #333;">Password Reset Request</h2>
-            <p>You recently requested to reset your password for your account. Use the button below to reset it.</p>
-            <p style="margin: 25px 0;">
-                <a href="{reset_link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Your Password</a>
-            </p>
-            <p>This password reset link is only valid for the next 15 minutes.</p>
-            <p>If you did not request a password reset, please ignore this email or contact support if you have questions.</p>
-            <p>Regards,<br>The Sentio Team</p>
+        <div style="font-family: Arial, sans-serif; padding: 20px; border-radius: 5px;">
+            <h2>Sentio Password Reset</h2>
+            <p>Use the code below to reset your password. It will expire in 15 minutes.</p>
+            <p style="font-size: 24px; font-weight: bold;">{verification_code}</p>
+            <p>If you didn't request this, ignore this email.</p>
         </div>
         """
-        
-        # Plain text alternative for email clients that don't support HTML
-        msg.body = f"""
-        Password Reset Request for Your Account
-        
-        You recently requested to reset your password for your account. Click the link below to reset it:
-        
-        {reset_link}
-        
-        This password reset link is only valid for the next 15 minutes.
-        
-        If you did not request a password reset, please ignore this email or contact support if you have questions.
-        
-        Regards,
-        The Sentio Team
+
+        msg.body = f"""Sentio Password Reset
+
+        Your code is: {verification_code}
+
+        It will expire in 15 minutes.
         """
+
         
         mail.send(msg)
 
-        return jsonify({"message": "Password reset email sent" , "token": reset_token}), 200
+        #return jsonify({"message": "Password reset email sent" , "token": reset_token}), 200
+        return jsonify({
+            "message": "Verification code sent to your email.",
+            "reset_token": reset_token
+        }), 200
     except Exception as e:
         print(f"🔥 Exception: {e}")  # Print exact error
         import traceback
@@ -527,20 +529,20 @@ def forgot_password():
 # ---------------------------------------
 #  **Reset Password**
 # ---------------------------------------
-@user_bp.route("/reset-password?token={reset_token}", methods=["POST"])
+@user_bp.route("/reset-password", methods=["POST"])
 def reset_password(reset_token):
     try:
         data = request.get_json()
         token = data.get("token")
-        if(token is None) :
-          token = reset_token    
+        """ if(token is None) :
+          token = reset_token     """
         new_password = data.get("newPassword")
 
         if not token or not new_password:
             return jsonify({"error": "Invalid request"}), 400
 
         try:
-            decoded_token = decode_token(token)
+            decoded_token = decode_token_full(token)
             user_id = decoded_token.get("sub")
         except Exception as token_error:
             print(f"Token validation error: {token_error}")
@@ -565,6 +567,102 @@ def reset_password(reset_token):
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------
+#  **Password reset with verification code**
+# ---------------------------------------
+@user_bp.route("/request-reset-code", methods=["POST"])
+def request_reset_code():
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
+        user = users_collection.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        code = str(random.randint(100000, 999999))
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"reset_code": code, "code_expiry": datetime.utcnow() + timedelta(minutes=15)}}
+        )
+
+        msg = Message("Your Sentio Reset Code", recipients=[email])
+        msg.body = f"Your password reset code is: {code}"
+        mail.send(msg)
+
+        return jsonify({"message": "Reset code sent to email"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@user_bp.route("/verify-reset-code", methods=["POST"])
+def verify_reset_code():
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        code = data.get("code")
+        token = data.get("token")
+        print(code)
+        print(token)
+
+        if not code or not token:
+            return jsonify({"error": "Missing code or token"}), 400
+
+        # Decode the token
+        try:
+            decoded_token = decode_token_full(token)
+            print("DECODED TOKEN")
+            print(decoded_token)
+            original_code = decoded_token.get("reset_code")
+            print("ORIGINAL CODE")
+            print(original_code)
+            user_id = decoded_token.get("sub")
+            print("SUB???????????????")
+            print(user_id)
+        except Exception as e:
+            print("❌ Token decoding error:", e)
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": "Invalid or expired token"}), 401
+
+        if not original_code:
+            return jsonify({"error": "Token is missing required fields"}), 400
+
+        if code != original_code:
+            return jsonify({"error": "Invalid code"}), 400
+
+        # All good – issue a short-lived password reset token
+        """ password_reset_token = create_access_token(
+            identity=email,
+            expires_delta=timedelta(minutes=10)
+        ) """
+        # Find the user again (you already have the email)
+        user = users_collection.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        user_id = str(user["_id"])  # 🆗 convert ObjectId to string
+        print("USER ID")
+        print(user_id)
+
+        password_reset_token = create_access_token(
+            identity=user_id,
+            expires_delta=timedelta(minutes=10)
+        )
+
+
+        return jsonify({
+            "message": "Code verified",
+            "token": password_reset_token
+        }), 200
+
+    except Exception as e:
+        print("❌ Exception in verify_reset_code:", e)
+        return jsonify({"error": str(e)}), 500
+
     
 # ---------------------------------------
 #  **Trend Analysis**
