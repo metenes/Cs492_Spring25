@@ -50,8 +50,6 @@ const ResetPasswordScreen = () => {
       return;
     }
   
-    console.log("ARE WE THERE YET");
-  
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
@@ -94,11 +92,12 @@ const ResetPasswordScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.appTitle}>Sentio</Text>
-      <Text style={styles.subtitle}>Set a New Password</Text>
+      <Text style={styles.subtitle}>Set a new password</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="New Password"
+        placeholder="Password"
+        placeholderTextColor="#999"
         value={newPassword}
         onChangeText={setNewPassword}
         secureTextEntry
@@ -107,7 +106,8 @@ const ResetPasswordScreen = () => {
 
       <TextInput
         style={styles.input}
-        placeholder="Confirm New Password"
+        placeholder="Confirm password"
+        placeholderTextColor="#999"
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
@@ -164,12 +164,12 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
   },
   resetButton: {
-    width: "90%",
+    width: "75%",
     backgroundColor: "#000000",
     paddingVertical: height * 0.018,
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: height * 0.3,// used to be 0.025 but keyboard almost covered textbox
+    marginBottom: height * 0.08,// used to be 0.025 but keyboard almost covered textbox
   },
   resetButtonText: {
     color: "#FFFFFF",
@@ -179,6 +179,12 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#555",
   },
+  backToLoginText: {
+    color: "#4A90E2",
+    fontSize: 16,
+    //marginTop: 20
+    marginBottom: height*0.15,
+  }
 });
 
 export default ResetPasswordScreen;
