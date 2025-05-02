@@ -20,7 +20,7 @@ type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackPara
 type ResetPasswordRouteProp = RouteProp<RootStackParamList, "ResetPassword">;
 
 const ResetPasswordScreen = () => {
-  //const [token, setToken] = useState("");
+  const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +33,7 @@ const ResetPasswordScreen = () => {
     if (route.params?.email && route.params?.code) {
       setEmail(route.params.email);
       setCode(route.params.code);
+      setToken(route.params.token);
       console.log("📩 Got reset code + email:", route.params.code, route.params.email);
     } else {
       Alert.alert(
@@ -44,10 +45,12 @@ const ResetPasswordScreen = () => {
   }, []);
 
   const handleResetPassword = async () => {
-    if (!email || !code) {
-      Alert.alert("Error", "Missing verification code or email.");
+    if (!email || !code || !token) {
+      Alert.alert("Error", "Missing verification details.");
       return;
     }
+  
+    console.log("ARE WE THERE YET");
   
     if (!newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields.");
@@ -67,10 +70,7 @@ const ResetPasswordScreen = () => {
     setLoading(true);
   
     try {
-      const token = await verifyResetCode(email, code);
-      console.log("✅ Token obtained:", token);
-      await resetPassword(token, newPassword);
-  
+      await resetPassword(token, newPassword);  // ✅ use the token directly
       Alert.alert(
         "Success",
         "Your password has been reset successfully!",
@@ -80,7 +80,7 @@ const ResetPasswordScreen = () => {
       let errorMessage = "An unknown error occurred.";
       if (error instanceof Error) {
         errorMessage = error.message.includes("400") || error.message.includes("401")
-          ? "Invalid or expired reset code. Please request a new one."
+          ? "Invalid or expired reset token. Please request a new one."
           : error.message;
       }
       Alert.alert("Error", errorMessage);
@@ -88,6 +88,7 @@ const ResetPasswordScreen = () => {
       setLoading(false);
     }
   };
+  
   
 
   return (
@@ -114,9 +115,9 @@ const ResetPasswordScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.resetButton, (loading || !token) && styles.disabledButton]} 
+        style={[styles.resetButton, (loading || !newPassword || !confirmPassword) && styles.disabledButton]} 
         onPress={handleResetPassword}
-        disabled={loading || !token}
+        disabled={loading || !newPassword || !confirmPassword}
         testID="submit-reset-button"
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.resetButtonText}>Reset Password</Text>}
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
     paddingVertical: height * 0.018,
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: height * 0.025,
+    marginBottom: height * 0.3,// used to be 0.025 but keyboard almost covered textbox
   },
   resetButtonText: {
     color: "#FFFFFF",
