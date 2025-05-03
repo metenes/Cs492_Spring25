@@ -18,7 +18,8 @@ import { saveJournalEntry, saveDraft, getDraft, clearDraft } from "./services/Ap
 import BottomNavigation from "./BottomNavigation";
 import { useTheme } from './context/ThemeContext';
 //import { saveGuidedJournalEntry } from "./services/ApiService";
-
+import { awardBadge } from "./services/ApiService"; // ✅
+import BadgeCongratsModal from "./BadgeCongratsModal";
 const MAX_CHAR_COUNT = 10000;
 
 const GuidedJournalingScreen = () => {
@@ -30,7 +31,9 @@ const GuidedJournalingScreen = () => {
   const navigation = useNavigation<any>();
   const { prompt } = route.params;
   const { theme, darkMode } = useTheme();
-
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
   // Load draft when component mounts
   useEffect(() => {
     const loadDraft = async () => {
@@ -50,7 +53,20 @@ const GuidedJournalingScreen = () => {
     };
     loadDraft();
   }, []);
-
+  useEffect(() => {
+    const loadBadges = async () => {
+      const stored = await AsyncStorage.getItem("earnedBadges");
+      if (stored) {
+        try {
+          setEarnedBadges(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse earnedBadges", e);
+        }
+      }
+    };
+    loadBadges();
+  }, []);
+  
   // Save draft when content or images change
   useEffect(() => {
     if (isLoading) return; // Skip saving during initial load
@@ -80,33 +96,38 @@ const GuidedJournalingScreen = () => {
     }
   
     try {
-      // Check if user is authenticated
       const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
+      const userId = await AsyncStorage.getItem("userId");
+      if (!token || !userId) {
         Alert.alert("Error", "User not authenticated.");
         return;
       }
   
-      // Save the journal entry, including images
       const response = await saveJournalEntry(content, imageUris, "guided", prompt);
-  
       if (response.error) {
         Alert.alert("Error", "Failed to save entry.");
         return;
       }
   
-      // Clear the draft if everything is successful
-      await clearDraft();
+      // 🎉 Award Guided Badge if not earned
+      if (!earnedBadges.includes("guided")) {
+        const success = await awardBadge(token, userId, "guided");
+        if (success) {
+          const updated = [...earnedBadges, "guided"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          setAwardedBadgeKey("guided");
+          setShowBadgeModal(true);
+        }
+      }
   
-      Alert.alert("Saved", "Your guided entry has been saved.");
+      await clearDraft();
       navigation.navigate("Home");
-      
     } catch (error) {
       console.error("Error saving guided entry:", error);
       Alert.alert("Error", "Something went wrong.");
     }
   };
-  
   
 
   if (isLoading) {
@@ -124,6 +145,13 @@ const GuidedJournalingScreen = () => {
   }
 
   return (
+    <View style={{ flex: 1}}>
+      <BadgeCongratsModal
+  visible={showBadgeModal}
+  badgeKey={awardedBadgeKey}
+  onClose={() => setShowBadgeModal(false)}
+/>
+
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={{ 
         flex: 1, 
@@ -243,6 +271,7 @@ const GuidedJournalingScreen = () => {
         <BottomNavigation activeScreen="GuidedJournaling" />
       </View>
     </TouchableWithoutFeedback>
+    </View>
   );
 };
 

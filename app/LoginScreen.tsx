@@ -8,6 +8,8 @@ import {
   Text, 
   Dimensions 
 } from "react-native";
+import { fetchEarnedBadges } from './services/ApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from "@react-navigation/native";
 import { loginUser } from "./services/ApiService";
 import { RootStackParamList } from "./types/types"; // Import route types
@@ -47,32 +49,57 @@ const LoginScreen = () => {
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      const response = await loginUser(email, password);
-      
-      if (!response.access_token) {
-        Alert.alert("Error", "No access token received!");
-        throw new Error("No access token received");
-      }
+const handleLogin = async () => {
+  try {
+    const response = await loginUser(email, password);
 
-      // Save credentials securely if login successful
-      try {
-        await Keychain.setGenericPassword(email, password);
-      } catch (error) {
-        console.log('Error saving credentials:', error);
-      }
-  
-      Alert.alert("Success", "Logged in successfully!");
-      navigation.navigate("Home");
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        Alert.alert("Login failed", error.message);
-      } else {
-        Alert.alert("Login failed", "An unknown error occurred");
-      }
+    if (!response.access_token) {
+      Alert.alert("Error", "No access token received!");
+      throw new Error("No access token received");
     }
-  };
+
+    const token = response.access_token;
+    await AsyncStorage.setItem("userToken", token);
+
+    // Decode token to get userId
+    const parts = token.split(".");
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+    const decoded = JSON.parse(atob(padded));
+    const userId = decoded.userId || decoded.sub || decoded.id;
+
+    await AsyncStorage.setItem("userId", userId);
+
+    // ✅ Fetch and cache earned badges
+    try {
+      const earnedBadges = await fetchEarnedBadges(token, userId);
+      await AsyncStorage.setItem("earnedBadges", JSON.stringify(earnedBadges));
+      console.log("🎖️ Earned badges cached");
+    } catch (error) {
+      console.error("⚠️ Failed to fetch earned badges:", error);
+      await AsyncStorage.setItem("earnedBadges", JSON.stringify([])); // fallback
+    }
+
+    // Save credentials securely
+    try {
+      await Keychain.setGenericPassword(email, password);
+    } catch (error) {
+      console.log("Error saving credentials:", error);
+    }
+
+    Alert.alert("Success", "Logged in successfully!");
+    navigation.navigate("Home");
+
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      Alert.alert("Login failed", error.message);
+    } else {
+      Alert.alert("Login failed", "An unknown error occurred");
+    }
+  }
+};
+
   
   return (
     <View style={styles.container}>

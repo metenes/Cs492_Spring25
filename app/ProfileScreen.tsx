@@ -22,11 +22,22 @@ import { Ionicons } from '@expo/vector-icons';
 import BottomNavigation from './BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount, API_URL } from "./services/ApiService";
+import { fetchProfile, uploadProfileImage, updateProfile, deleteAccount, API_URL, fetchEarnedBadges } from "./services/ApiService";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./types/types";
 import { useTheme } from './context/ThemeContext';
 import EditProfileModal from './EditProfileModal';
+import LockedJournalBadge from './badges/locked_journal.png';
+import FreeformBadge from './badges/freeform.png';
+import GuidedBadge from './badges/guided.png';
+import QuickBadge from './badges/quick.png';
+import PromptWandererBadge from './badges/promptwanderer-Photoroom.png';
+import EmotionExplorerBadge from './badges/emotion_explorer.png';
+import MoodShifterBadge from './badges/mood_shifter.png';
+import LetItOutBadge from './badges/Let_itout.png';
+import ImageStorytellerBadge from './badges/image_stroyteller.png';
+
+declare module '*.png';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
 
@@ -54,6 +65,61 @@ const ProfileScreen = () => {
   const [imageLoading, setImageLoading] = useState(true);
   const pulseAnim = new Animated.Value(0);
 
+  const [selectedBadge, setSelectedBadge] = useState<null | number>(null);
+  const [badgeModalVisible, setBadgeModalVisible] = useState(false);
+
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
+
+  const badgeData = [
+    {
+      key: "locked_journal",
+      image: LockedJournalBadge,
+      description: "Lock any journal entry to earn this badge.",
+    },
+    {
+      key: "freeform",
+      image: FreeformBadge,
+      description: "Write your first freeform journal to unlock this badge.",
+    },
+    {
+      key: "guided",
+      image: GuidedBadge,
+      description: "Complete your first guided journal to earn this badge.",
+    },
+    {
+      key: "quick",
+      image: QuickBadge,
+      description: "Write a quick freeform journal entry to get this badge.",
+    },
+    {
+      key: "prompt_wanderer",
+      image: PromptWandererBadge,
+      description: "Explore all prompt types in guided journaling to unlock this badge.",
+    },
+    {
+      key: "emotion_explorer",
+      image: EmotionExplorerBadge,
+      description: "Trigger detection of 5 or more emotions in a single entry to earn this badge.",
+    },
+    {
+      key: "mood_shifter",
+      image: MoodShifterBadge,
+      description: "Experience both positive and negative emotions in the same week to unlock this badge.",
+    },
+    {
+      key: "let_it_out",
+      image: LetItOutBadge,
+      description: "Express strong emotions like anger or frustration in your journal to earn this badge.",
+    },
+    {
+      key: "image_storyteller",
+      image: ImageStorytellerBadge,
+      description: "Add an image and tell a story around it to unlock this badge.",
+    },
+  ];
+  
+  // Example from backend
+  
   useEffect(() => {
     const initializeProfile = async () => {
       try {
@@ -499,6 +565,27 @@ const ProfileScreen = () => {
     toggleDarkMode();
   };
 
+  useEffect(() => {
+    
+    const loadEarnedBadges = async () => {
+      if (!token || !userId) {
+        console.warn("Token or user ID not available");
+        return;
+      }
+  
+      try {
+        const earnedBadges = await fetchEarnedBadges(token, userId);
+        setEarnedBadges(earnedBadges);
+      } catch (error) {
+        console.error("Error fetching earned badges:", error);
+        Alert.alert("Error", "Could not load earned badges.");
+      }
+    };
+  
+    loadEarnedBadges();
+  }, [token, userId]);
+  
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundColor }]}>
@@ -584,7 +671,31 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      
+      <View style={[styles.badgesSection, { borderBottomWidth: 1 }]}>
+        <Text style={[styles.badgesTitle, { color: theme.text }]}>Badges</Text>
+        <View style={styles.badgesRow}>
+          {badgeData.map((badge, idx) => (
+           <TouchableOpacity
+           key={idx}
+           style={styles.badgeItem}
+           onPress={() => {
+             setSelectedBadge(idx);
+             setBadgeModalVisible(true);
+           }}
+         >
+           <Image
+             source={badge.image}
+             style={[
+               styles.badgeImage,
+               !earnedBadges.includes(badge.key) && { opacity: 0.3 }
+             ]}
+           />
+         </TouchableOpacity>
+         
+         
+          ))}
+        </View>
+      </View>
         
         <TouchableOpacity 
           style={styles.deleteButton} 
@@ -642,6 +753,40 @@ const ProfileScreen = () => {
             >
               <Text style={[styles.modalCancelText, { color: theme.primary }]}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={badgeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBadgeModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.7)",
+          justifyContent: "center",
+          alignItems: "center"
+        }}>
+          <View style={{
+            backgroundColor: theme.cardBackground,
+            padding: 24,
+            borderRadius: 16,
+            alignItems: "center",
+            maxWidth: "80%"
+          }}>
+            {selectedBadge !== null && (
+              <>
+                <Image source={badgeData[selectedBadge].image} style={{ width: 80, height: 80, marginBottom: 16 }} />
+                <Text style={{ color: theme.text, fontSize: 16, textAlign: "center", marginBottom: 16 }}>
+                  {badgeData[selectedBadge].description}
+                </Text>
+                <TouchableOpacity onPress={() => setBadgeModalVisible(false)}>
+                  <Text style={{ color: theme.primary, fontWeight: "bold", fontSize: 16 }}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -742,6 +887,11 @@ const styles = StyleSheet.create({
     marginLeft: 10, 
     flex: 1
   },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 75, 
+  },  
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -883,6 +1033,39 @@ const styles = StyleSheet.create({
   editButton: {
     marginLeft: 10,
     padding: 5,
+  },
+  badgesSection: {
+    padding: 15,
+    borderBottomWidth: 1,
+  },
+  badgesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  badgeLocked: {
+    tintColor: 'gray',
+  }
+  
+,  
+  badgeItem: {
+    width: 80,
+    alignItems: 'center',
+    marginVertical: 10,
+    marginHorizontal: 5,
+  },
+  badgeImage: {
+    width: 70,
+    height: 70,
+    margin: 10,
+  },
+  badgeLabel: {
+    fontSize: 14,
   },
 });
 

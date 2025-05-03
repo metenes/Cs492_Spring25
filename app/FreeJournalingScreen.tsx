@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import BadgeCongratsModal from './BadgeCongratsModal';
+
 import * as ImagePicker from "expo-image-picker";
 import { MediaType } from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
@@ -23,7 +25,7 @@ import { useTheme } from './context/ThemeContext';
 
 import { saveJournalEntry, saveDraft, getDraft, clearDraft, uploadJournalImage, deleteJournalImage } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { awardBadge } from "./services/ApiService";
 type RootStackParamList = {
   FreeJournaling: { selectedDate?: string };  //undefined;
   Home: undefined;
@@ -45,7 +47,9 @@ const FreeJournalingScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
-
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+  
   const navigation = useNavigation<NavigationProp>();
 
   const route = useRoute<RouteProps>();
@@ -187,7 +191,23 @@ const FreeJournalingScreen = () => {
 
     return () => clearTimeout(timeoutId);
   }, [content, imageUris]);
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
 
+  // Load earned badges when screen mounts
+  useEffect(() => {
+    const loadBadges = async () => {
+      const stored = await AsyncStorage.getItem("earnedBadges");
+      if (stored) {
+        try {
+          setEarnedBadges(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse earnedBadges", e);
+        }
+      }
+    };
+    loadBadges();
+  }, []);
+  
   const handleSaveEntry = async () => {
     // Step 1: Prevent saving if entry content is empty
     if (!content.trim()) {
@@ -216,8 +236,23 @@ const FreeJournalingScreen = () => {
       }
   
       console.log('✅ Journal entry saved successfully');
+      const token = await AsyncStorage.getItem("userToken");
+      const userId = await AsyncStorage.getItem("userId");
+
+      if (token && userId && !earnedBadges.includes("freeform")) {
+        const success = await awardBadge(token, userId, "freeform");
+      
+        if (success) {
+          const updated = [...earnedBadges, "freeform"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🎉 Freeform badge awarded and saved.");
+          setAwardedBadgeKey("freeform");
+          setShowBadgeModal(true); // 🟢 Show the congrats modal
+        }
+      }
+      
       await clearDraft();
-      Alert.alert("Success", "Journal entry saved successfully!");
       navigation.navigate("Home");
     } catch (error) {
       console.error("❌ Error in handleSaveEntry:", error);
@@ -249,6 +284,13 @@ const FreeJournalingScreen = () => {
   }
 
   return (
+    <View style={{ flex: 1 }}>
+      <BadgeCongratsModal
+  visible={showBadgeModal}
+  badgeKey={awardedBadgeKey}
+  onClose={() => setShowBadgeModal(false)}
+/>
+
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={{ flex: 1, backgroundColor: theme.backgroundColor}}>
          <View style={{ flex: 1, padding: 20 }}>
@@ -501,7 +543,9 @@ const FreeJournalingScreen = () => {
             <BottomNavigation activeScreen="FreeJournaling" />
           </View>
         </View>
+        
   </TouchableWithoutFeedback>
+  </View>
   );
 };
 

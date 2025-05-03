@@ -14,6 +14,9 @@ import Icon from "react-native-vector-icons/Feather";
 import { ScrollView } from "react-native";
 // import {setToken } from "./auth/AuthContext"
 import { RootStackParamList } from "./types/types";
+import { awardBadge } from "./services/ApiService";
+import BadgeCongratsModal from "./BadgeCongratsModal";
+
 import { StackNavigationProp } from "@react-navigation/stack";
 import { saveCheckIn, getCheckInDraft, saveCheckInDraft, clearCheckInDraft } from "./services/ApiService"; // Import the API functions
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -50,10 +53,27 @@ const CheckInScreen = () => {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+  
   const [userId, setUserId] = useState(""); 
   const [token, setToken] = useState("");
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
 
+  useEffect(() => {
+    const loadBadges = async () => {
+      const stored = await AsyncStorage.getItem("earnedBadges");
+      if (stored) {
+        try {
+          setEarnedBadges(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse earnedBadges", e);
+        }
+      }
+    };
+    loadBadges();
+  }, []);
+  
   const toggleSelection = (item : any, state: any, setState: any) => {
     setState((prev : any) =>
       prev.includes(item)
@@ -130,44 +150,50 @@ const CheckInScreen = () => {
   // Function to handle the check-in submission
   const handlesaveCheckIn = async () => {
     const token = await AsyncStorage.getItem('userToken');
-    console.log("🔹 retrive token to fetch profile:", token);
-      if (token ) {
-        console.log("🔹 Using token to fetch profile:", token);
-        setToken(token);
-          
-        if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
-          Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
-          return;
+    const storedUserId = await AsyncStorage.getItem('userId');
+  
+    if (!token || !storedUserId) {
+      console.error("🔴 Token or userId missing");
+      Alert.alert("Error", "User not authenticated.");
+      return;
+    }
+  
+    setToken(token);
+    setUserId(storedUserId);
+  
+    if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
+      Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
+      return;
+    }
+  
+    setIsSubmitting(true);
+    try {
+      const comments = comment.trim() ? [comment] : [];
+      const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
+  
+      await clearCheckInDraft();
+      navigation.navigate("Home")
+  
+      // Award badge correctly
+      if (!earnedBadges.includes("quick")) {
+        const success = await awardBadge(token, storedUserId, "quick");
+        if (success) {
+          const updated = [...earnedBadges, "quick"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          setAwardedBadgeKey("quick");
+          setShowBadgeModal(true);
+          console.log("🎉 Quick check-in badge awarded.");
         }
-
-        setIsSubmitting(true);
-        try {
-          // Prepare comments array if comment is provided
-          const comments = comment.trim() ? [comment] : [];
-          
-          // Call the API to submit the check-in
-          const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
-          
-          // Clear the saved draft after successful submission
-          await clearCheckInDraft();
-          
-          // Show success message
-          Alert.alert(
-            "Check-in Submitted", 
-            "Your check-in has been successfully recorded.",
-            [{ text: "OK", onPress: () => navigation.navigate("Home") }]
-          );
-        } catch (error) {
-          console.error("Failed to submit check-in:", error);
-          Alert.alert(
-            "Submission Failed", 
-            "There was a problem submitting your check-in. Please try again."
-          );
-        } finally {
-          setIsSubmitting(false);
-        }
+      }
+    } catch (error) {
+      console.error("Failed to submit check-in:", error);
+      Alert.alert("Submission Failed", "There was a problem submitting your check-in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+  
 
   // Render loading state
   if (isLoading) {
@@ -180,8 +206,14 @@ const CheckInScreen = () => {
   }
 
   return (
+
     <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-      {/* Clear Draft Icon */}
+         
+         <BadgeCongratsModal
+      visible={showBadgeModal}
+      badgeKey={awardedBadgeKey}
+      onClose={() => setShowBadgeModal(false)}
+    />
       {(selectedEmotions.length > 0 || selectedReasons.length > 0 || comment.trim()) && (
         <TouchableOpacity
           style={{
