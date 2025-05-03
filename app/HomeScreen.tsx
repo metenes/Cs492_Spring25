@@ -9,12 +9,13 @@ import BottomNavigation from './BottomNavigation';
 import { ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from './context/ThemeContext';
+import { awardBadge } from "./services/ApiService";
+import BadgeCongratsModal from "./BadgeCongratsModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Searchbar } from 'react-native-paper';  // Search bar 
 import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin} from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
-
 export type Entry = {
   _id: string;
   entryContent: string;
@@ -38,6 +39,8 @@ const commonEmotions = [
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
 const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) => {
+  
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   const { theme, darkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,7 +66,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [verifyPinModalVisible, setVerifyPinModalVisible] = useState(false);
   const [removePinModalVisible, setRemovePinModalVisible] = useState(false);
   const [pinOptionsModalVisible, setPinOptionsModalVisible] = useState(false);
-
+  useEffect(() => {
+    const loadBadges = async () => {
+      const earned = await AsyncStorage.getItem("earnedBadges");
+      const parsedBadges = earned ? JSON.parse(earned) : [];
+      setEarnedBadges(parsedBadges);
+    };
+  
+    loadBadges();
+  }, []);
   // Pick a random quote
   const [randomQuote] = useState(() => {
     const quotes = [
@@ -106,6 +117,9 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   // Search Bar
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [badgeCongratsModalVisible, setBadgeCongratsModalVisible] = useState(false);
+const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   // Map UI filter names to your backend category values
@@ -151,6 +165,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     // Reapply filters with new search query
     applyFilter(activeFilter); 
   };
+
   
   // Toggle emotion selection
   const toggleEmotion = (emotion: string) => {
@@ -421,8 +436,22 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       setPin('');
       setConfirmPin('');
       setSelectedEntry(null);
-
-      Alert.alert("Success", "Journal is now PIN protected.");
+      // Award LockedBadge if not already earned
+if (!earnedBadges.includes("locked_journal")) {
+  const token = await AsyncStorage.getItem("userToken");
+  const userId = await AsyncStorage.getItem("userId");
+  if (token) {
+    const success = await awardBadge( token, userId,"locked_journal",);
+    if (success) {
+      const updatedBadges = [...earnedBadges, "locked_journal"];
+      await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+      setEarnedBadges(updatedBadges);
+      setAwardedBadgeKey("locked_journal");
+      setBadgeCongratsModalVisible(true);
+    }
+    
+  }
+}
     } catch (error) {
       console.error("Error setting PIN:", error);
       Alert.alert("Error", "Failed to set PIN. Please try again.");
@@ -1025,6 +1054,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </View>
         </View>
       </Modal>
+      <BadgeCongratsModal
+  visible={badgeCongratsModalVisible}
+  badgeKey={awardedBadgeKey}
+  onClose={() => setBadgeCongratsModalVisible(false)}
+/>
 
       <View style={{ backgroundColor: theme.backgroundColor }}>
         <BottomNavigation activeScreen="Home" darkMode={darkMode} />
