@@ -806,6 +806,31 @@ export const registerUser = async (email: string, password: string, dob: string)
   }
 };
 
+// onboard user
+export const getOnboardingStatus = async (token: string) => {
+  const response = await fetch(`${API_URL}/user/onboarding`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  console.log("DID WE GET TO ONBOARD AT ALLLL")
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch onboarding status");
+  }
+  return response.json();
+};
+
+export const completeOnboarding = async (token: string) => {
+  await fetch(`${API_URL}/user/onboarding`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {

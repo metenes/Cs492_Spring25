@@ -14,6 +14,9 @@ import { Searchbar } from 'react-native-paper';  // Search bar
 import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin} from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
+import { getOnboardingStatus, completeOnboarding } from './services/ApiService';
+import OnboardingWizard from './OnboardingWizard';
+
 
 export type Entry = {
   _id: string;
@@ -43,6 +46,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [skip, setSkip] = useState(0); // for pagination
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
 
   // Animation state for the floating menu
   const [isMenuOpen, setMenuOpen] = useState(false);
@@ -257,6 +264,12 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       if (token) {
         console.log("🔹 Found Token:", token);
         storeToken(token);
+
+        const status = await getOnboardingStatus(token);
+        console.log("Onboarding status:", status); // ⬅️ Add this log
+        if (!status.hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
       }
     };
     checkStoredToken();
@@ -579,6 +592,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={async () => {
+            const token = await AsyncStorage.getItem("userToken");
+            if (token) await completeOnboarding(token);
+            setShowOnboarding(false);
+          }}
+        />
+      )}
       <SafeAreaView
         style={[
           styles.container,
