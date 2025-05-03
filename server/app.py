@@ -13,7 +13,7 @@ from controller.activities_controller import activities_bp
 from controller.journal_controller import journal_bp
 from controller.chat_controller import chat_bp, model_bp
 from controller.check_in_controller import check_bp
-from controller.notification_controller import notification_bp, send_journal_reminders
+from controller.notification_controller import notification_bp, send_journal_reminders, send_analysis_notifications
 
 # importing the database and mail configurations
 from utils.mail_config import mail
@@ -80,6 +80,15 @@ scheduler.add_job(
      trigger='cron',
      hour=19,
      minute=30
+)
+
+# send weekly analysis notifications at 9:15 PM
+scheduler.add_job(
+     id='weekly_analysis_job',
+     func=send_analysis_notifications,
+     trigger='cron',
+     hour=21,
+     minute=15
 )
 
 if __name__ == "__main__":
