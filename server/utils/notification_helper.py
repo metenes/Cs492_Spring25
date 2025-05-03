@@ -46,7 +46,6 @@ def get_all_user_push_tokens():
             user_id = str(entry["user_id"])
             user_token_map[user_id] = entry
 
-        print(f"User Token Map: {user_token_map}")
         return user_token_map
     except Exception as e:
         print(f"❌ Error in get_all_user_push_tokens: {e}")
@@ -121,6 +120,36 @@ def has_written_journal_today(user_id):
         return False
     
 
+def has_seven_day_journal_streak(user_id, today, required_dates):
+    try:
+        if not user_id:
+            return False
+
+        user_object_id = ObjectId(user_id)
+        journal_doc = journal_entries_collection.find_one({"_id": user_object_id})
+        if not journal_doc or "journalEntries" not in journal_doc:
+            return False
+
+        dates_written = set()
+        for entry in journal_doc["journalEntries"]:
+            entry_date = entry.get("entryDate")
+
+            if isinstance(entry_date, str):
+                try:
+                    entry_date = datetime.fromisoformat(entry_date.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+            if isinstance(entry_date, datetime):
+                dates_written.add(entry_date.date())
+
+        # print(f"Required dates: {required_dates}, Dates written: {dates_written}")
+        return required_dates.issubset(dates_written)
+
+    except Exception as e:
+        print(f"Error checking 7-day journal streak for user {user_id}: {e}")
+        return False
+
+
 def should_send_reminder(user_doc):
 
     frequency = user_doc.get("reminder_notification_frequency", "daily")
@@ -146,5 +175,26 @@ def should_send_reminder(user_doc):
         if not last_sent_date:
             return {"result": True, "push_message": "Don't forget to write your journal for this week!"}
         return {"result": ((today - last_sent_date).days >= 7), "push_message": "Don't forget to write your journal for this week!"}
+
+    return {"result": False, "push_message": ""}
+
+
+def should_send_analysis_notification(user_doc):
+    last_sent = user_doc.get("last_analysis_notification_date", None)
+    last_sent_date = None
+    today = datetime.utcnow().date()
+    required_dates = { today - timedelta(days=i) for i in range(7) }
+
+    if last_sent:
+        if isinstance(last_sent, str):
+            last_sent = datetime.fromisoformat(last_sent)
+        last_sent_date = last_sent.date()
+
+    has_written_seven_days = has_seven_day_journal_streak(user_doc["user_id"], today, required_dates) # streak count for past 7 days
+    if has_written_seven_days:
+        # check if the last sent date is None or more than 7 days ago
+        if not last_sent_date:
+            return {"result": True, "push_message": "Your 7-day journal streak is complete! Check your analysis!"}
+        return {"result": ((today - last_sent_date).days >= 7), "push_message": "Your 7-day journal streak is complete! Check your analysis!"}
 
     return {"result": False, "push_message": ""}

@@ -400,6 +400,70 @@ def get_user_profile(user_id):
     
     return jsonify(user), 200
 
+
+@user_bp.route('/<user_id>/badges', methods=['POST'])
+@jwt_required()
+def add_user_badge(user_id):
+    try:
+        # Get current user from JWT
+        current_user_id = get_jwt_identity()
+
+        if str(current_user_id) != str(user_id):
+            return jsonify({"error": "Unauthorized access"}), 403
+
+        # Parse badge key from request body
+        data = request.get_json()
+        badge_key = data.get("badge")
+
+        if not badge_key:
+            return jsonify({"error": "Badge key is required"}), 400
+
+        # Find user
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Add badge if not already present
+        if badge_key not in user.get("earned_badges", []):
+            users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$push": {"earned_badges": badge_key}}
+            )
+
+        return jsonify({"message": f"Badge '{badge_key}' added successfully."}), 200
+
+    except Exception as e:
+        print(f"Error adding badge: {e}")
+        return jsonify({"error": "Failed to add badge"}), 500
+
+# ---------------------------------------
+#  **User Badges**
+# ---------------------------------------
+@user_bp.route('/<user_id>/badges', methods=['GET'])
+@jwt_required()
+def get_user_badges(user_id):
+    try:
+        # Get current user's ID from JWT token
+        current_user_id = get_jwt_identity()
+        
+        # Verify the requesting user is accessing their own badges
+        if str(current_user_id) != str(user_id):
+            return jsonify({"error": "Unauthorized access"}), 403
+
+        # Find user in database
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Get earned badges from user document
+        earned_badges = user.get("earned_badges", [])
+        
+        return jsonify({"earnedBadges": earned_badges}), 200
+
+    except Exception as e:
+        print(f"Error fetching user badges: {e}")
+        return jsonify({"error": "Failed to fetch badges"}), 500
+
 # Update user profile
 @user_bp.route('/<user_id>/update-user', methods=['PUT'])
 @jwt_required()
