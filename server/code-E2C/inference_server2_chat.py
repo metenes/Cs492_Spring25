@@ -1,72 +1,73 @@
 # ========================= inference_server2_chat.py (on EC2) =========================
 from flask import Flask, request, jsonify
 from botocore.exceptions import ClientError
-# LLM 
+# LLM
 import traceback
 import os, json, torch, boto3, traceback
 import numpy as np
 from transformers import (
     BertTokenizer, BertForSequenceClassification,
-    AutoTokenizer, AutoModelForCausalLM, pipeline
+    AutoTokenizer, AutoModelForCausalLM, pipeline,
+    AutoModelForSeq2SeqLM
 )
 from botocore.exceptions import ClientError
 # Best THERSHOLDS
-EMOTION_THRESHOLDS = {  "admiration": 0.5636809468269348, 
-                        "amusement": 0.455887109041214, 
-                        "anger": 0.5269321203231812, 
-                        "annoyance": 0.36041176319122314, 
-                        "approval": 0.38077831268310547, 
-                        "caring": 0.3923538029193878, 
-                        "confusion": 0.45215746760368347, 
-                        "curiosity": 0.4687836766242981, 
-                        "desire": 0.6101184487342834, 
-                        "disappointment": 0.4222204387187958, 
-                        "disapproval": 0.3825962245464325, 
-                        "disgust": 0.535349428653717, 
-                        "embarrassment": 0.48492151498794556, 
-                        "excitement": 0.38570845127105713, 
-                        "fear": 0.32441622018814087, 
-                        "gratitude": 0.660706639289856, 
-                        "grief": 0.39133381843566895, 
-                        "joy": 0.44913506507873535, 
-                        "love": 0.39080554246902466, 
-                        "nervousness": 0.570563793182373, 
-                        "optimism": 0.5039885640144348, 
-                        "pride": 0.5252490639686584, 
-                        "realization": 0.4292587637901306, 
-                        "relief": 0.4243277311325073, 
+EMOTION_THRESHOLDS = {  "admiration": 0.5636809468269348,
+                        "amusement": 0.455887109041214,
+                        "anger": 0.5269321203231812,
+                        "annoyance": 0.36041176319122314,
+                        "approval": 0.38077831268310547,
+                        "caring": 0.3923538029193878,
+                        "confusion": 0.45215746760368347,
+                        "curiosity": 0.4687836766242981,
+                        "desire": 0.6101184487342834,
+                        "disappointment": 0.4222204387187958,
+                        "disapproval": 0.3825962245464325,
+                        "disgust": 0.535349428653717,
+                        "embarrassment": 0.48492151498794556,
+                        "excitement": 0.38570845127105713,
+                        "fear": 0.32441622018814087,
+                        "gratitude": 0.660706639289856,
+                        "grief": 0.39133381843566895,
+                        "joy": 0.44913506507873535,
+                        "love": 0.39080554246902466,
+                        "nervousness": 0.570563793182373,
+                        "optimism": 0.5039885640144348,
+                        "pride": 0.5252490639686584,
+                        "realization": 0.4292587637901306,
+                        "relief": 0.4243277311325073,
                         "remorse": 0.4213601350784302,
-                        "sadness": 0.43017059564590454, 
-                        "surprise": 0.35856375098228455, 
+                        "sadness": 0.43017059564590454,
+                        "surprise": 0.35856375098228455,
                         "neutral": 0.37793856859207153  }
 
-EMOTIONS = ["admiration", 
-            "amusement", 
-            "anger", 
-            "annoyance", 
-            "approval", 
-            "caring", 
-            "confusion", 
-            "curiosity", 
-            "desire", 
-            "disappointment", 
-            "disapproval", 
-            "disgust", 
-            "embarrassment", 
-            "excitement", 
-            "fear", 
-            "gratitude", 
-            "grief", 
-            "joy", 
-            "love", 
-            "nervousness", 
-            "optimism", 
-            "pride", 
-            "realization", 
-            "relief", 
+EMOTIONS = ["admiration",
+            "amusement",
+            "anger",
+            "annoyance",
+            "approval",
+            "caring",
+            "confusion",
+            "curiosity",
+            "desire",
+            "disappointment",
+            "disapproval",
+            "disgust",
+            "embarrassment",
+            "excitement",
+            "fear",
+            "gratitude",
+            "grief",
+            "joy",
+            "love",
+            "nervousness",
+            "optimism",
+            "pride",
+            "realization",
+            "relief",
             "remorse",
-            "sadness", 
-            "surprise", 
+            "sadness",
+            "surprise",
             "neutral" ]
 
 app = Flask(__name__)
@@ -78,12 +79,60 @@ s3 = boto3.client("s3")
 
 # Tokenizers & Models
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-chat_tokenizer = AutoTokenizer.from_pretrained("tiiuae/falcon-rw-1b", trust_remote_code=True)
-chat_model = AutoModelForCausalLM.from_pretrained("tiiuae/falcon-rw-1b", trust_remote_code=True)
-chat_pipeline = pipeline("text-generation", model=chat_model, tokenizer=chat_tokenizer, device=0 if torch.cuda.is_available() else -1)
+# chat_tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small", trust_remote_code=True)
+# chat_model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-small", trust_remote_code=True)
 
+# print("Loading DialoGPT model...")
+# chat_tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
+# chat_model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-small")
+# chat_pipeline = pipeline("text-generation", model=chat_model, tokenizer=chat_tokenizer, device=0 if torch.cuda.is_available() else -1)
+
+# Initialize the chat model
+print("Loading GODEL model...")
+device = 0 if torch.cuda.is_available() else -1
+
+# Using GODEL model for better dialogue capabilities
+chat_tokenizer = AutoTokenizer.from_pretrained("microsoft/GODEL-v1_1-large-seq2seq")
+# chat_model = AutoModelForCausalLM.from_pretrained("microsoft/GODEL-v1_1-large-seq2seq")
+chat_model = AutoModelForSeq2SeqLM.from_pretrained("microsoft/GODEL-v1_1-large-seq2seq")
 # Model caching
 last_user_id, cached_model = None, None
+
+def generate_response(user_message, emotion_context):
+    """Generate response using GODEL with proper formatting for mental health support"""
+    # Format instruction for GODEL (knowledge grounded open-domain dialogue)
+    print("Generate response using GODEL with proper formatting for mental health support")
+    instruction = "Respond helpfully, kind, detailed and long as a supportive mental health assistant. Give a moti "
+    knowledge = "The user appears to be feeling: {} ".format(emotion_context)
+    # GODEL expects input in this format
+    prompt = "Instruction: {}\nKnowledge: {}\nDialogue:\nHuman: {}\nAssistant:".format(instruction, knowledge, user_message)       
+    print(prompt)
+    # Tokenize input
+    inputs = chat_tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+    # Move inputs to GPU if available
+    if torch.cuda.is_available():
+        inputs = {k: v.to("cuda") for k, v in inputs.items()}
+    # Generate response
+    output_ids = chat_model.generate(
+        inputs["input_ids"],
+        attention_mask=inputs["attention_mask"],
+        max_length=512,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        num_return_sequences=1,
+       # pad_token_id=chat_tokenizer.eos_token_id
+    )
+    # Decode the response
+    response = chat_tokenizer.decode(output_ids[0], skip_special_tokens=True)
+    # Extract only the assistant's response
+    if "Assistant:" in response:
+        response = response.split("Assistant:")[-1].strip()
+    else:
+        response = response.strip()
+    print(response)
+    return response
+
 
 @app.route("/analyze", methods=["POST"])
 def analyze_sentiment():
@@ -92,14 +141,20 @@ def analyze_sentiment():
     try:
         data = request.get_json()
         user_id = data.get("user_id")
-        message = data.get("message")
+        raw_message = data.get("message").strip()
         chat_id = data.get("chat_id")
-
+        lines = raw_message.split("\n")
+        message = ""
+        for line in reversed(lines):
+            if line.startswith("User:"):
+               message  = line.replace("User:", "").strip()
+               break
+        if not message :
+          message  = raw_message
         print("message reviced to Predict : {}".format(message))
         if not user_id or not message:
             return jsonify({"error": "user_id and message required"}), 400
-        
-        # Model properties 
+        # Model properties
         model_key = "models/{}/model.pt".format(user_id)
         local_path = "/tmp/{}_model.pt".format(user_id)
 
@@ -125,7 +180,7 @@ def analyze_sentiment():
             else:
                 model = cached_model
         except Exception as e:
-            print(f"Error loading model: {str(e)}")
+            print("Error loading model: {}".format(str(e)))
             return jsonify({"error": "Model loading failed"}), 500
 
         print("Model fetch done\nStart generating response")
@@ -192,17 +247,28 @@ def analyze_sentiment():
         emotion_labels = ", ".join([e["label"] for e in top_emotions]) or "neutral"
 
         # --- Chat Generation Prompt ---
-        prompt = (
-            f"You are a caring and helpful mental health assistant.\n"
-            f"User: {message}\n"
-            f"Emotional context: {emotion_labels}.\n"
-            f"Reply supportively and empathetically:"
-        )
+        # prompt = ("You are a caring and helpful mental health assistant.\nUser: {}\nEmotional context: {}.\nReply supportively and empathetically:".format(message , emotion_labels) )
+        # print("\nprompt {}\n\n".format(prompt))
+        # chat_output = chat_pipeline(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)[0]['generated_text']
+        # chat_reply = chat_output.split("Reply supportively and empathetically:")[-1].strip()
 
-        chat_output = chat_pipeline(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)[0]['generated_text']
-        chat_reply = chat_output.split("Reply supportively and empathetically:")[-1].strip()
-        
-        print(f"✅ Detected emotions: {emotions}")
+        # Generate response using DialoGPT
+        # chat_reply = generate_response(prompt)
+        chat_reply = generate_response(message, emotion_labels)
+        # If response is empty, provide a fallback response
+        if not chat_reply.strip():
+            if emotion_labels == "neutral":
+                chat_reply = f"Hi there! I'm here to listen and support you. How can I help you today?"
+            else:
+                chat_reply = f"I can sense you might be feeling {emotion_labels}. I'm here for you. How can I best support you right now?"
+
+        # Full output for debugging
+        prompt = "User: {}\nEmotional context: {}".format(message, emotion_labels)
+        chat_output = "{}\nAssistant: {}".format(prompt, chat_reply)
+
+        print("✅ Detected emotions: {}".format(emotions))
+        print("✅ Chat reply: {}".format(chat_reply))
+        print("✅ Chat output: {}".format(chat_output))
 
         return jsonify({
             "user_id": user_id,
@@ -210,11 +276,11 @@ def analyze_sentiment():
             "message": message,
             "emotion_probabilities": emotions,
             "top_emotions": emotions[:3], # or any top-N you prefer
-            "chat_response": chat_reply
+            "chat_response": chat_reply,
+            "chat_output": chat_output
         })
-    
     except Exception as e:
-        print(f"❌ Error in sentiment analysis: {str(e)}")
+        print("❌ Error in sentiment analysis: {}".format(str(e)))
         traceback.print_exc()
         return jsonify({"error": "Failed to analyze sentiment"}), 500
 

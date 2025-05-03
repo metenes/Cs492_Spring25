@@ -10,7 +10,7 @@ import { ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from './context/ThemeContext';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
+import { Searchbar } from 'react-native-paper';  // Search bar 
 import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin} from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
@@ -26,6 +26,14 @@ export type Entry = {
   prompt: string;
   lockCode?: string;
 };
+
+const commonEmotions = [
+  "admiration", "amusement", "anger", "annoyance", "approval", "caring",
+  "confusion", "curiosity", "desire", "disappointment", "disapproval", "disgust",
+  "embarrassment", "excitement", "fear", "gratitude", "grief", "joy", "love",
+  "nervousness", "optimism", "pride", "realization", "relief", "remorse",
+  "sadness", "surprise", "neutral"
+]
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -95,6 +103,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
   const [shouldLoadData, setShouldLoadData] = useState(true);
+  // Search Bar
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   // Map UI filter names to your backend category values
   const filterMap: { [key: string]: string } = {
@@ -103,17 +115,52 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     "guided": "guided"
   };
 
-  // Apply filter function
+  // Enhanced filter function
   const applyFilter = (filter: string) => {
     setActiveFilter(filter);
-
-    if (filter === "all") {
-      setFilteredEntries(entries);
-      return;
+    let filtered = entries;
+    
+    // Apply category filter
+    if (filter !== "all") {
+      filtered = filtered.filter(entry => entry.category === filterMap[filter]);
     }
-
-    const filtered = entries.filter(entry => entry.category === filterMap[filter]);
+    
+    // Apply search filter if there's a search query
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(entry => 
+        entry.entryContent?.toLowerCase().includes(query) || 
+        entry.prompt?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply emotion filters if any are selected
+    if (selectedEmotions.length > 0) {
+      filtered = filtered.filter(entry =>
+        entry.journalSentiments?.some(sentiment => 
+          selectedEmotions.includes(sentiment.emotion?.toLowerCase())
+        )
+      );
+    }
     setFilteredEntries(filtered);
+  };
+
+  // Update search query handler
+  const onChangeSearch = (query: string) => {
+    setSearchQuery(query);
+    // Reapply filters with new search query
+    applyFilter(activeFilter); 
+  };
+  
+  // Toggle emotion selection
+  const toggleEmotion = (emotion: string) => {
+    if (selectedEmotions.includes(emotion)) {
+      setSelectedEmotions(selectedEmotions.filter(e => e !== emotion));
+    } else {
+      setSelectedEmotions([...selectedEmotions, emotion]);
+    }
+    // Reapply filters after toggling emotion
+    applyFilter(activeFilter);
   };
 
   const loadData = useCallback(async () => {
@@ -133,7 +180,20 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       if (Array.isArray(checkInResponse.history)) {
         fetchedCheckIns = checkInResponse.history;
       }
-
+    /*
+        for entry in entries:
+            result.append({
+                "entry_id": str(entry["_id"]),
+                "user_id": str(entry["userId"]),
+                "created_at": entry["timestamp"].isoformat(),
+                "type": "checkin",
+                "date": entry["timestamp"].strftime("%Y-%m-%d"),
+                "sentiments": entry.get("sentiments", []),
+                "causes": entry.get("causes", []),
+                "comments": entry.get("comments", []),
+                "lockCode": entry.get("lockCode", "") # for locking logic
+            })
+    */
       const formattedCheckIns = fetchedCheckIns.map((checkIn: {
         date: string;
         causes: never[];
@@ -141,8 +201,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         comments: string | any[];
         created_at: any;
         sentiments: any;
+        lockCode : string; 
       }) => ({
-
         _id: checkIn.entry_id,
         entryContent: checkIn.comments.length > 0 ? checkIn.comments[0] : "No comments",
         entryDate: checkIn.date || new Date().toISOString(),
@@ -152,7 +212,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         sentiments: checkIn.sentiments || [],
         causes: checkIn.causes || [],
         comments: checkIn.comments || [],
-        prompt: ""
+        prompt: "",
+        lockCode : checkIn.lockCode || ""
       }));
 
       let allEntries = [...fetchedEntries, ...formattedCheckIns];
@@ -540,6 +601,52 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             </Text>
           </TouchableOpacity>
         </View>
+        {/* Search Bar */}
+        <Searchbar
+          placeholder="Search journals..."
+          onChangeText={onChangeSearch}
+          value={searchQuery}
+          style={[styles.searchBar, { backgroundColor: theme.inputBackground }]}
+          inputStyle={{ color: theme.text }}
+          iconColor={theme.icon}
+          placeholderTextColor={theme.textSecondary}
+          clearIcon={() => searchQuery ? <Icon name="x" size={20} color={theme.icon} /> : null}
+          right={() => (
+            <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
+              <Icon name="sliders" size={20} color={theme.icon} />
+            </TouchableOpacity>
+          )}
+        />
+
+        {/* Advanced Filters (Collapsible) */}
+        {showFilters && (
+          <View style={[styles.advancedFilters, { backgroundColor: theme.cardBackground }]}>            
+            {/* Emotions Filter */}
+            <Text style={[styles.filterHeader, { color: theme.text }]}>Filter by emotions:</Text>
+            <View style={styles.emotionsContainer}>
+              {commonEmotions.map(emotion => (
+                <TouchableOpacity 
+                  key={emotion}
+                  style={[
+                    styles.emotionChip,
+                    selectedEmotions.includes(emotion) && 
+                      { backgroundColor: theme.primary + '30', borderColor: theme.primary }
+                  ]}
+                  onPress={() => toggleEmotion(emotion)}
+                >
+                  <Text 
+                    style={[
+                      styles.emotionText, 
+                      { color: selectedEmotions.includes(emotion) ? theme.primary : theme.text }
+                    ]}
+                  >
+                    {emotion}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}>
           <ScrollView
@@ -551,6 +658,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             {renderTab("Check-ins", "checkin", activeFilter === "checkin")}
             {renderTab("Freeform Journals", "freeform", activeFilter === "freeform")}
             {renderTab("Guided Journals", "guided", activeFilter === "guided")}
+
           </ScrollView>
         </View>
 
@@ -1123,7 +1231,50 @@ const styles = StyleSheet.create({
   buttonText: {
     fontWeight: "600",
     fontSize: 16
-  }
+  },
+  searchBar: { // Search bar
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 10,
+    elevation: 0,
+  },
+  advancedFilters: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 10,
+  },
+  filterHeader: {
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  emotionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  emotionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  emotionText: {
+    fontSize: 12,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  filterText: {
+    marginLeft: 8,
+  },
 });
 
 export default HomeScreen;

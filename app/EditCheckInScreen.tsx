@@ -8,7 +8,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navig
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Feather } from "@expo/vector-icons";
 import { RootStackParamList } from "./types/types";
-import { deleteJournalEntry, editJournalEntry, editCheckIn, deleteCheckIn } from "./services/ApiService"; // ✅ Import both delete & update functions
+import { deleteJournalEntry, editJournalEntry, editCheckIn, deleteCheckIn } from "./services/ApiService"; //  Import both delete & update functions
 import { format } from "date-fns";
 import { uploadJournalImage, deleteJournalImage, updateCheckIn, getCheckInHistory, updateJournalEntry} from "./services/ApiService";
 import * as ImagePicker from 'expo-image-picker';

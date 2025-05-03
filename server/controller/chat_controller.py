@@ -66,7 +66,7 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "16.16.217.210" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
+E2C_IP = "51.21.246.174" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
 
 # Define the emotion labels - Local 
 emotion_labels = [
@@ -364,6 +364,18 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
     print(response.status_code)
     print(json.dumps(response.json(), indent=2))
     """
+    """ 
+    Expected retunrn form AWS Server
+        return jsonify({
+            "user_id": user_id,
+            "input_text": message,
+            "message": message,
+            "emotion_probabilities": emotions,
+            "top_emotions": emotions[:3], # or any top-N you prefer
+            "chat_response": chat_reply,
+            "chat_output": chat_output
+        })
+    """
     """Invoke the user's personalized model from S3, with chat_id/context support."""
 
     context = context or {}  # Ensure context is not None
@@ -389,6 +401,7 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
         
         # Mode will be CLOUD based model - Server
         if(mode=="ec2") :
+            
             try:
                 import aiohttp
                 prompt = await process_chat_for_inference(user_id, message, context)
@@ -411,6 +424,7 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
                             result = await resp.json()
                             emotions = ", ".join(result.get("predicted_emotions", []))
                             chat = result.get("chat_response", "NAN")
+
                         else:
                             raise Exception(f"EC2 returned status {resp.status}")
                         

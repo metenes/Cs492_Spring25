@@ -253,9 +253,8 @@ def update_lock_code(entry_id):
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
-        new_lock_code = data.get("lockCode")
+        lock_code = data.get("lockCode")
         print(user_id)
-        check_in = None
         check_in = check_in_collection.find_one({"_id": ObjectId(entry_id), "userId": user_id})
         print("user id", user_id)
 
@@ -263,14 +262,13 @@ def update_lock_code(entry_id):
         if not check_in:
             return jsonify({"error": "User not found"}), 404
         
-        lock_code = check_in.get("lockCode")
         # if lock_code is empty or None, remove the existing lock code
         if not lock_code:
             print("NOT LOCK_CODE")
 
             result = check_in_collection.update_one(
                 {"_id": ObjectId(entry_id), "userId": user_id},
-                {"$set": {"lockCode": new_lock_code}}
+                {"$unset": {"lockCode": ""}}
             )
             if result.modified_count == 0:
                 return jsonify({"error": "Failed to remove lock code"}), 500
@@ -278,17 +276,13 @@ def update_lock_code(entry_id):
                 
         else:
             print(" LOCK_CODE")
-            if(lock_code == new_lock_code): 
-                result = check_in_collection.update_one(
+            result = check_in_collection.update_one(
                     {"_id": ObjectId(entry_id), "userId": user_id},
-                    {"$unset": {"lockCode": ""}}
-                )
-                if result.modified_count == 0:
-                    return jsonify({"error": "Failed to create lock code"}), 500
-            
-                return jsonify({"message": "Lock code created successfully"}), 200
-            else: 
-                return jsonify({"error": "Wrong lock code"}), 500
+                    {"$set": {"lockCode": lock_code}}
+            )
+            if result.modified_count == 0:
+                return jsonify({"error": "Failed to create lock code"}), 500
+            return jsonify({"message": "Lock code created successfully"}), 200
 
     except Exception as e:
         print(f"❌ Error updating lock code: {str(e)}")
