@@ -264,6 +264,33 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
           }
         }
       }
+
+      if (!earnedBadges.includes("prompt_wanderer")) {
+
+        const guidedEntries = allEntries.filter(entry => entry.category === "guided");
+
+        const uniquePrompts = new Set();
+        guidedEntries.forEach(entry => {
+          if (entry.category === 'guided' && entry.prompt) {
+            uniquePrompts.add(entry.prompt);
+          }
+        });
+        
+        if (uniquePrompts.size === 6) {
+
+          const userId = await AsyncStorage.getItem("userId");
+          if (userId) {
+            const success = await awardBadge(token, userId, "prompt_wanderer");
+            if (success) {
+              const updatedBadges = [...earnedBadges, "prompt_wanderer"];
+              await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+              setEarnedBadges(updatedBadges);
+              setAwardedBadgeKey("prompt_wanderer");
+              setBadgeCongratsModalVisible(true);
+            }
+          }
+        } 
+      }
       
       // Reset loading flags
       setIsLoadingMore(false);

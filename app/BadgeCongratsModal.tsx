@@ -57,7 +57,7 @@ const badgeData = [
   {
     key: "emotion_explorer",
     image: EmotionExplorerBadge,
-    description: "You uncovered 5+ emotions in one entry. Impressive insight!",
+    description: "You uncovered 3+ emotions in one entry. Impressive insight!",
   },
   {
     key: "mood_shifter",

@@ -148,6 +148,40 @@ const GuidedJournalingScreen = () => {
         }
       }
 
+      if (!earnedBadges.includes("let_it_out") && token && userId) {
+        if(response.entry.journalSentiments){
+          for (const sentiment of response.entry.journalSentiments) {
+            // 2 = Anger, 10 = disapproval, 11 = disgust, 16 = grief, 25 = sadness
+            if ([2, 10, 11, 16, 25].includes(sentiment.emotion)) {
+
+              const success = await awardBadge(token, userId, "let_it_out");
+              if (success) {
+                const updated = [...earnedBadges, "let_it_out"];
+                setEarnedBadges(updated);
+                await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+                setAwardedBadgeKey("let_it_out");
+                setShowBadgeModal(true);
+              }
+
+              break;
+            }
+          }
+        }
+      }
+
+      if (!earnedBadges.includes("emotion_explorer") && token && userId) {
+        if(response.entry.journalSentiments && response.entry.journalSentiments.length >= 3){
+          const success = await awardBadge(token, userId, "emotion_explorer");
+          if (success) {
+            const updated = [...earnedBadges, "emotion_explorer"];
+            setEarnedBadges(updated);
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+            setAwardedBadgeKey("emotion_explorer");
+            setShowBadgeModal(true);
+          }
+        }
+      }
+
       await clearDraft();
       navigation.navigate("Home");
     } catch (error) {
