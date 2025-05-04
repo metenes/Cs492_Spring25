@@ -219,7 +219,7 @@ const CheckInScreen = () => {
 
 // Early Bird: Between 4 AM and 8 AM
 if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8) {
-  const success = await awardBadge(token, userId, "early_bird");
+  const success = await awardBadge(token, storedUserId, "early_bird");
   if (success) {
     const updated = [...earnedBadges, "early_bird"];
     setEarnedBadges(updated);
@@ -232,7 +232,7 @@ if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8) {
 
 // Night Owl: Between 11 PM and 2 AM
 if (!earnedBadges.includes("night_owl") && (entryHour >= 23 || entryHour < 2)) {
-  const success = await awardBadge(token, userId, "night_owl");
+  const success = await awardBadge(token, storedUserId, "night_owl");
   if (success) {
     const updated = [...earnedBadges, "night_owl"];
     setEarnedBadges(updated);
