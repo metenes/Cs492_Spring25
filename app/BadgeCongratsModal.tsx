@@ -62,8 +62,9 @@ const badgeData = [
   {
     key: "mood_shifter",
     image: MoodShifterBadge,
-    description: "You experienced a range of emotions this week. That’s real growth!",
+    description: "In one journal entry, you captured both highs and lows—embracing the full spectrum of your emotions!",
   },
+  
   {
     key: "let_it_out",
     image: LetItOutBadge,

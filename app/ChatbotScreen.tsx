@@ -416,6 +416,11 @@ const ChatbotScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? theme.backgroundColor : "#f9f9fb" }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+      >
       <View style={[styles.header, { 
         backgroundColor: darkMode ? theme.cardBackground : "#fff",
         borderBottomColor: darkMode ? '#333' : '#eaecef'
@@ -529,7 +534,7 @@ const ChatbotScreen = () => {
           )}
         </View>
       </View>
-      
+      </KeyboardAvoidingView>
       <BottomNavigation activeScreen={"FreeJournaling"} />
     </SafeAreaView>
   );
