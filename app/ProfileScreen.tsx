@@ -107,8 +107,8 @@ const ProfileScreen = () => {
     {
       key: "mood_shifter",
       image: MoodShifterBadge,
-      description: "Experience both positive and negative emotions in the same week to unlock this badge.",
-    },
+      description: "Unlock this badge by expressing both positive and negative emotions in the same journal entry.",
+    },    
     {
       key: "let_it_out",
       image: LetItOutBadge,

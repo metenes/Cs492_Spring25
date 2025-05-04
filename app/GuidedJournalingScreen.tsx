@@ -181,7 +181,46 @@ const GuidedJournalingScreen = () => {
           }
         }
       }
-
+      if (!earnedBadges.includes("mood_shifter")) {
+        const sentiments = response.entry.journalSentiments as { emotion: number; percentage: number }[] | undefined;
+        if (Array.isArray(sentiments)) {
+          const codeToName = [
+            "admiration","amusement","anger","annoyance","approval","caring",
+            "confusion","curiosity","desire","disappointment","disapproval","disgust",
+            "embarrassment","excitement","fear","gratitude","grief","joy","love",
+            "nervousness","optimism","pride","realization","relief","remorse",
+            "sadness","surprise","neutral"
+          ];
+          const positiveSet = new Set([
+            "admiration","amusement","approval","caring","curiosity","desire",
+            "excitement","gratitude","joy","love","optimism","pride","realization","relief"
+          ]);
+          const negativeSet = new Set([
+            "anger","annoyance","confusion","disappointment","disapproval","disgust",
+            "embarrassment","fear","grief","nervousness","remorse","sadness"
+          ]);
+  
+          let hasPos = false, hasNeg = false;
+          for (const s of sentiments) {
+            const name = codeToName[s.emotion] ?? "";
+            if (positiveSet.has(name)) hasPos = true;
+            if (negativeSet.has(name)) hasNeg = true;
+            if (hasPos && hasNeg) break;
+          }
+  
+          if (hasPos && hasNeg) {
+            const ok = await awardBadge(token, userId, "mood_shifter");
+            if (ok) {
+              const updated = [...earnedBadges, "mood_shifter"];
+              setEarnedBadges(updated);
+              await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+              console.log("🔄 Mood Shifter badge awarded!");
+              setAwardedBadgeKey("mood_shifter");
+              setShowBadgeModal(true);
+            }
+          }
+        }
+      }
       await clearDraft();
       navigation.navigate("Home");
     } catch (error) {
