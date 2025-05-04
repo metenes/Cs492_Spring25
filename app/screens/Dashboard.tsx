@@ -453,13 +453,13 @@ const SentimentAnalysisPage: React.FC = () => {
           )}
 
           {Object.keys(emotionCauseLinks).length > 0 && (
-            <View style={styles.causeContainer}>
-              <Text style={styles.causeTitle}>🔍 Possible Causes</Text>
+            <View style={[styles.causeContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#F3E8FF' }]}>
+              <Text style={[styles.causeTitle, { color: darkMode ? theme.text : '#9C6B00' }]}>🔍 Possible Causes</Text>
               {Object.entries(emotionCauseLinks).map(([emotion, causes]: any) => (
                 <View key={emotion} style={{ marginBottom: 5 }}>
-                  <Text style={styles.causeText}>{emotion.toUpperCase()}</Text>
+                  <Text style={[styles.causeText, { color: darkMode ? theme.textSecondary : '#5E3A87' }]}>{emotion.toUpperCase()}</Text>
                   {causes.map((item: any, index: number) => (
-                    <Text style={styles.causeText} key={index}>• {item.cause}</Text>
+                    <Text style={[styles.causeText, { color: darkMode ? theme.textSecondary : '#5E3A87' }]} key={index}>• {item.cause}</Text>
                   ))}
                 </View>
               ))}
