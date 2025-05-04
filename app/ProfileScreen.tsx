@@ -102,7 +102,7 @@ const ProfileScreen = () => {
     {
       key: "emotion_explorer",
       image: EmotionExplorerBadge,
-      description: "Trigger detection of 5 or more emotions in a single entry to earn this badge.",
+      description: "Trigger detection of 3 or more emotions in a single entry to earn this badge.",
     },
     {
       key: "mood_shifter",

@@ -303,7 +303,6 @@ const FreeJournalingScreen = () => {
                 const updated = [...earnedBadges, "let_it_out"];
                 setEarnedBadges(updated);
                 await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
-                console.log("😡 Let it out badge awarded!");
                 setAwardedBadgeKey("let_it_out");
                 setShowBadgeModal(true);
               }
@@ -313,10 +312,22 @@ const FreeJournalingScreen = () => {
           }
         }
       }
-      
-      
-      await clearDraft();
-      navigation.navigate("Home");
+
+      if (!earnedBadges.includes("emotion_explorer") && token && userId) {
+        if(response.entry.journalSentiments && response.entry.journalSentiments.length >= 3){
+          const success = await awardBadge(token, userId, "emotion_explorer");
+          if (success) {
+            const updated = [...earnedBadges, "emotion_explorer"];
+            setEarnedBadges(updated);
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+            setAwardedBadgeKey("emotion_explorer");
+            setShowBadgeModal(true);
+          }
+        }
+      }
+
+        await clearDraft();
+        navigation.navigate("Home");
     } catch (error) {
       console.error("❌ Error in handleSaveEntry:", error);
       Alert.alert("Error", "An error occurred while saving the journal entry.");
