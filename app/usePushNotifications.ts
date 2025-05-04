@@ -87,7 +87,6 @@ export const usePushNotifications = (): PushNotificationState => {
         }
         else {
             console.log("Must use physical device for Push Notifications");
-            alert("Must use physical device for Push Notifications");
             return;
         }
     }

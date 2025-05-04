@@ -16,12 +16,6 @@ import { RootStackParamList } from "./types/types"; // Import route types
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Keychain from 'react-native-keychain';
 
-// Google (Meta, X etc.. same  way add if ) and Apfel register
-import * as AuthSession from 'expo-auth-session';
-import * as Google from "expo-auth-session/providers/google";
-import * as Apple from "expo-apple-authentication";
-import * as Facebook from "expo-auth-session/providers/facebook";
-
 // Get screen width & height dynamically
 const { width, height } = Dimensions.get("window");
 
