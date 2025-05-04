@@ -278,7 +278,22 @@ const FreeJournalingScreen = () => {
           setShowBadgeModal(true);
         }
       }
-
+      if (
+        imageUris.length > 0 && 
+        !earnedBadges.includes("image_storyteller") &&
+        token && userId
+      ) {
+        const success = await awardBadge(token, userId, "image_storyteller");
+        if (success) {
+          const updated = [...earnedBadges, "image_storyteller"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("📷 Image Storyteller badge awarded!");
+          setAwardedBadgeKey("image_storyteller");
+          setShowBadgeModal(true);
+        }
+      }
+      
       
       await clearDraft();
       navigation.navigate("Home");
