@@ -117,7 +117,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
 
-  // Filtering state
   const [activeFilter, setActiveFilter] = useState("all");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
@@ -203,20 +202,7 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
       if (Array.isArray(checkInResponse.history)) {
         fetchedCheckIns = checkInResponse.history;
       }
-    /*
-        for entry in entries:
-            result.append({
-                "entry_id": str(entry["_id"]),
-                "user_id": str(entry["userId"]),
-                "created_at": entry["timestamp"].isoformat(),
-                "type": "checkin",
-                "date": entry["timestamp"].strftime("%Y-%m-%d"),
-                "sentiments": entry.get("sentiments", []),
-                "causes": entry.get("causes", []),
-                "comments": entry.get("comments", []),
-                "lockCode": entry.get("lockCode", "") # for locking logic
-            })
-    */
+    
       const formattedCheckIns = fetchedCheckIns.map((checkIn: {
         date: string;
         causes: never[];
@@ -262,7 +248,20 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
       const dates = await fetchJournalDates(token, limit, skip);
       const calculatedStreak = calculateStreak(dates);
       setStreak(calculatedStreak);
-
+      if (calculatedStreak == 365 && !earnedBadges.includes("one_year")) {
+        const userId = await AsyncStorage.getItem("userId");
+        if (userId) {
+          const success = await awardBadge(token, userId, "one_year");
+          if (success) {
+            const updatedBadges = [...earnedBadges, "one_year"];
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+            setEarnedBadges(updatedBadges);
+            setAwardedBadgeKey("one_year");
+            setBadgeCongratsModalVisible(true);
+          }
+        }
+      }
+      
       // Reset loading flags
       setIsLoadingMore(false);
       setShouldLoadData(false);
@@ -454,7 +453,7 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 if (!earnedBadges.includes("locked_journal")) {
   const token = await AsyncStorage.getItem("userToken");
   const userId = await AsyncStorage.getItem("userId");
-  if (token) {
+  if (token && userId) {
     const success = await awardBadge( token, userId,"locked_journal",);
     if (success) {
       const updatedBadges = [...earnedBadges, "locked_journal"];
