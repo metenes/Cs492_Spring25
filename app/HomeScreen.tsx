@@ -159,7 +159,10 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
     if (selectedEmotions.length > 0) {
       filtered = filtered.filter(entry =>
         entry.journalSentiments?.some(sentiment => 
-          selectedEmotions.includes(sentiment.emotion?.toLowerCase())
+          //selectedEmotions.includes(sentiment.emotion?.toLowerCase())
+          typeof sentiment.emotion === 'string' &&
+            selectedEmotions.includes(sentiment.emotion.toLowerCase()) 
+
         )
       );
     }
@@ -664,7 +667,7 @@ if (!earnedBadges.includes("locked_journal")) {
           clearIcon={() => searchQuery ? <Icon name="x" size={20} color={theme.icon} /> : null}
           right={() => (
             <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-              <Icon name="sliders" size={20} color={theme.icon} />
+              <Icon name="sliders" size={20} color={theme.icon} style={[styles.sliderIcon]} />
             </TouchableOpacity>
           )}
         />
@@ -699,7 +702,7 @@ if (!earnedBadges.includes("locked_journal")) {
           </View>
         )}
 
-        <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}>
+        <View style={[styles.tabWrapper, { borderColor: darkMode ? "#111" : "#fff" }]}>{/* <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}> */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1294,16 +1297,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 0,
   },
+  sliderIcon: {
+    marginRight: 10,
+    //paddingRight: 20,
+  },
   advancedFilters: {
     marginHorizontal: 16,
     marginBottom: 8,
-    padding: 12,
+    padding: 40,
     borderRadius: 10,
   },
   filterHeader: {
     fontWeight: '600',
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 20,
   },
   emotionsContainer: {
     flexDirection: 'row',
@@ -1319,7 +1326,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   emotionText: {
-    fontSize: 12,
+    fontSize: 13,
   },
   filterOption: {
     flexDirection: 'row',
