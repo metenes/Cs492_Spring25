@@ -36,7 +36,9 @@ import EmotionExplorerBadge from './badges/emotion_explorer.png';
 import MoodShifterBadge from './badges/mood_shifter.png';
 import LetItOutBadge from './badges/Let_itout.png';
 import ImageStorytellerBadge from './badges/image_stroyteller.png';
-
+import NightOwl from './badges/night_owl.png';
+import EarlyBird from './badges/early_bird.png';
+import OneYear from './badges/one_year.png';
 declare module '*.png';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, "Login">;
@@ -72,15 +74,11 @@ const ProfileScreen = () => {
 
   const badgeData = [
     {
-      key: "locked_journal",
-      image: LockedJournalBadge,
-      description: "Lock any journal entry to earn this badge.",
-    },
-    {
       key: "freeform",
       image: FreeformBadge,
       description: "Write your first freeform journal to unlock this badge.",
     },
+    
     {
       key: "guided",
       image: GuidedBadge,
@@ -90,6 +88,11 @@ const ProfileScreen = () => {
       key: "quick",
       image: QuickBadge,
       description: "Write a quick freeform journal entry to get this badge.",
+    },
+    {
+      key: "locked_journal",
+      image: LockedJournalBadge,
+      description: "Lock any journal entry to earn this badge.",
     },
     {
       key: "prompt_wanderer",
@@ -116,7 +119,23 @@ const ProfileScreen = () => {
       image: ImageStorytellerBadge,
       description: "Add an image and tell a story around it to unlock this badge.",
     },
+    {
+      key: "early_bird",
+      image: EarlyBird,
+      description: "Write a journal entry between 4:00 AM and 8:00 AM to earn this badge.",
+    },
+    {
+      key: "night_owl",
+      image: NightOwl,
+      description: "Write a journal entry between 11:00 PM and 2:00 AM to unlock this badge.",
+    },
+    {
+      key: "one_year",
+      image: OneYear,
+      description: "Keep journaling consistently for 365 days to earn this milestone badge.",
+    }
   ];
+  
   
   // Example from backend
   

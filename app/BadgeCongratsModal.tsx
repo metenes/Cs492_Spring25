@@ -19,7 +19,9 @@ import EmotionExplorerBadge from './badges/emotion_explorer.png';
 import MoodShifterBadge from './badges/mood_shifter.png';
 import LetItOutBadge from './badges/Let_itout.png';
 import ImageStorytellerBadge from './badges/image_stroyteller.png';
-
+import NightOwl from './badges/night_owl.png';
+import EarlyBird from './badges/early_bird.png';
+import OneYear from './badges/one_year.png';
 interface BadgeCongratsModalProps {
   visible: boolean;
   badgeKey: string | null;
@@ -27,52 +29,68 @@ interface BadgeCongratsModalProps {
 }
 
 const badgeData = [
-    {
-      key: "locked_journal",
-      image: LockedJournalBadge,
-      description: "You locked a journal entry. Your privacy matters!",
-    },
-    {
-      key: "freeform",
-      image: FreeformBadge,
-      description: "You wrote your first freeform journal. Well done!",
-    },
-    {
-      key: "guided",
-      image: GuidedBadge,
-      description: "You completed your first guided journal. Great job!",
-    },
-    {
-      key: "quick",
-      image: QuickBadge,
-      description: "You jotted down a quick journal entry. Way to go!",
-    },
-    {
-      key: "prompt_wanderer",
-      image: PromptWandererBadge,
-      description: "You explored all prompt types. What a curious mind!",
-    },
-    {
-      key: "emotion_explorer",
-      image: EmotionExplorerBadge,
-      description: "You uncovered 5+ emotions in one entry. Impressive insight!",
-    },
-    {
-      key: "mood_shifter",
-      image: MoodShifterBadge,
-      description: "You experienced a range of emotions this week. That’s real growth!",
-    },
-    {
-      key: "let_it_out",
-      image: LetItOutBadge,
-      description: "You let out strong emotions. That took courage!",
-    },
-    {
-      key: "image_storyteller",
-      image: ImageStorytellerBadge,
-      description: "You added images to tell a story. A picture is worth a thousand words!",
-    },
-  ];
+  {
+    key: "locked_journal",
+    image: LockedJournalBadge,
+    description: "You locked a journal entry. Your privacy matters!",
+  },
+  {
+    key: "freeform",
+    image: FreeformBadge,
+    description: "You wrote your first freeform journal. Well done!",
+  },
+  {
+    key: "guided",
+    image: GuidedBadge,
+    description: "You completed your first guided journal. Great job!",
+  },
+  {
+    key: "quick",
+    image: QuickBadge,
+    description: "You jotted down a quick journal entry. Way to go!",
+  },
+  {
+    key: "prompt_wanderer",
+    image: PromptWandererBadge,
+    description: "You explored all prompt types. What a curious mind!",
+  },
+  {
+    key: "emotion_explorer",
+    image: EmotionExplorerBadge,
+    description: "You uncovered 5+ emotions in one entry. Impressive insight!",
+  },
+  {
+    key: "mood_shifter",
+    image: MoodShifterBadge,
+    description: "You experienced a range of emotions this week. That’s real growth!",
+  },
+  {
+    key: "let_it_out",
+    image: LetItOutBadge,
+    description: "You let out strong emotions. That took courage!",
+  },
+  {
+    key: "image_storyteller",
+    image: ImageStorytellerBadge,
+    description: "You added images to tell a story. A picture is worth a thousand words!",
+  },
+  {
+    key: "night_owl",
+    image: NightOwl,
+    description: "You journaled late at night. Burning the midnight oil!",
+  },
+  {
+    key: "early_bird",
+    image: EarlyBird,
+    description: "You journaled early in the morning. What a fresh start!",
+  },
+  {
+    key: "one_year",
+    image: OneYear,
+    description: "You kept journaling for a full year. What a powerful habit!",
+  }
+];
+
   
 
 const BadgeCongratsModal: React.FC<BadgeCongratsModalProps> = ({ visible, badgeKey, onClose }) => {

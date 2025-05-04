@@ -45,6 +45,7 @@ const reasons = [
 ];
 
 const CheckInScreen = () => {
+  const [entryDate, setEntryDate] = useState(new Date().toISOString());
   const navigation = useNavigation<CheckInNavigationProp>();
   const { theme, darkMode } = useTheme();
   const [step, setStep] = useState(1);
@@ -186,6 +187,34 @@ const CheckInScreen = () => {
           console.log("🎉 Quick check-in badge awarded.");
         }
       }
+      const entryHour = new Date(entryDate).getHours();
+
+// Early Bird: Between 4 AM and 8 AM
+if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8) {
+  const success = await awardBadge(token, userId, "early_bird");
+  if (success) {
+    const updated = [...earnedBadges, "early_bird"];
+    setEarnedBadges(updated);
+    await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+    console.log("🌅 Early Bird badge awarded!");
+    setAwardedBadgeKey("early_bird");
+    setShowBadgeModal(true);
+  }
+}
+
+// Night Owl: Between 11 PM and 2 AM
+if (!earnedBadges.includes("night_owl") && (entryHour >= 23 || entryHour < 2)) {
+  const success = await awardBadge(token, userId, "night_owl");
+  if (success) {
+    const updated = [...earnedBadges, "night_owl"];
+    setEarnedBadges(updated);
+    await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+    console.log("🌙 Night Owl badge awarded!");
+    setAwardedBadgeKey("night_owl");
+    setShowBadgeModal(true);
+  }
+}
+
     } catch (error) {
       console.error("Failed to submit check-in:", error);
       Alert.alert("Submission Failed", "There was a problem submitting your check-in. Please try again.");

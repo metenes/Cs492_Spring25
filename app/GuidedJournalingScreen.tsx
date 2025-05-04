@@ -24,6 +24,7 @@ const MAX_CHAR_COUNT = 10000;
 
 const GuidedJournalingScreen = () => {
   const [content, setContent] = useState("");
+  const [entryDate, setEntryDate] = useState(new Date().toISOString());
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,7 +121,33 @@ const GuidedJournalingScreen = () => {
           setShowBadgeModal(true);
         }
       }
-  
+      const entryHour = new Date(entryDate).getHours();
+      // Early Bird: Between 4 AM and 8 AM
+      if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8 && token && userId) {
+        const success = await awardBadge(token, userId, "early_bird");
+        if (success) {
+          const updated = [...earnedBadges, "early_bird"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🌅 Early Bird badge awarded!");
+          setAwardedBadgeKey("early_bird");
+          setShowBadgeModal(true);
+        }
+      }
+
+      // Night Owl: Between 11 PM and 2 AM
+      if (!earnedBadges.includes("night_owl") && (entryHour >= 23 || entryHour < 2) && token && userId) {
+        const success = await awardBadge(token, userId, "night_owl");
+        if (success) {
+          const updated = [...earnedBadges, "night_owl"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🌙 Night Owl badge awarded!");
+          setAwardedBadgeKey("night_owl");
+          setShowBadgeModal(true);
+        }
+      }
+
       await clearDraft();
       navigation.navigate("Home");
     } catch (error) {
