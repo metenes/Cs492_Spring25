@@ -228,6 +228,7 @@ def register():
             "role": "user",               # user, admin
             "failed_login_attempts": 0,
             "lockout_until": None,
+            "hasSeenOnboarding": False,
 
         }
         users_collection.insert_one(new_user)
@@ -314,6 +315,30 @@ def login():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------
+#  **Onboarding**
+# ---------------------------------------
+@user_bp.route("/onboarding", methods=["GET", "PATCH"])
+@jwt_required()
+def onboarding_status():
+    user_id = get_jwt_identity()
+
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if request.method == "GET":
+        # Return the onboarding completion status
+        return jsonify({"hasSeenOnboarding": user.get("hasSeenOnboarding", False)}), 200
+
+    elif request.method == "PATCH":
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"hasSeenOnboarding": True}}
+        )
+        return jsonify({"message": "Onboarding marked as completed"}), 200
 
 
 # ---------------------------------------
