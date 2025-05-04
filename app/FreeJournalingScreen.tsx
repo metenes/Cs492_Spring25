@@ -54,12 +54,11 @@ const FreeJournalingScreen = () => {
 
   const route = useRoute<RouteProps>();
   const [entryDate, setEntryDate] = useState(new Date().toISOString());
-  console.log(entryDate)
 
   useEffect(() => {
     if (route.params?.selectedDate) {
       setEntryDate(route.params.selectedDate);
-      console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
+      //console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
     }
   }, [route.params]);
 
@@ -224,11 +223,9 @@ const FreeJournalingScreen = () => {
         signedUrl: imageUris[index]
       }));
   
-      console.log('📦 Prepared image data:', imageData);
+      //console.log('📦 Prepared image data:', imageData);
   
       const response = await saveJournalEntry(content, imageData, "freeform", undefined, entryDate);
-      console.log(entryDate);
-  
       if (response.error) {
         console.error('❌ Failed to save journal entry:', response.error);
         Alert.alert("Error", "Failed to save journal entry.");
@@ -293,6 +290,29 @@ const FreeJournalingScreen = () => {
           setShowBadgeModal(true);
         }
       }
+
+      // Let It Out: Check if analysis contains strong emotions
+      if (!earnedBadges.includes("let_it_out") && token && userId) {
+        if(response.entry.journalSentiments){
+          for (const sentiment of response.entry.journalSentiments) {
+            // 2 = Anger, 10 = disapproval, 11 = disgust, 16 = grief, 25 = sadness
+            if ([2, 10, 11, 16, 25].includes(sentiment.emotion)) {
+
+              const success = await awardBadge(token, userId, "let_it_out");
+              if (success) {
+                const updated = [...earnedBadges, "let_it_out"];
+                setEarnedBadges(updated);
+                await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+                console.log("😡 Let it out badge awarded!");
+                setAwardedBadgeKey("let_it_out");
+                setShowBadgeModal(true);
+              }
+
+              break;
+            }
+          }
+        }
+      }
       
       
       await clearDraft();
@@ -329,15 +349,14 @@ const FreeJournalingScreen = () => {
   return (
     <View style={{ flex: 1 }}>
       <BadgeCongratsModal
-  visible={showBadgeModal}
-  badgeKey={awardedBadgeKey}
-  onClose={() => setShowBadgeModal(false)}
-/>
+        visible={showBadgeModal}
+        badgeKey={awardedBadgeKey}
+        onClose={() => setShowBadgeModal(false)}
+      />
 
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={{ flex: 1, backgroundColor: theme.backgroundColor}}>
          <View style={{ flex: 1, padding: 20 }}>
-        {/* Journal Entry Section */}
         <View
           style={{
             flex: 2,
@@ -354,7 +373,6 @@ const FreeJournalingScreen = () => {
           }}
         >
 
-          {/* 🆕 Clear Entry Button - only shows if needed */}
           {(content.trim() || imageUris.length > 0) && (
             <TouchableOpacity
               style={{
@@ -401,7 +419,6 @@ const FreeJournalingScreen = () => {
             </TouchableOpacity>
           )}
 
-          {/* ✍️ Journal Text Input */}
           <TextInput
             style={{
               flex: 1,
@@ -422,8 +439,7 @@ const FreeJournalingScreen = () => {
             }}
             keyboardType="default"
             returnKeyType="done"
-          />
-          {/* ✅ Character Counter */}
+          />          
           <Text
             style={{
               textAlign: "right",
@@ -434,22 +450,19 @@ const FreeJournalingScreen = () => {
           >
             {content.length} / {MAX_CHAR_COUNT}
           </Text>
-
-          {/* Hard Limit Warning when close to max */}
+         
           {content.length >= MAX_CHAR_COUNT - 500 && content.length < MAX_CHAR_COUNT && (
             <Text style={{ color: "red", textAlign: "center", marginTop: 5 }}>
               ⚠️ You're writing a wonderful entry! Just a heads-up, you're nearing the character limit.
             </Text>
           )}
-
-          {/* Hard Limit Reached Message */}
+         
           {content.length >= MAX_CHAR_COUNT && (
             <Text style={{ color: "red", textAlign: "center", marginTop: 5, fontWeight: "bold" }}>
               🚫 That's an amazing entry! You've reached the limit, but you can always start a new one.
             </Text>
           )}
-        </View>
-        {/* Display Selected Images with Progress */}
+        </View>        
         {localImageUris.length > 0 && (
           <ScrollView horizontal style={{ marginTop: 10 }}>
             {localImageUris.map((uri, index) => (
@@ -486,17 +499,14 @@ const FreeJournalingScreen = () => {
               </View>
             ))}
           </ScrollView>
-        )}
-         {/* Image Picker Warning Message */}
+        )}         
          {imagePickerWarning ? (
   <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>
     {imagePickerWarning}
   </Text>
 ) : null}
-
-        {/* Button Container */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 40, }}>
-          {/* Upload Image Button */}
+        
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 40, }}>         
           <TouchableOpacity
             style={{
               backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -513,8 +523,7 @@ const FreeJournalingScreen = () => {
 </Text>
 
           </TouchableOpacity>
-
-          {/* Save Entry Button */}
+          
           <TouchableOpacity
             style={{
               backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -533,8 +542,7 @@ const FreeJournalingScreen = () => {
         </View>
 
        
-
-        {/* Image Fullscreen Modal */}
+        
         <Modal visible={!!selectedImage} transparent={true} animationType="fade">
           <View
             style={{
@@ -555,8 +563,7 @@ const FreeJournalingScreen = () => {
                 resizeMode="contain"
               />
             )}
-            <View style={{ flexDirection: "row", marginTop: 20 }}>
-              {/* Close Button */}
+            <View style={{ flexDirection: "row", marginTop: 20 }}>              
               <TouchableOpacity
                 style={{
                   backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -568,8 +575,7 @@ const FreeJournalingScreen = () => {
               >
                 <Text style={{ fontSize: 16, color: darkMode ? theme.text : '#000' }}>Close</Text>
               </TouchableOpacity>
-
-              {/* Delete Button */}
+              
               <TouchableOpacity
                 style={{
                   backgroundColor: "red",
@@ -584,7 +590,7 @@ const FreeJournalingScreen = () => {
           </View>
         </Modal>
 
-        </View> {/* closes the padding View */}
+        </View> 
           <View>
             <BottomNavigation activeScreen="FreeJournaling" />
           </View>

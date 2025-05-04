@@ -42,7 +42,6 @@ export const usePushNotifications = (): PushNotificationState => {
             }
             console.log("finalStatus", finalStatus);
             if (finalStatus !== "granted") {
-                alert("Failed to get push token for push notification!");
                 return;
             }
             console.log("finalStatus", finalStatus);
