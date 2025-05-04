@@ -248,7 +248,7 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
       const dates = await fetchJournalDates(token, limit, skip);
       const calculatedStreak = calculateStreak(dates);
       setStreak(calculatedStreak);
-      if (calculatedStreak == 365 && !earnedBadges.includes("one_year")) {
+      if (streak == 365 && !earnedBadges.includes("one_year")) {
         const userId = await AsyncStorage.getItem("userId");
         if (userId) {
           const success = await awardBadge(token, userId, "one_year");
