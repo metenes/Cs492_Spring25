@@ -3,6 +3,11 @@ import AppNavigation from "./AppNavigation";
 import { AuthProvider } from "./auth/AuthContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { usePushNotifications } from './usePushNotifications';
+
+import { LogBox } from 'react-native';
+
+// Ignore all log notifications
+LogBox.ignoreAllLogs(true);
 interface AppProps {
   hideSplashScreen: () => Promise<void>;
 }
