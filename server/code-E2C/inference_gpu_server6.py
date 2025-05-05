@@ -10,6 +10,7 @@ from transformers import (
 )
 import concurrent.futures
 from functools import lru_cache
+import gc # for cache clear 
 
 # Emotion threshold definitions
 EMOTION_THRESHOLDS = {
@@ -25,10 +26,10 @@ EMOTIONS = list(EMOTION_THRESHOLDS.keys())
 
 # App information that will be included in helper prompts
 APP_INFO = """
-    This app is a sentiment analysis assistant that helps users understand emotions in text.Our Sentiment-Aware Journaling Web App aims to support users in reflecting on their daily emotions and experiences through an innovative approach combining journaling and conversational AI. The. app includes two core sections: a freeform journal entry feature where users can document their
-    feelings and thoughts, and a chatbot interface that engages users in conversation about their day.
-    Both inputs are analyzed using natural language processing techniques to provide a detailed
-    sentiment summary of the day.
+    This app is a sentiment analysis assistant that helps users understand emotions in text.
+    Our Sentiment-Aware Journaling Web App aims to support users in reflecting on their daily emotions and experiences through an innovative approach combining journaling and conversational AI. 
+    The app includes two core sections: a freeform journal entry feature where users can document their feelings and thoughts, and a chatbot interface that engages users in conversation about their day.
+    Both inputs are analyzed using natural language processing techniques to provide a detailed sentiment summary of the day.
     The app helps users identify recurring emotions or patterns in their thoughts, alerting them to trends
     that may require attention, such as ongoing anxiety or positivity shifts. Additionally, after each daily
     log, the app offers personalized suggestions, such as relaxation exercises or motivational activities,
@@ -270,6 +271,12 @@ chat_model = AutoModelForCausalLM.from_pretrained(
 if chat_tokenizer.pad_token is None:
     chat_tokenizer.pad_token = chat_tokenizer.eos_token
 
+# Optimization: Cache clear
+def clear_gpu_memory():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
+        
 # Optimization: Cache for model downloads
 @lru_cache(maxsize=32)
 def get_model_path(user_id, model_type="model"):
@@ -330,6 +337,7 @@ def process_text_segments(segments, model):
     inputs = {k: v.to(device) for k, v in encoded_inputs.items()}
     
     # Get model predictions for all segments at once
+    # with torch.no_grad() and torch.cuda.amp.autocast():
     with torch.no_grad():
         outputs = model(**inputs)
         logits = outputs.logits
@@ -457,7 +465,8 @@ def compute_sentiment(user_id, text):
             truncation=True, 
             max_length=128
         ).to(device)
-
+        
+        # with torch.no_grad() and torch.cuda.amp.autocast():
         with torch.no_grad():
             outputs = model(**inputs)
             logits = outputs.logits
@@ -597,7 +606,8 @@ def analyze_sentiment():
         
         # Predict emotion with optimized processing
         inputs = tokenizer(message, return_tensors="pt", truncation=True, padding=True).to(device)
-
+        
+        # with torch.no_grad() and torch.cuda.amp.autocast():
         with torch.no_grad():
             outputs = model(**inputs)
             scores = torch.softmax(outputs.logits, dim=1).squeeze().cpu().numpy()
@@ -699,3 +709,17 @@ def validate_sentiment():
 # ----------------------------- Entry Point -----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, threaded=True)
+
+    """ 
+    # Preload models to warm up cache
+    print("Warming up model cache...")
+    dummy_text = "This is a test message to warm up the model."
+    compute_sentiment("default", dummy_text)
+    generate_prompt_response("Hello")
+    print("Model cache warmed up!")
+    
+    # Use production-ready server configuration
+    from waitress import serve
+    print("Starting server on port 8080...")
+    serve(app, host="0.0.0.0", port=8080, threads=8)
+    """
