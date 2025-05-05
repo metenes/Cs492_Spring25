@@ -40,6 +40,37 @@ const commonEmotions = [
   "sadness", "surprise", "neutral"
 ]
 
+const emotionMap: Record<number, string> = {
+  0: "admiration",
+  1: "amusement",
+  2: "anger",
+  3: "annoyance",
+  4: "approval",
+  5: "caring",
+  6: "confusion",
+  7: "curiosity",
+  8: "desire",
+  9: "disappointment",
+  10: "disapproval",
+  11: "disgust",
+  12: "embarrassment",
+  13: "excitement",
+  14: "fear",
+  15: "gratitude",
+  16: "grief",
+  17: "joy",
+  18: "love",
+  19: "nervousness",
+  20: "optimism",
+  21: "pride",
+  22: "realization",
+  23: "relief",
+  24: "remorse",
+  25: "sadness",
+  26: "surprise",
+  27: "neutral"
+};
+
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
 const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) => {
@@ -115,8 +146,6 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     return quotes[Math.floor(Math.random() * quotes.length)];
   });
 
-  // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
-
   const [activeFilter, setActiveFilter] = useState("all");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
@@ -125,7 +154,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [badgeCongratsModalVisible, setBadgeCongratsModalVisible] = useState(false);
-const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
@@ -138,9 +167,9 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 
   // Enhanced filter function
   const applyFilter = (filter: string) => {
+
     setActiveFilter(filter);
     let filtered = entries;
-    
     // Apply category filter
     if (filter !== "all") {
       filtered = filtered.filter(entry => entry.category === filterMap[filter]);
@@ -154,18 +183,20 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
         entry.prompt?.toLowerCase().includes(query)
       );
     }
-    
-    // Apply emotion filters if any are selected
-    if (selectedEmotions.length > 0) {
-      filtered = filtered.filter(entry =>
-        entry.journalSentiments?.some(sentiment => 
-          //selectedEmotions.includes(sentiment.emotion?.toLowerCase())
-          typeof sentiment.emotion === 'string' &&
-            selectedEmotions.includes(sentiment.emotion.toLowerCase()) 
 
-        )
-      );
+
+    if (selectedEmotions.length > 0) {
+      const selectedSet = new Set(selectedEmotions);
+      filtered = filtered.filter(entry => {
+        if (!entry.journalSentiments?.length) return false;
+
+        return entry.journalSentiments.some(sentiment => {
+          const emotionStr = emotionMap[sentiment.emotion];
+          return emotionStr && selectedSet.has(emotionStr);;
+        });
+      });
     }
+
     setFilteredEntries(filtered);
   };
 
@@ -248,10 +279,9 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 
       // Reapply the current filter
       if (activeFilter === "all") {
-        setFilteredEntries(allEntries);
+        applyFilter(activeFilter)
       } else {
-        const filtered = allEntries.filter(entry => entry.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
+        applyFilter(activeFilter)
       }
 
       // Load streak
@@ -316,7 +346,6 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
         storeToken(token);
 
         const status = await getOnboardingStatus(token);
-        console.log("Onboarding status:", status); // ⬅️ Add this log
         if (!status.hasSeenOnboarding) {
           setShowOnboarding(true);
         }
@@ -422,12 +451,7 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 
       setEntries(updatedEntries);
 
-      if (activeFilter === "all") {
-        setFilteredEntries(updatedEntries);
-      } else {
-        const filtered = updatedEntries.filter(e => e.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
-      }
+      applyFilter(activeFilter);
 
       setRemovePinModalVisible(false);
       setCurrentPin('');
@@ -472,12 +496,7 @@ const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
 
       setEntries(updatedEntries);
 
-      if (activeFilter === "all") {
-        setFilteredEntries(updatedEntries);
-      } else {
-        const filtered = updatedEntries.filter(entry => entry.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
-      }
+      applyFilter(activeFilter);
 
       // Close modal and reset state
       setPinModalVisible(false);
@@ -549,12 +568,7 @@ if (!earnedBadges.includes("locked_journal")) {
         if (activeFilter !== filterValue) {
           setActiveFilter(filterValue);
           // Refilter existing data rather than triggering a reload
-          if (filterValue === "all") {
-            setFilteredEntries(entries);
-          } else {
-            const filtered = entries.filter(entry => entry.category === filterMap[filterValue]);
-            setFilteredEntries(filtered);
-          }
+          applyFilter(filterValue);
         }
       }}
     >
