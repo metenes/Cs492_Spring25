@@ -27,13 +27,6 @@ const PaymentMethodHistoryScreen: React.FC<PaymentMethodHistoryScreenProps> = ({
   return (
     <>
       <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-        {/* Header */}
-        <TouchableOpacity 
-          onPress={() => navigation.navigate("PaymentMethodSettingScreen")} 
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color={theme.text} />
-        </TouchableOpacity>
         <Text style={[styles.headerText, { color: theme.text }]}>Payment History</Text>
         
         <ScrollView contentContainerStyle={styles.content}>
