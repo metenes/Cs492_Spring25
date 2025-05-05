@@ -22,13 +22,11 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
   return (
     <>
       <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-        {/* Header */}
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.navigate("Settings")} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerText, { color: theme.text }]}>Payment Options</Text>
         
-        {/* Add Payment Button */}
         <TouchableOpacity 
           style={[styles.addButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
           onPress={() => navigation.navigate("PaymentMethodAddScreen")}
@@ -37,7 +35,6 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
           <ArrowRight size={20} color="#fff" />
         </TouchableOpacity>
 
-        {/* Subscription Details */}
         <View style={[styles.card, { 
           backgroundColor: darkMode ? '#1a1a1a' : theme.backgroundColor,
           shadowColor: darkMode ? '#000' : '#000',
@@ -49,7 +46,6 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
             Your subscription will automatically renew on 01.01.2025. A fee of 29,99 TL will be charged.
           </Text>
 
-          {/* Payment Method */}
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Method of Payment</Text>
           <View style={styles.paymentMethod}>
             <Text style={[styles.paymentText, { color: theme.text }]}>MASTERCARD - 1234</Text>
@@ -58,7 +54,6 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
             </TouchableOpacity>
           </View>
 
-          {/* Navigation to Payment History */}
           <TouchableOpacity 
             style={[styles.viewHistoryButton, { backgroundColor: darkMode ? '#2d2d2d' : '#1a1a1a' }]} 
             onPress={() => navigation.navigate("PaymentMethodHistoryScreen")}

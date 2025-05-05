@@ -4,6 +4,8 @@ import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar, Platform } from "react-native";
 import { RootStackParamList } from "./types/types"; // Import the route types
 //import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
+import { useRef } from 'react';
+import { NavigationState, PartialState } from '@react-navigation/native';
 
 // Bottom Navigator
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -67,8 +69,12 @@ type RootTabParamList = {
   Settings: undefined;
 };
 
+const screenOrder = ['Login', 'Home', 'Dashboard', 'Profile', 'Settings'];
+
 const AppNavigation = () => {
   const { theme, darkMode } = useTheme();
+
+  const previousRouteNameRef = useRef<string | null>(null);
 
   return (
     <>
@@ -78,9 +84,27 @@ const AppNavigation = () => {
         translucent={true}
       />
       <NavigationContainer>
-        <Stack.Navigator 
-          initialRouteName="Login"
-          screenOptions={{
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={({ route }) => {
+          let animation: 'slide_from_right' | 'slide_from_left' | 'fade' = 'slide_from_right';
+
+          const current = route.name;
+          const previous = previousRouteNameRef.current;
+
+          // Only apply slide logic to nav screen transitions
+          if (previous && screenOrder.includes(current) && screenOrder.includes(previous)) {
+            const fromIndex = screenOrder.indexOf(previous);
+            const toIndex = screenOrder.indexOf(current);
+            animation = toIndex > fromIndex ? 'slide_from_right' : 'slide_from_left';
+          } else if (previous === 'Login' && current === 'Home') {
+            animation = 'slide_from_right'; // Login to Home
+          }
+
+          // Update previous route for next render
+          previousRouteNameRef.current = current;
+
+          return {
             headerStyle: {
               backgroundColor: theme.backgroundColor,
             },
@@ -91,22 +115,26 @@ const AppNavigation = () => {
             contentStyle: {
               backgroundColor: theme.backgroundColor,
             },
-            // Android specific
+            animation, 
+            gestureEnabled: true,
+            //headerShown: false,
             ...(Platform.OS === 'android' && {
               headerTransparent: true,
               headerBlurEffect: 'dark',
             }),
-          }}
-        >
+          };
+        }}
+      >
+
           <Stack.Screen 
             name="Login" 
             component={LoginScreen} 
-            options={{ headerShown: false }} 
+            options={{ headerShown: false, gestureEnabled: true, animation: 'slide_from_left', }} 
           />
           <Stack.Screen 
             name="Home" 
             component={HomeScreen} 
-            options={{ headerShown: false, gestureEnabled: true, animation: 'slide_from_left',  }}
+            options={{ headerShown: false,  }}//gestureEnabled: true, animation: 'slide_from_left', 
           />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />

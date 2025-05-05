@@ -14,6 +14,9 @@ import Icon from "react-native-vector-icons/Feather";
 import { ScrollView } from "react-native";
 // import {setToken } from "./auth/AuthContext"
 import { RootStackParamList } from "./types/types";
+import { awardBadge } from "./services/ApiService";
+import BadgeCongratsModal from "./BadgeCongratsModal";
+
 import { StackNavigationProp } from "@react-navigation/stack";
 import { saveCheckIn, getCheckInDraft, saveCheckInDraft, clearCheckInDraft } from "./services/ApiService"; // Import the API functions
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -42,6 +45,7 @@ const reasons = [
 ];
 
 const CheckInScreen = () => {
+  const [entryDate, setEntryDate] = useState(new Date().toISOString());
   const navigation = useNavigation<CheckInNavigationProp>();
   const { theme, darkMode } = useTheme();
   const [step, setStep] = useState(1);
@@ -50,10 +54,27 @@ const CheckInScreen = () => {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+  
   const [userId, setUserId] = useState(""); 
   const [token, setToken] = useState("");
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
 
+  useEffect(() => {
+    const loadBadges = async () => {
+      const stored = await AsyncStorage.getItem("earnedBadges");
+      if (stored) {
+        try {
+          setEarnedBadges(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse earnedBadges", e);
+        }
+      }
+    };
+    loadBadges();
+  }, []);
+  
   const toggleSelection = (item : any, state: any, setState: any) => {
     setState((prev : any) =>
       prev.includes(item)
@@ -130,44 +151,106 @@ const CheckInScreen = () => {
   // Function to handle the check-in submission
   const handlesaveCheckIn = async () => {
     const token = await AsyncStorage.getItem('userToken');
-    console.log("🔹 retrive token to fetch profile:", token);
-      if (token ) {
-        console.log("🔹 Using token to fetch profile:", token);
-        setToken(token);
-          
-        if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
-          Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
-          return;
+    const storedUserId = await AsyncStorage.getItem('userId');
+  
+    if (!token || !storedUserId) {
+      console.error("🔴 Token or userId missing");
+      Alert.alert("Error", "User not authenticated.");
+      return;
+    }
+  
+    setToken(token);
+    setUserId(storedUserId);
+  
+    if (selectedEmotions.length === 0 || selectedReasons.length === 0) {
+      Alert.alert("Missing Information", "Please select at least one emotion and one reason.");
+      return;
+    }
+  
+    setIsSubmitting(true);
+    try {
+      const comments = comment.trim() ? [comment] : [];
+      const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
+      if (!earnedBadges.includes("mood_shifter")) {
+        const positiveSet = new Set([
+          "Admiration","Amusement","Approval","Caring","Curiosity","Desire",
+          "Excitement","Gratitude","Joy","Love","Optimism","Pride","Realization","Relief"
+        ].map(e => e.toLowerCase()));
+        const negativeSet = new Set([
+          "Anger","Annoyance","Confusion","Disappointment","Disapproval","Disgust",
+          "Embarrassment","Fear","Grief","Nervousness","Remorse","Sadness"
+        ].map(e => e.toLowerCase()));
+  
+        const hasPositive = selectedEmotions
+          .map(e => e.toLowerCase())
+          .some(e => positiveSet.has(e));
+        const hasNegative = selectedEmotions
+          .map(e => e.toLowerCase())
+          .some(e => negativeSet.has(e));
+  
+        if (hasPositive && hasNegative) {
+          const ok = await awardBadge(token, storedUserId, "mood_shifter");
+          if (ok) {
+            const updated = [...earnedBadges, "mood_shifter"];
+            setEarnedBadges(updated);
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+            console.log("🔄 Mood Shifter badge awarded!");
+            setAwardedBadgeKey("mood_shifter");
+            setShowBadgeModal(true);
+          }
         }
+      }
+      await clearCheckInDraft();
+      navigation.navigate("Home")
+  
+      // Award badge correctly
+      if (!earnedBadges.includes("quick")) {
+        const success = await awardBadge(token, storedUserId, "quick");
+        if (success) {
+          const updated = [...earnedBadges, "quick"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          setAwardedBadgeKey("quick");
+          setShowBadgeModal(true);
+          console.log("🎉 Quick check-in badge awarded.");
+        }
+      }
+      const entryHour = new Date(entryDate).getHours();
 
-        setIsSubmitting(true);
-        try {
-          // Prepare comments array if comment is provided
-          const comments = comment.trim() ? [comment] : [];
-          
-          // Call the API to submit the check-in
-          const result = await saveCheckIn(token, selectedEmotions, selectedReasons, comments);
-          
-          // Clear the saved draft after successful submission
-          await clearCheckInDraft();
-          
-          // Show success message
-          Alert.alert(
-            "Check-in Submitted", 
-            "Your check-in has been successfully recorded.",
-            [{ text: "OK", onPress: () => navigation.navigate("Home") }]
-          );
-        } catch (error) {
-          console.error("Failed to submit check-in:", error);
-          Alert.alert(
-            "Submission Failed", 
-            "There was a problem submitting your check-in. Please try again."
-          );
-        } finally {
-          setIsSubmitting(false);
-        }
+// Early Bird: Between 4 AM and 8 AM
+if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8) {
+  const success = await awardBadge(token, storedUserId, "early_bird");
+  if (success) {
+    const updated = [...earnedBadges, "early_bird"];
+    setEarnedBadges(updated);
+    await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+    console.log("🌅 Early Bird badge awarded!");
+    setAwardedBadgeKey("early_bird");
+    setShowBadgeModal(true);
+  }
+}
+
+// Night Owl: Between 11 PM and 2 AM
+if (!earnedBadges.includes("night_owl") && (entryHour >= 23 || entryHour < 2)) {
+  const success = await awardBadge(token, storedUserId, "night_owl");
+  if (success) {
+    const updated = [...earnedBadges, "night_owl"];
+    setEarnedBadges(updated);
+    await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+    console.log("🌙 Night Owl badge awarded!");
+    setAwardedBadgeKey("night_owl");
+    setShowBadgeModal(true);
+  }
+}
+
+    } catch (error) {
+      console.error("Failed to submit check-in:", error);
+      Alert.alert("Submission Failed", "There was a problem submitting your check-in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+  
 
   // Render loading state
   if (isLoading) {
@@ -180,8 +263,14 @@ const CheckInScreen = () => {
   }
 
   return (
+
     <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-      {/* Clear Draft Icon */}
+         
+         <BadgeCongratsModal
+      visible={showBadgeModal}
+      badgeKey={awardedBadgeKey}
+      onClose={() => setShowBadgeModal(false)}
+    />
       {(selectedEmotions.length > 0 || selectedReasons.length > 0 || comment.trim()) && (
         <TouchableOpacity
           style={{

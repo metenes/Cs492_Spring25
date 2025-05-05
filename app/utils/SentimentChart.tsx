@@ -351,7 +351,7 @@ const renderEmptyTable = (
         { 
           backgroundColor: darkMode ? '#2C2C2C' : '#fff',
           borderWidth: 1,
-          borderColor: darkMode ? '#404040' : '#e0e0e0'
+          borderColor: darkMode ? '#1e1e1e' : '#FFF'
         }
       ]}>
         <View style={[

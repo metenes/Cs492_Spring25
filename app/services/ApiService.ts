@@ -879,6 +879,31 @@ export const registerUser = async (email: string, password: string, dob: string)
   }
 };
 
+// onboard user
+export const getOnboardingStatus = async (token: string) => {
+  const response = await fetch(`${API_URL}/user/onboarding`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  console.log("DID WE GET TO ONBOARD AT ALLLL")
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch onboarding status");
+  }
+  return response.json();
+};
+
+export const completeOnboarding = async (token: string) => {
+  await fetch(`${API_URL}/user/onboarding`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+
 
 // Fetch the user's profile information
 export const fetchProfile = async (token: string) => {
@@ -1513,7 +1538,7 @@ export const calculateStreak = (dates: string[]): number => {
 
 export async function fetchJournalEntriesWithDate(
   token: string,
-  startDate: string,   // “YYYY-MM-DD”
+  startDate: string,   // "YYYY-MM-DD"
   endDate: string
 ) {
   const resp = await fetch(
@@ -2326,4 +2351,55 @@ export const checkEmailExists = async (email: string) => {
   const res = await fetch(`${API_URL}/user/email-exists?email=${email}`);
   const data = await res.json();
   return data.exists;
+};
+
+// Fetch user's earned badges
+export const fetchEarnedBadges = async (token: string, userId: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/${userId}/badges`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch badges: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Fetched earned badges:", data.earnedBadges);
+
+    if (!Array.isArray(data.earnedBadges)) {
+      throw new Error("Invalid response format: earnedBadges is not an array");
+    }
+
+    return data.earnedBadges;
+  } catch (error) {
+    console.error("Error fetching earned badges:", error);
+    throw error;
+  }
+};
+export const awardBadge = async (token: string, userId: string, badgeKey: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/${userId}/badges`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ badge: badgeKey }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to award badge: ${response.status}`);
+    }
+
+    console.log(`✅ Badge "${badgeKey}" awarded`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error awarding badge "${badgeKey}":`, error);
+    return false;
+  }
 };

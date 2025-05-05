@@ -9,11 +9,16 @@ import BottomNavigation from './BottomNavigation';
 import { ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from './context/ThemeContext';
+import { awardBadge } from "./services/ApiService";
+import BadgeCongratsModal from "./BadgeCongratsModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Searchbar } from 'react-native-paper';  // Search bar 
 import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, updateJournalPin} from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
+import { getOnboardingStatus, completeOnboarding } from './services/ApiService';
+import OnboardingWizard from './OnboardingWizard';
+
 
 import HelperAssistant from "./components/HelperAssistant";
 
@@ -37,14 +42,51 @@ const commonEmotions = [
   "sadness", "surprise", "neutral"
 ]
 
+const emotionMap: Record<number, string> = {
+  0: "admiration",
+  1: "amusement",
+  2: "anger",
+  3: "annoyance",
+  4: "approval",
+  5: "caring",
+  6: "confusion",
+  7: "curiosity",
+  8: "desire",
+  9: "disappointment",
+  10: "disapproval",
+  11: "disgust",
+  12: "embarrassment",
+  13: "excitement",
+  14: "fear",
+  15: "gratitude",
+  16: "grief",
+  17: "joy",
+  18: "love",
+  19: "nervousness",
+  20: "optimism",
+  21: "pride",
+  22: "realization",
+  23: "relief",
+  24: "remorse",
+  25: "sadness",
+  26: "surprise",
+  27: "neutral"
+};
+
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
 const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) => {
+  
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   const { theme, darkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [skip, setSkip] = useState(0); // for pagination
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
 
   // Animation state for the floating menu
   const [isMenuOpen, setMenuOpen] = useState(false);
@@ -65,7 +107,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [verifyPinModalVisible, setVerifyPinModalVisible] = useState(false);
   const [removePinModalVisible, setRemovePinModalVisible] = useState(false);
   const [pinOptionsModalVisible, setPinOptionsModalVisible] = useState(false);
-
+  useEffect(() => {
+    const loadBadges = async () => {
+      const earned = await AsyncStorage.getItem("earnedBadges");
+      const parsedBadges = earned ? JSON.parse(earned) : [];
+      setEarnedBadges(parsedBadges);
+    };
+  
+    loadBadges();
+  }, []);
   // Pick a random quote
   const [randomQuote] = useState(() => {
     const quotes = [
@@ -98,16 +148,18 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     return quotes[Math.floor(Math.random() * quotes.length)];
   });
 
-  // const { storeToken } = useAuth(); // ✅ Get logout function from AuthContext
-
-  // Filtering state
   const [activeFilter, setActiveFilter] = useState("all");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
   const [shouldLoadData, setShouldLoadData] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
+
   // Search Bar
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [badgeCongratsModalVisible, setBadgeCongratsModalVisible] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   // Map UI filter names to your backend category values
@@ -120,32 +172,42 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   // Enhanced filter function
   const applyFilter = (filter: string) => {
     setActiveFilter(filter);
-    let filtered = entries;
-    
-    // Apply category filter
-    if (filter !== "all") {
-      filtered = filtered.filter(entry => entry.category === filterMap[filter]);
-    }
-    
-    // Apply search filter if there's a search query
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(entry => 
-        entry.entryContent?.toLowerCase().includes(query) || 
-        entry.prompt?.toLowerCase().includes(query)
-      );
-    }
-    
-    // Apply emotion filters if any are selected
-    if (selectedEmotions.length > 0) {
-      filtered = filtered.filter(entry =>
-        entry.journalSentiments?.some(sentiment => 
-          selectedEmotions.includes(sentiment.emotion?.toLowerCase())
-        )
-      );
-    }
-    setFilteredEntries(filtered);
+    setIsFiltering(true);
+  
+    // let React paint the spinner before we crunch the array
+    setTimeout(() => {
+      let filtered = entries;
+  
+      // — category filter
+      if (filter !== "all") {
+        filtered = filtered.filter(e => e.category === filterMap[filter]);
+      }
+  
+      // — text search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(e => {
+        const content = (e.entryContent ?? "").toLowerCase();
+        const p      = (e.prompt       ?? "").toLowerCase();
+        return content.includes(q) || p.includes(q);
+        });
+      }
+  
+      // — emotion filter
+      if (selectedEmotions.length) {
+        const sel = new Set(selectedEmotions);
+        filtered = filtered.filter(e =>
+          e.journalSentiments?.some(s =>
+            sel.has(emotionMap[s.emotion])
+          )
+        );
+      }
+  
+      setFilteredEntries(filtered);
+      setIsFiltering(false);
+    }, 0);
   };
+  
 
   // Update search query handler
   const onChangeSearch = (query: string) => {
@@ -153,6 +215,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     // Reapply filters with new search query
     applyFilter(activeFilter); 
   };
+
   
   // Toggle emotion selection
   const toggleEmotion = (emotion: string) => {
@@ -161,17 +224,24 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     } else {
       setSelectedEmotions([...selectedEmotions, emotion]);
     }
-    // Reapply filters after toggling emotion
-    applyFilter(activeFilter);
   };
-
+  useEffect(() => {
+    applyFilter(activeFilter);
+  }, [selectedEmotions, searchQuery, activeFilter]);
   const loadData = useCallback(async () => {
     if (!shouldLoadData) return;
 
     try {
       setIsLoadingMore(skip > 0);
+    
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
+    
+      // ✅ Load earned badges once inside loadData
+      const earned = await AsyncStorage.getItem("earnedBadges");
+      const parsedBadges = earned ? JSON.parse(earned) : [];
+      setEarnedBadges(parsedBadges); // update the state so UI can also reflect
+    
 
       // Load entries
       const fetchedEntries = await fetchJournalEntries(token, limit, skip);
@@ -182,20 +252,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       if (Array.isArray(checkInResponse.history)) {
         fetchedCheckIns = checkInResponse.history;
       }
-    /*
-        for entry in entries:
-            result.append({
-                "entry_id": str(entry["_id"]),
-                "user_id": str(entry["userId"]),
-                "created_at": entry["timestamp"].isoformat(),
-                "type": "checkin",
-                "date": entry["timestamp"].strftime("%Y-%m-%d"),
-                "sentiments": entry.get("sentiments", []),
-                "causes": entry.get("causes", []),
-                "comments": entry.get("comments", []),
-                "lockCode": entry.get("lockCode", "") # for locking logic
-            })
-    */
+    
       const formattedCheckIns = fetchedCheckIns.map((checkIn: {
         date: string;
         causes: never[];
@@ -231,17 +288,54 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
       // Reapply the current filter
       if (activeFilter === "all") {
-        setFilteredEntries(allEntries);
+        applyFilter(activeFilter)
       } else {
-        const filtered = allEntries.filter(entry => entry.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
+        applyFilter(activeFilter)
       }
 
       // Load streak
       const dates = await fetchJournalDates(token, limit, skip);
       const calculatedStreak = calculateStreak(dates);
       setStreak(calculatedStreak);
+      if (streak == 365 && !earnedBadges.includes("one_year")) {
+        const userId = await AsyncStorage.getItem("userId");
+        if (userId) {
+          const success = await awardBadge(token, userId, "one_year");
+          if (success) {
+            const updatedBadges = [...earnedBadges, "one_year"];
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+            setEarnedBadges(updatedBadges);
+            setAwardedBadgeKey("one_year");
+            setBadgeCongratsModalVisible(true);
+          }
+        }
+      }
 
+      if (!parsedBadges.includes("prompt_wanderer")) {
+        const guidedEntries = allEntries.filter(entry => entry.category === "guided");
+      
+        const uniquePrompts = new Set();
+        guidedEntries.forEach(entry => {
+          if (entry.prompt) {
+            uniquePrompts.add(entry.prompt);
+          }
+        });
+      
+        if (uniquePrompts.size === 6) {
+          const userId = await AsyncStorage.getItem("userId");
+          if (userId) {
+            const success = await awardBadge(token, userId, "prompt_wanderer");
+            if (success) {
+              const updatedBadges = [...parsedBadges, "prompt_wanderer"];
+              await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+              setEarnedBadges(updatedBadges); // ✅ update local state too
+              setAwardedBadgeKey("prompt_wanderer");
+              setBadgeCongratsModalVisible(true);
+            }
+          }
+        }
+      }
+      
       // Reset loading flags
       setIsLoadingMore(false);
       setShouldLoadData(false);
@@ -259,6 +353,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       if (token) {
         console.log("🔹 Found Token:", token);
         storeToken(token);
+
+        const status = await getOnboardingStatus(token);
+        if (!status.hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
       }
     };
     checkStoredToken();
@@ -361,12 +460,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
       setEntries(updatedEntries);
 
-      if (activeFilter === "all") {
-        setFilteredEntries(updatedEntries);
-      } else {
-        const filtered = updatedEntries.filter(e => e.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
-      }
+      applyFilter(activeFilter);
 
       setRemovePinModalVisible(false);
       setCurrentPin('');
@@ -411,20 +505,29 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
       setEntries(updatedEntries);
 
-      if (activeFilter === "all") {
-        setFilteredEntries(updatedEntries);
-      } else {
-        const filtered = updatedEntries.filter(entry => entry.category === filterMap[activeFilter]);
-        setFilteredEntries(filtered);
-      }
+      applyFilter(activeFilter);
 
       // Close modal and reset state
       setPinModalVisible(false);
       setPin('');
       setConfirmPin('');
       setSelectedEntry(null);
-
-      Alert.alert("Success", "Journal is now PIN protected.");
+      // Award LockedBadge if not already earned
+if (!earnedBadges.includes("locked_journal")) {
+  const token = await AsyncStorage.getItem("userToken");
+  const userId = await AsyncStorage.getItem("userId");
+  if (token && userId) {
+    const success = await awardBadge( token, userId,"locked_journal",);
+    if (success) {
+      const updatedBadges = [...earnedBadges, "locked_journal"];
+      await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+      setEarnedBadges(updatedBadges);
+      setAwardedBadgeKey("locked_journal");
+      setBadgeCongratsModalVisible(true);
+    }
+    
+  }
+}
     } catch (error) {
       console.error("Error setting PIN:", error);
       Alert.alert("Error", "Failed to set PIN. Please try again.");
@@ -474,12 +577,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         if (activeFilter !== filterValue) {
           setActiveFilter(filterValue);
           // Refilter existing data rather than triggering a reload
-          if (filterValue === "all") {
-            setFilteredEntries(entries);
-          } else {
-            const filtered = entries.filter(entry => entry.category === filterMap[filterValue]);
-            setFilteredEntries(filtered);
-          }
+          applyFilter(filterValue);
         }
       }}
     >
@@ -581,6 +679,15 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={async () => {
+            const token = await AsyncStorage.getItem("userToken");
+            if (token) await completeOnboarding(token);
+            setShowOnboarding(false);
+          }}
+        />
+      )}
       <SafeAreaView
         style={[
           styles.container,
@@ -615,7 +722,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           clearIcon={() => searchQuery ? <Icon name="x" size={20} color={theme.icon} /> : null}
           right={() => (
             <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-              <Icon name="sliders" size={20} color={theme.icon} />
+              <Icon name="sliders" size={20} color={theme.icon} style={[styles.sliderIcon]} />
             </TouchableOpacity>
           )}
         />
@@ -650,7 +757,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </View>
         )}
 
-        <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}>
+        <View style={[styles.tabWrapper, { borderColor: darkMode ? "#111" : "#fff" }]}>{/* <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}> */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -663,7 +770,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
           </ScrollView>
         </View>
-
+        {isFiltering ? (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" color={theme.primary} />
+    </View>
+  ) : (
         <FlatList
           data={filteredEntries}
           renderItem={renderEntry}
@@ -685,6 +796,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             ) : null
           }
         />
+  )}
 
         {/* Floating Action Button (FAB) + Dropdown Menu */}
         <View style={styles.fabContainer}>
@@ -1027,6 +1139,11 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           </View>
         </View>
       </Modal>
+      <BadgeCongratsModal
+  visible={badgeCongratsModalVisible}
+  badgeKey={awardedBadgeKey}
+  onClose={() => setBadgeCongratsModalVisible(false)}
+/>
 
       <View style={{ backgroundColor: theme.backgroundColor }}>
         <BottomNavigation activeScreen="Home" darkMode={darkMode} />
@@ -1240,16 +1357,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 0,
   },
+  sliderIcon: {
+    marginRight: 10,
+    //paddingRight: 20,
+  },
   advancedFilters: {
     marginHorizontal: 16,
     marginBottom: 8,
-    padding: 12,
+    padding: 40,
     borderRadius: 10,
   },
   filterHeader: {
     fontWeight: '600',
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 20,
   },
   emotionsContainer: {
     flexDirection: 'row',
@@ -1265,7 +1386,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   emotionText: {
-    fontSize: 12,
+    fontSize: 13,
   },
   filterOption: {
     flexDirection: 'row',

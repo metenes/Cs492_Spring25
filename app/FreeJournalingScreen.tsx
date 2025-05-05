@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
+import BadgeCongratsModal from './BadgeCongratsModal';
+
 import * as ImagePicker from "expo-image-picker";
 import { MediaType } from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
@@ -23,7 +25,7 @@ import { useTheme } from './context/ThemeContext';
 
 import { saveJournalEntry, saveDraft, getDraft, clearDraft, uploadJournalImage, deleteJournalImage } from "./services/ApiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { awardBadge } from "./services/ApiService";
 type RootStackParamList = {
   FreeJournaling: { selectedDate?: string };  //undefined;
   Home: undefined;
@@ -45,17 +47,18 @@ const FreeJournalingScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
-
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  const [awardedBadgeKey, setAwardedBadgeKey] = useState<string | null>(null);
+  
   const navigation = useNavigation<NavigationProp>();
 
   const route = useRoute<RouteProps>();
   const [entryDate, setEntryDate] = useState(new Date().toISOString());
-  console.log(entryDate)
 
   useEffect(() => {
     if (route.params?.selectedDate) {
       setEntryDate(route.params.selectedDate);
-      console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
+      //console.log("🗓️ Custom entry date from calendar:", route.params.selectedDate);
     }
   }, [route.params]);
 
@@ -187,7 +190,23 @@ const FreeJournalingScreen = () => {
 
     return () => clearTimeout(timeoutId);
   }, [content, imageUris]);
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
 
+  // Load earned badges when screen mounts
+  useEffect(() => {
+    const loadBadges = async () => {
+      const stored = await AsyncStorage.getItem("earnedBadges");
+      if (stored) {
+        try {
+          setEarnedBadges(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse earnedBadges", e);
+        }
+      }
+    };
+    loadBadges();
+  }, []);
+  
   const handleSaveEntry = async () => {
     // Step 1: Prevent saving if entry content is empty
     if (!content.trim()) {
@@ -204,11 +223,9 @@ const FreeJournalingScreen = () => {
         signedUrl: imageUris[index]
       }));
   
-      console.log('📦 Prepared image data:', imageData);
+      //console.log('📦 Prepared image data:', imageData);
   
       const response = await saveJournalEntry(content, imageData, "freeform", undefined, entryDate);
-      console.log(entryDate);
-  
       if (response.error) {
         console.error('❌ Failed to save journal entry:', response.error);
         Alert.alert("Error", "Failed to save journal entry.");
@@ -216,9 +233,147 @@ const FreeJournalingScreen = () => {
       }
   
       console.log('✅ Journal entry saved successfully');
-      await clearDraft();
-      Alert.alert("Success", "Journal entry saved successfully!");
-      navigation.navigate("Home");
+      const token = await AsyncStorage.getItem("userToken");
+      const userId = await AsyncStorage.getItem("userId");
+
+      if (token && userId && !earnedBadges.includes("freeform")) {
+        const success = await awardBadge(token, userId, "freeform");
+      
+        if (success) {
+          const updated = [...earnedBadges, "freeform"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🎉 Freeform badge awarded and saved.");
+          setAwardedBadgeKey("freeform");
+          setShowBadgeModal(true); // 🟢 Show the congrats modal
+        }
+      }
+      const entryHour = new Date(entryDate).getHours();
+
+      // Early Bird: Between 4 AM and 8 AM
+      if (!earnedBadges.includes("early_bird") && entryHour >= 4 && entryHour < 8 && token && userId) {
+        const success = await awardBadge(token, userId, "early_bird");
+        if (success) {
+          const updated = [...earnedBadges, "early_bird"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🌅 Early Bird badge awarded!");
+          setAwardedBadgeKey("early_bird");
+          setShowBadgeModal(true);
+        }
+      }
+
+      // Night Owl: Between 11 PM and 2 AM
+      if (!earnedBadges.includes("night_owl") && (entryHour >= 23 || entryHour < 2) && token && userId) {
+        const success = await awardBadge(token, userId, "night_owl");
+        if (success) {
+          const updated = [...earnedBadges, "night_owl"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("🌙 Night Owl badge awarded!");
+          setAwardedBadgeKey("night_owl");
+          setShowBadgeModal(true);
+        }
+      }
+      if (
+        imageUris.length > 0 && 
+        !earnedBadges.includes("image_storyteller") &&
+        token && userId
+      ) {
+        const success = await awardBadge(token, userId, "image_storyteller");
+        if (success) {
+          const updated = [...earnedBadges, "image_storyteller"];
+          setEarnedBadges(updated);
+          await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+          console.log("📷 Image Storyteller badge awarded!");
+          setAwardedBadgeKey("image_storyteller");
+          setShowBadgeModal(true);
+        }
+      }
+
+      // Let It Out: Check if analysis contains strong emotions
+      if (!earnedBadges.includes("let_it_out") && token && userId) {
+        if(response.entry.journalSentiments){
+          for (const sentiment of response.entry.journalSentiments) {
+            // 2 = Anger, 10 = disapproval, 11 = disgust, 16 = grief, 25 = sadness
+            if ([2, 10, 11, 16, 25].includes(sentiment.emotion)) {
+
+              const success = await awardBadge(token, userId, "let_it_out");
+              if (success) {
+                const updated = [...earnedBadges, "let_it_out"];
+                setEarnedBadges(updated);
+                await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+                setAwardedBadgeKey("let_it_out");
+                setShowBadgeModal(true);
+              }
+
+              break;
+            }
+          }
+        }
+      }
+
+      if (!earnedBadges.includes("emotion_explorer") && token && userId) {
+        if(response.entry.journalSentiments && response.entry.journalSentiments.length >= 3){
+          const success = await awardBadge(token, userId, "emotion_explorer");
+          if (success) {
+            const updated = [...earnedBadges, "emotion_explorer"];
+            setEarnedBadges(updated);
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+            setAwardedBadgeKey("emotion_explorer");
+            setShowBadgeModal(true);
+          }
+        }
+      }
+
+        // … after your existing emotion_explorer badge logic, before clearDraft()/navigation:
+if (!earnedBadges.includes("mood_shifter") && token && userId) {
+  const sentiments = response.entry.journalSentiments as { emotion: number; percentage: number }[] | undefined;
+  if (Array.isArray(sentiments) && sentiments.length > 0) {
+    // map code → name
+    const codeToName = [
+      "admiration","amusement","anger","annoyance","approval","caring",
+      "confusion","curiosity","desire","disappointment","disapproval","disgust",
+      "embarrassment","excitement","fear","gratitude","grief","joy","love",
+      "nervousness","optimism","pride","realization","relief","remorse",
+      "sadness","surprise","neutral"
+    ];
+    // define positive/negative sets
+    const positive = new Set([
+      "admiration","amusement","approval","caring","curiosity","desire",
+      "excitement","gratitude","joy","love","optimism","pride","realization","relief"
+    ]);
+    const negative = new Set([
+      "anger","annoyance","confusion","disappointment","disapproval","disgust",
+      "embarrassment","fear","grief","nervousness","remorse","sadness"
+    ]);
+
+    let hasPos = false, hasNeg = false;
+    for (const s of sentiments) {
+      const name = codeToName[s.emotion] ?? "";
+      if (positive.has(name)) hasPos = true;
+      if (negative.has(name)) hasNeg = true;
+      if (hasPos && hasNeg) break;
+    }
+
+    if (hasPos && hasNeg) {
+      const ok = await awardBadge(token, userId, "mood_shifter");
+      if (ok) {
+        const updated = [...earnedBadges, "mood_shifter"];
+        setEarnedBadges(updated);
+        await AsyncStorage.setItem("earnedBadges", JSON.stringify(updated));
+        console.log("🔄 Mood Shifter badge awarded!");
+        setAwardedBadgeKey("mood_shifter");
+        setShowBadgeModal(true);
+      }
+    }
+  }
+}
+
+// finally clear draft + navigate
+await clearDraft();
+navigation.navigate("Home");
+
     } catch (error) {
       console.error("❌ Error in handleSaveEntry:", error);
       Alert.alert("Error", "An error occurred while saving the journal entry.");
@@ -249,10 +404,16 @@ const FreeJournalingScreen = () => {
   }
 
   return (
+    <View style={{ flex: 1 }}>
+      <BadgeCongratsModal
+        visible={showBadgeModal}
+        badgeKey={awardedBadgeKey}
+        onClose={() => setShowBadgeModal(false)}
+      />
+
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={{ flex: 1, backgroundColor: theme.backgroundColor}}>
          <View style={{ flex: 1, padding: 20 }}>
-        {/* Journal Entry Section */}
         <View
           style={{
             flex: 2,
@@ -269,7 +430,6 @@ const FreeJournalingScreen = () => {
           }}
         >
 
-          {/* 🆕 Clear Entry Button - only shows if needed */}
           {(content.trim() || imageUris.length > 0) && (
             <TouchableOpacity
               style={{
@@ -316,7 +476,6 @@ const FreeJournalingScreen = () => {
             </TouchableOpacity>
           )}
 
-          {/* ✍️ Journal Text Input */}
           <TextInput
             style={{
               flex: 1,
@@ -337,8 +496,7 @@ const FreeJournalingScreen = () => {
             }}
             keyboardType="default"
             returnKeyType="done"
-          />
-          {/* ✅ Character Counter */}
+          />          
           <Text
             style={{
               textAlign: "right",
@@ -349,22 +507,19 @@ const FreeJournalingScreen = () => {
           >
             {content.length} / {MAX_CHAR_COUNT}
           </Text>
-
-          {/* Hard Limit Warning when close to max */}
+         
           {content.length >= MAX_CHAR_COUNT - 500 && content.length < MAX_CHAR_COUNT && (
             <Text style={{ color: "red", textAlign: "center", marginTop: 5 }}>
               ⚠️ You're writing a wonderful entry! Just a heads-up, you're nearing the character limit.
             </Text>
           )}
-
-          {/* Hard Limit Reached Message */}
+         
           {content.length >= MAX_CHAR_COUNT && (
             <Text style={{ color: "red", textAlign: "center", marginTop: 5, fontWeight: "bold" }}>
               🚫 That's an amazing entry! You've reached the limit, but you can always start a new one.
             </Text>
           )}
-        </View>
-        {/* Display Selected Images with Progress */}
+        </View>        
         {localImageUris.length > 0 && (
           <ScrollView horizontal style={{ marginTop: 10 }}>
             {localImageUris.map((uri, index) => (
@@ -401,16 +556,14 @@ const FreeJournalingScreen = () => {
               </View>
             ))}
           </ScrollView>
-        )}
-         {/* Image Picker Warning Message */}
+        )}         
          {imagePickerWarning ? (
-          <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>
-            {imagePickerWarning}
-          </Text>
-        ) : null}
-        {/* Button Container */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 40, }}>
-          {/* Upload Image Button */}
+  <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>
+    {imagePickerWarning}
+  </Text>
+) : null}
+        
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, marginBottom: 40, }}>         
           <TouchableOpacity
             style={{
               backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -423,11 +576,11 @@ const FreeJournalingScreen = () => {
             onPress={pickImage}
           >
             <Text style={{ color: darkMode ? theme.text : '#000', fontSize: 14 }}>
-              <Text>📸</Text> Upload Images
-            </Text>
-          </TouchableOpacity>
+  📸 Upload Images
+</Text>
 
-          {/* Save Entry Button */}
+          </TouchableOpacity>
+          
           <TouchableOpacity
             style={{
               backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -439,14 +592,14 @@ const FreeJournalingScreen = () => {
             onPress={handleSaveEntry}
           >
             <Text style={{ color: darkMode ? theme.text : '#000', fontSize: 14 }}>
-              <Text>💾</Text> Save Entry
-            </Text>
+  💾 Save Entry
+</Text>
+
           </TouchableOpacity>
         </View>
 
        
-
-        {/* Image Fullscreen Modal */}
+        
         <Modal visible={!!selectedImage} transparent={true} animationType="fade">
           <View
             style={{
@@ -467,8 +620,7 @@ const FreeJournalingScreen = () => {
                 resizeMode="contain"
               />
             )}
-            <View style={{ flexDirection: "row", marginTop: 20 }}>
-              {/* Close Button */}
+            <View style={{ flexDirection: "row", marginTop: 20 }}>              
               <TouchableOpacity
                 style={{
                   backgroundColor: darkMode ? '#404040' : '#E0E0E0',
@@ -480,8 +632,7 @@ const FreeJournalingScreen = () => {
               >
                 <Text style={{ fontSize: 16, color: darkMode ? theme.text : '#000' }}>Close</Text>
               </TouchableOpacity>
-
-              {/* Delete Button */}
+              
               <TouchableOpacity
                 style={{
                   backgroundColor: "red",
@@ -496,12 +647,14 @@ const FreeJournalingScreen = () => {
           </View>
         </Modal>
 
-        </View> {/* closes the padding View */}
+        </View> 
           <View>
             <BottomNavigation activeScreen="FreeJournaling" />
           </View>
         </View>
+        
   </TouchableWithoutFeedback>
+  </View>
   );
 };
 

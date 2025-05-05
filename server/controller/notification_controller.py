@@ -152,3 +152,26 @@ def send_journal_reminders():
         )
 
     print("Reminder job completed.")
+
+def send_analysis_notifications():
+    print("Running analysis notification job...")
+
+    user_entries = get_all_user_push_tokens()
+    for user_id, token_entry in user_entries.items():
+        notification_result = should_send_analysis_notification(token_entry)
+        if not notification_result['result']: 
+            continue
+        
+        result = send_push_to_user_id(
+            user_id,
+            "📊 Your Journal Analysis is Ready!",
+            notification_result['message'],
+        )
+
+        notification_tokens_collection.update_one(
+            {"user_id": ObjectId(user_id)},
+            {"$set": {"last_analysis_notification_date": datetime.utcnow()}}
+        )
+        print(f" Notification Sent to {user_id}: {result}")
+
+    print("Analysis notification job completed.")

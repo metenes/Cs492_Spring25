@@ -18,6 +18,8 @@ export const usePushNotifications = (): PushNotificationState => {
             shouldShowAlert: true,
             shouldPlaySound: false,
             shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
         }),
     });
 
@@ -25,12 +27,12 @@ export const usePushNotifications = (): PushNotificationState => {
 
     const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
 
-    const notificationListener = useRef<Notifications.EventSubscription>();
-    const responseListener = useRef<Notifications.EventSubscription>();
+    const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+    const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
     async function registerForPushNotificationsAsync() {
         let token;
-
+        console.log(Device);
         if (Device.isDevice) {
             const { status: existingStatus } = await Notifications.getPermissionsAsync();
             let finalStatus = existingStatus;
@@ -42,7 +44,6 @@ export const usePushNotifications = (): PushNotificationState => {
             }
             console.log("finalStatus", finalStatus);
             if (finalStatus !== "granted") {
-                alert("Failed to get push token for push notification!");
                 return;
             }
             console.log("finalStatus", finalStatus);
@@ -87,7 +88,6 @@ export const usePushNotifications = (): PushNotificationState => {
         }
         else {
             console.log("Must use physical device for Push Notifications");
-            alert("Must use physical device for Push Notifications");
             return;
         }
     }
