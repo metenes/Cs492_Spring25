@@ -436,6 +436,7 @@ const SentimentAnalysisPage: React.FC = () => {
               darkMode={darkMode}
             />
           </View>
+          <Text style={[styles.checkinsTitle]}>💫 Let’s hear from your check-ins 💫</Text>
           {emotionalInsight && (
             <View style={[styles.insightContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#E6F0FA' }]}>
               <Text style={[styles.insightTitle, { color: darkMode ? theme.text : '#1A3C6F' }]}>🧠 Emotional Insight</Text>
@@ -454,7 +455,7 @@ const SentimentAnalysisPage: React.FC = () => {
 
           {Object.keys(emotionCauseLinks).length > 0 && (
             <View style={[styles.causeContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#F3E8FF' }]}>
-              <Text style={[styles.causeTitle, { color: darkMode ? theme.text : '#9C6B00' }]}>🔍 Possible Causes</Text>
+              <Text style={[styles.causeTitle, { color: darkMode ? theme.text : '#5E3A87' }]}>🔍 Possible Causes</Text>
               {Object.entries(emotionCauseLinks).map(([emotion, causes]: any) => (
                 <View key={emotion} style={{ marginBottom: 5 }}>
                   <Text style={[styles.causeText, { color: darkMode ? theme.textSecondary : '#5E3A87' }]}>{emotion.toUpperCase()}</Text>
@@ -583,6 +584,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#5E3A87",
   },
+  checkinsTitle: {
+    fontSize: 16,
+    fontStyle: "italic",
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 12,
+    color: '#3a3a3a',
+  }
   
   
 });

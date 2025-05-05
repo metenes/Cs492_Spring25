@@ -663,7 +663,7 @@ export const loginUser = async (email: string, password: string) => {
 
     return responseData;
   } catch (error) {
-    console.error("Login error:", error);
+    //console.error("Login error:", error);
     throw error;
   }
 };
