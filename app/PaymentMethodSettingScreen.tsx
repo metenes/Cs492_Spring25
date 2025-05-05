@@ -22,9 +22,6 @@ export const PaymentMethodSettingScreen: React.FC<PaymentMethodSettingScreenProp
   return (
     <>
       <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("Settings")} style={styles.backButton}>
-          <ArrowLeft size={24} color={theme.text} />
-        </TouchableOpacity>
         <Text style={[styles.headerText, { color: theme.text }]}>Payment Options</Text>
         
         <TouchableOpacity 

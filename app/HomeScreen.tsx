@@ -863,19 +863,6 @@ if (!earnedBadges.includes("locked_journal")) {
                 </Text>
                 <Text style={[styles.menuText, { color: theme.text }]}>Prompts</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuOpen(false);
-                  navigation.navigate("CommunityInsight");
-                }}
-              >
-                <Text>
-                  <Icon name="smile" size={20} color={theme.text} />
-                </Text>
-                <Text style={[styles.menuText, { color: theme.text }]}> Insights </Text>
-              </TouchableOpacity>
             </Animated.View>
           )}
 

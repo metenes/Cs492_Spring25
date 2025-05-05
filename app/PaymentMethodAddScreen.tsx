@@ -26,10 +26,6 @@ export const PaymentMethodAddScreen = () => {
   return (
     <>
       <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
-        {/* Header with Back Button */}
-        <TouchableOpacity onPress={() => navigation.navigate("PaymentMethodSettingScreen")} style={styles.backButton}>
-          <ArrowLeft size={24} color={theme.text} />
-        </TouchableOpacity>
         <Text style={[styles.headerText, { color: theme.text }]}>Add Payment</Text>
 
         {/* Cardholder Name */}

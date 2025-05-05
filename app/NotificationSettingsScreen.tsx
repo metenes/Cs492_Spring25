@@ -80,12 +80,6 @@ export const NotificationSettingsScreen = () => {
             padding: 16, 
             marginTop: 16 
           }}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={{ padding: 2 }}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.text} />
-            </TouchableOpacity>
             <View style={{ marginTop: 50 }}>
               <Text style={[styles.label, { color: theme.text }]}>Journal Reminder Frequency</Text>
               <View style={[
