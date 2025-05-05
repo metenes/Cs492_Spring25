@@ -10,7 +10,7 @@ import {
 import { useTheme } from './context/ThemeContext';
 
 // Import badge images
-import LockedJournalBadge from './badges/locked_journal.png';
+import LockedJournalBadge from './badges/night_owl.png';
 import FreeformBadge from './badges/freeform.png';
 import GuidedBadge from './badges/guided.png';
 import QuickBadge from './badges/quick.png';
@@ -22,6 +22,7 @@ import ImageStorytellerBadge from './badges/image_stroyteller.png';
 import NightOwl from './badges/night_owl.png';
 import EarlyBird from './badges/early_bird.png';
 import OneYear from './badges/one_year.png';
+
 interface BadgeCongratsModalProps {
   visible: boolean;
   badgeKey: string | null;

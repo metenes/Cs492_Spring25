@@ -49,6 +49,8 @@ class MessageSchema(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    chat_id: str  # Changed from int to str
+    tone: str
     context: Optional[Dict[str, Any]] = None
     update_model: bool = False
     context_window: int = 10  # Number of previous messages to include

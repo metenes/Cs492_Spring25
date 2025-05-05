@@ -20,6 +20,8 @@ import { getOnboardingStatus, completeOnboarding } from './services/ApiService';
 import OnboardingWizard from './OnboardingWizard';
 
 
+import HelperAssistant from "./components/HelperAssistant";
+
 export type Entry = {
   _id: string;
   entryContent: string;

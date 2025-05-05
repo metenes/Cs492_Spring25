@@ -52,6 +52,9 @@ import ContactSupportScreen from "./ContactSupportScreen";
 import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 import { useTheme } from './context/ThemeContext';
 
+// Helper assistant 
+import HelperAssistant from './components/HelperAssistant';
+
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -182,6 +185,8 @@ const AppNavigation = () => {
           <Stack.Screen name="ContactSupport" component={ContactSupportScreen} />
 
         </Stack.Navigator>
+        <HelperAssistant />
+
       </NavigationContainer>
     </>
   );
