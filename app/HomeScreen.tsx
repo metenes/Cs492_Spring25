@@ -15,6 +15,8 @@ import { fetchJournalEntries, fetchJournalDates, calculateStreak, fetchCheckIn, 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 
+import HelperAssistant from "./components/HelperAssistant";
+
 export type Entry = {
   _id: string;
   entryContent: string;

@@ -41,7 +41,7 @@ from transformers import BertTokenizer
 # utils 
 from models.chat import Chat, Message, ChatRequest, ChatResponse, ModelTrainingRequest, ModelTrainingResponse  # Import the Chat model
 from utils.database import db, chat_collection, users_collection, activities_collection, sentiments_collection, model_collection
-from utils.load_model import model, tokenizer
+from utils.load_model import model, tokenizer, E2C_IP
 from utils.jwt_config import * 
 from ml.chat_emotion_model import load_model, predict_emotions, predict_emotions_with_segments   # Import the module
 
@@ -66,7 +66,7 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "51.21.246.174" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
+# E2C_IP is inside  utils.load_model from now on...
 
 # Define the emotion labels - Local 
 emotion_labels = [
@@ -76,27 +76,6 @@ emotion_labels = [
     "nervousness", "optimism", "pride", "realization", "relief", "remorse",
     "sadness", "surprise", "neutral"
 ]
-
-# Mindfullness exercises 
-MINDFULNESS_EXERCISES = {
-    "deep_breathing": {
-        "title": "Deep Breathing",
-        "description": "Close your eyes. Inhale for 4, hold for 4, exhale for 4. Repeat 5 times.",
-    },
-    "body_scan": {
-        "title": "Body Scan",
-        "description": "Mentally scan your body from head to toe. Release tension as you go.",
-    },
-    "gratitude_journal": {
-        "title": "Gratitude Journal",
-        "description": "List 3 things you're grateful for today.",
-    },
-    "grounding_5_4_3_2_1": {
-        "title": "5-4-3-2-1 Grounding",
-        "description": "Identify 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell, 1 you can taste.",
-    }
-}
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -240,9 +219,14 @@ async def personalized_chat(chat_id):
         
         try:
             # Validate request data with your ChatRequest model
+            print("1 sending" ,data)
+
             chat_request = ChatRequest(**data)
+            print("1 sending" ,chat_id)
+
         except Exception as validation_error:
             return jsonify({"error": f"Invalid request format: {str(validation_error)}"}), 400
+        print("1 sending" ,chat_id)
 
         # Generate conversation ID if new conversation
         if (chat_id == None) : 
@@ -277,20 +261,22 @@ async def personalized_chat(chat_id):
             except Exception as model_create_error:
                 logger.error(f"Failed to create user model: {model_create_error}")
                 return jsonify({"error": "Could not create personalized model"}), 500
+        print("2 sending" ,chat_id)
 
         # Invoke the user's model
         try:
-            response_text, inference_time, chat = await invoke_user_model(
+            emotions, inference_time, chat = await invoke_user_model(
                 user_id=user_id,
                 message=chat_request.message,
+                tone = chat_request.tone,
                 context={
-                    "chat_id": chat_id,
                     **(chat_request.context or {})
                 }
             )
             print("Inference take time : " , inference_time); 
             print(f"chat retunred by invoke model : {chat}")
-            
+            print(f"emotions retunred by invoke model : {emotions}")
+
         except Exception as inference_error:
             # Error for the response
             # response_text = "Sorry, Something went wrong." 
@@ -304,8 +290,9 @@ async def personalized_chat(chat_id):
             await log_conversation(
                 user_id=user_id,
                 chat_id=chat_id,
+                tone = chat_request.tone,
                 message=chat_request.message,
-                response=response_text
+                response=chat
             )
         except Exception as log_error:
             # Non-critical error, just log it
@@ -320,12 +307,13 @@ async def personalized_chat(chat_id):
             try:
                 chat_data = {
                     "user_message": chat_request.message,
-                    "model_response": response_text,
+                    "model_response": chat,
+                    "tone" : chat_request.tone,
                     "context": chat_request.context or {},
                     "timestamp": time.time()
                 }
                 
-                update_success, new_version = update_user_model(user_id, chat_data)
+                update_success, new_version = trigger_user_model_retrain(user_id)
                 if update_success:
                     model_version = new_version
                     model_updated = True
@@ -337,7 +325,7 @@ async def personalized_chat(chat_id):
 
         # Prepare and return response
         response = ChatResponse(
-            response=response_text,
+            response=chat,
             chat_id=chat_id,
             model_version=str(model_version),
             model_updated=model_updated,
@@ -351,7 +339,7 @@ async def personalized_chat(chat_id):
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
-async def invoke_user_model(user_id: str, message: str, context: Dict = None, mode: str = "ec2"):
+async def invoke_user_model(user_id: str, message: str, tone : str, context: Dict = None, mode: str = "ec2"):
     """Invoke the user's personalized model from S3."""
     """ 
     # Example API USAGE 
@@ -409,29 +397,37 @@ async def invoke_user_model(user_id: str, message: str, context: Dict = None, mo
                 # Update the paylod for multiple chat_id 
                 payload = {
                     "user_id": user_id,
-                    "message": prompt, # 
+                    "message": prompt, 
+                    "tone" : tone, # tone to affect the respond 
                     "chat_id": context.get("chat_id", "1")
                 }
                 print("payload is sent : " , payload)
-                ec2_url = f"http://{E2C_IP}:8080/analyze"  # Send to cloud like this
+                # ec2_url = f"http://{E2C_IP}:8080/analyze"  # Send to cloud like this
+                ec2_url = f"http://{E2C_IP}:8080/analyze-last"  # Send to cloud like this
 
                 # ec2_url = f"http://{E2C_IP}:8080/predict"  # Send to cloud like this
                 logger.info(f"Connecting to E2C Distance Servre: {E2C_IP} to {ec2_url}\nSending payload :{payload}")
-
+                start_time = time.time()
                 async with aiohttp.ClientSession() as session:
                     async with session.post(ec2_url, json=payload) as resp:
                         if resp.status == 200:
                             result = await resp.json()
-                            emotions = ", ".join(result.get("predicted_emotions", []))
-                            chat = result.get("chat_response", "NAN")
-
+                            emotions = result.get("predicted_emotion", [])
+                            chat = result.get("response", "")
+                            print("Results obtained : ", result)
                         else:
                             raise Exception(f"EC2 returned status {resp.status}")
                         
                 logger.info(f"Results from E2C Distance Servre: {E2C_IP} by {ec2_url} equals to\n result :{result}\n emotions {emotions}")
+
                 print(f"Model returned the result\n {result}\nwhere:\n-emotions : {emotions}\n-chat: {chat}\n ")
+                # time 
+                inference_time = time.time() - start_time
+                # logger
                 await analyze_and_log_sentiment(user_id, message, emotions)
-                return emotions, resp.status , chat
+
+                return emotions, inference_time , chat
+            
             except Exception as ec2_error:
                 logger.error(f"EC2 inference error: {ec2_error}")
                 raise HTTPException(status_code=500, detail=f"EC2 inference failed: {str(ec2_error)}")
@@ -648,6 +644,8 @@ def list_chats():
 def get_chat(chat_id):
     print("get_chat history chat_id :" , chat_id)
     chat = chat_collection.find_one({"_id": chat_id})
+    print("CHats found, ", chat)
+
     if not chat:
         return jsonify({"error": "Chat not found"}), 404
     return jsonify({"message": chat["messages"]})
@@ -885,56 +883,6 @@ async def predict_emotions(text, threshold=0.3):
 
     return json.dumps(response, indent=4)  # Standardized JSON output
 
-# ------------------------------------------------------------------------ Helper Functions ------------------------------------------------------------------------
-    
-def update_user_model(user_id: str, chat_data: Dict):
-    """Update the user's model based on chat interaction (stored in S3)."""
-    try:
-        # Define model paths
-        base_model_path = f"models/base_model.pt"
-        user_model_path = f"models/{user_id}/model.pt"
-        
-        # Check if user model exists, else copy base model
-        if not check_s3_object_exists(S3_BUCKET, user_model_path):
-            copy_s3_object(S3_BUCKET, base_model_path, S3_BUCKET, user_model_path)
-
-        # Download current model from S3
-        local_model_path = f"/tmp/{user_id}_model.pt"
-        # download_model_from_s3(user_model_path, local_model_path)
-
-        # Load model
-        model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=28)
-        model.load_state_dict(torch.load(local_model_path, map_location=torch.device(DEVICE)))
-        # model.to(DEVICE)
-        model.train()
-
-        # Prepare training data
-        user_message = chat_data["user_message"]
-        model_response = chat_data["model_response"]
-
-        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
-
-        inputs = tokenizer(user_message, return_tensors="pt").to(DEVICE)
-        labels = tokenizer(model_response, return_tensors="pt").input_ids.to(DEVICE)
-
-        # Training step
-        outputs = model(**inputs, labels=labels)
-        loss = outputs.loss
-        loss.backward()
-        optimizer.step()
-
-        # Save updated model
-        torch.save(model.state_dict(), local_model_path)
-
-        # Upload updated model to S3
-        upload_model_to_s3(local_model_path, user_model_path)
-
-        logger.info(f"Updated model for user {user_id}")
-
-        return user_model_path, "latest"
-    except Exception as e:
-        logger.error(f"Error updating user model: {e}")
-        raise
 
 # ---------------------------------------
 #  ** Contious Training functions for ML
@@ -966,7 +914,7 @@ async def trigger_user_model_retrain(user_id: str):
     try:
         import aiohttp
         async with aiohttp.ClientSession() as session:
-            retrain_url = "http://<your-ec2-ip>:8081/retrain"
+            retrain_url = "fhttp://{E2C_IP}:8080/retrain"
             payload = {"user_id": user_id}
             async with session.post(retrain_url, json=payload) as resp:
                 if resp.status == 200:
@@ -977,7 +925,7 @@ async def trigger_user_model_retrain(user_id: str):
         logger.error(f"❌ Failed to trigger retraining for {user_id}: {e}")
 
 
-async def log_conversation(user_id: str, chat_id: str, message: str, response: str):
+async def log_conversation(user_id: str, chat_id: str, tone: str, message: str, response: str):
     """Logs a conversation into memory and MongoDB properly"""
     timestamp = datetime.now()
 
@@ -988,12 +936,13 @@ async def log_conversation(user_id: str, chat_id: str, message: str, response: s
     conversations[chat_id].append({
         "timestamp": timestamp,
         "user_id": user_id,
+        "tone" : tone, 
         "message": message,
         "response": response
     })
 
     print("added to conversations")
-
+    print(f"message and respond : {message} {response}")
     # MongoDB update
     chat_collection.update_one(
         {"_id": str(chat_id)},
@@ -1004,11 +953,13 @@ async def log_conversation(user_id: str, chat_id: str, message: str, response: s
                         {
                             "sender": "user",
                             "text": message,
+                            "tone" : tone,
                             "timestamp": timestamp
                         },
                         {
                             "sender": "bot",
                             "text": response,
+                            "tone" : tone,
                             "timestamp": timestamp
                         }
                     ]
@@ -1021,7 +972,6 @@ async def log_conversation(user_id: str, chat_id: str, message: str, response: s
     )
 
     print("updated chat_collection with new messages")
-
 
 # 1. Inference Prompt Generator
 async def process_chat_for_inference(user_id, message, context=None, history_limit=5):
@@ -1149,62 +1099,116 @@ async def prepare_training_data(user_id):
         logger.error(f"Data prep error: {e}")
         return {"status": "error", "message": str(e)}
     
-
 # ---------------------------------------
-#  ** Extra Data Collection from other utilities 
+#  ** Helper AI
 # ---------------------------------------
 
-# Endpoint Example: Accept journal entries
-@model_bp.post("/data/journal")
-async def journal_entry(data: dict):
-    user_id, text, labels = data.get("user_id"), data.get("text"), data.get("labels", [])
-    if not user_id or not text:
-        raise HTTPException(400, "Missing user_id or text")
-    await upload_user_training_data(user_id, [text], [labels])
-    await trigger_user_model_retrain(user_id)
-    return {"message": "Journal entry received."}
-
-# Endpoint Example: Accept check-ins
-@model_bp.post("/data/checkin")
-async def check_in(data: dict):
-    user_id, mood, note = data.get("user_id"), data.get("mood"), data.get("note", "")
-    entry = f"Mood: {mood}. Note: {note}"
-    await upload_user_training_data(user_id, [entry], [[27]])  # Neutral label
-    await trigger_user_model_retrain(user_id)
-    return {"message": "Check-in received."}
-
-# Endpoint Example: Accept photo context (metadata only)
-@model_bp.post("/data/photo")
-async def photo_metadata(data: dict):
-    user_id = data.get("user_id")
-    caption = data.get("caption", "")
-    labels = data.get("labels", [])
-    if not user_id or not caption:
-        raise HTTPException(400, "Missing caption")
-    await upload_user_training_data(user_id, [caption], [labels])
-    await trigger_user_model_retrain(user_id)
-    return {"message": "Photo metadata stored."}
-
-# Endpoint: Inference using global model
-@model_bp.post("/infer/global")
-async def infer_global(data: dict):
+@chat_bp.route("/ask-helper", methods=["POST"])
+@jwt_required()
+def ask_helper():
+    import asyncio
+    import aiohttp
+    from flask import current_app as app
+    
+    user_id = get_jwt_identity()
+    
+    data = request.get_json()
     message = data.get("message")
+    print("helper api message ", message )
+    print("helper api data ", data )
+ 
     if not message:
-        raise HTTPException(400, "Message required")
+        return jsonify({"error": "No question provided"}), 400
 
-    global_model_path = "/tmp/global_model.pt"
-    await download_model_from_s3("models/global_model.pt", global_model_path)
+    async def fetch_helper_response():
+        try: 
+            print("message asked ", message)
+            payload = {
+                "user_id": user_id,
+                "message": message,
+                "tone": "Explaining",
+            }
 
-    model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=28)
-    model.load_state_dict(torch.load(global_model_path, map_location=DEVICE))
-    model.eval()
+            ec2_url = f"http://{E2C_IP}:8080/helper"
+            logger.info(f"Sending payload to {ec2_url}: {payload}")
 
-    inputs = tokenizer(message, return_tensors="pt", truncation=True, padding=True, max_length=128)
-    with torch.no_grad():
-        logits = model(**inputs).logits
-        probs = torch.sigmoid(logits).squeeze().tolist()
-    predictions = [i for i, p in enumerate(probs) if p > 0.3]
-    return {"predicted_labels": predictions, "probabilities": probs}
+            async with aiohttp.ClientSession() as session:
+                async with session.post(ec2_url, json=payload) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        chat = result.get("response", "Sorry, I don't have adequent knowledge to answer this question. Currently...")
+                        logger.info(f"EC2 response: {result}")
+                        # Log sentiment
+                        # await analyze_and_log_sentiment(user_id, message, chat)
+                        return chat
+                    else:
+                        raise Exception(f"EC2 returned status code {resp.status}")
+        except Exception as e:
+            logger.error(f"Error in fetch_helper_response: {e}")
+            return "Sorry, something went wrong."
+
+    # Run the async call
+    try:
+        answer = asyncio.run(fetch_helper_response())
+        return jsonify({"response": answer})
+    
+    except Exception as e:
+        logger.exception("Helper AI failed.")
+        return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------
+#  ** Verify sentiment
+# ---------------------------------------
+@chat_bp.route("/verify-sentiment-chat", methods=["POST"])
+@jwt_required()
+def verify_helper():
+    import asyncio
+    import aiohttp
+    from flask import current_app as app
 
+    user_id = get_jwt_identity()
+
+    data = request.get_json()
+    message = data.get("message")
+    sentiment = data.get("sentiment", "neutral")
+
+    if not message:
+        return jsonify({"error": "No question provided"}), 400
+
+    async def fetch_helper_response():
+        try:
+            prompt = f"You are an AI helper for the Sentio app. The user asked: '{message}'"
+
+            payload = {
+                "user_id": user_id,
+                "message": prompt,
+                "sentiment": sentiment,
+            }
+
+            ec2_url = f"http://{E2C_IP}:8080/verify-sentiment"
+            logger.info(f"Sending payload to {ec2_url}: {payload}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(ec2_url, json=payload) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        chat = result.get("sentiment", sentiment ) # old sentiment
+                        logger.info(f"EC2 response: {result}")
+                        # Log sentiment
+                        await analyze_and_log_sentiment(user_id, message, chat)
+                        return chat
+                    else:
+                        raise Exception(f"EC2 returned status code {resp.status}")
+        except Exception as e:
+            logger.error(f"Error in fetch_helper_response: {e}")
+            return "Sorry, something went wrong."
+
+    # Run the async call
+    try:
+        answer = asyncio.run(fetch_helper_response())
+        return jsonify({"response": answer})
+    
+    except Exception as e:
+        logger.exception("Helper AI failed.")
+        return jsonify({"error": str(e)}), 500

@@ -50,6 +50,9 @@ import ContactSupportScreen from "./ContactSupportScreen";
 import {NotificationSettingsScreen} from "./NotificationSettingsScreen"
 import { useTheme } from './context/ThemeContext';
 
+// Helper assistant 
+import HelperAssistant from './components/HelperAssistant';
+
 // Create the stack navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -64,47 +67,6 @@ type RootTabParamList = {
   Settings: undefined;
 };
 
-/* 
-// Screens that will have bottom navigation
-const BottomTabs = () => {
-  return (
-    <Tab.Navigator
-    screenOptions={({ route }: { route: RouteProp<RootTabParamList, keyof RootTabParamList> }) => ({
-      tabBarIcon: ({ color, size }: { color: string; size: number }) => {
-        let iconName: string = "help-circle-outline";
-
-          if (route.name === "Diary") iconName = "book-outline";
-          else if (route.name === "Analysis") iconName = "bar-chart-outline";
-          else if (route.name === "Profile") iconName = "person-outline";
-          else if (route.name === "Settings") iconName = "settings-outline";
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "#3B82F6",
-        tabBarInactiveTintColor: "gray",
-        headerShown: false, // Hide header for bottom tab screens
-      })}
-    >
-      <Tab.Screen name="Diary" component={DiaryMainScreen} />
-      <Tab.Screen name="Analysis" component={AnalysisScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
-    </Tab.Navigator>
-  );
-};
-
-*/ 
-
-/*
-<Stack.Screen
-          name="Main"
-          component={BottomTabs}
-          options={{ headerShown: false }} // Hide header for bottom tabs
-        />
-
-*/
-//  <Stack.Screen name="PaymentMethodHistory" component={PaymentMethodHistory} />
-//  <Stack.Screen name="Analysis" component={AnalysisScreen} /> // Grafikde hata var
 const AppNavigation = () => {
   const { theme, darkMode } = useTheme();
 
@@ -195,6 +157,8 @@ const AppNavigation = () => {
           <Stack.Screen name="ContactSupport" component={ContactSupportScreen} />
 
         </Stack.Navigator>
+        <HelperAssistant />
+
       </NavigationContainer>
     </>
   );

@@ -1,10 +1,13 @@
+import time
+import aiohttp
+import logging
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from models.sentiment import Sentiment  # Import the Sentiment model
 from utils.database import sentiments_collection, journal_entries_collection, check_in_collection
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
-from utils.load_model import model, tokenizer
+from utils.load_model import model, tokenizer, E2C_IP
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -12,6 +15,9 @@ import json
 from pathlib import Path
 from collections import Counter, defaultdict
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Initialize Blueprint for user routes
 sentiments_bp = Blueprint("sentiments_bp", __name__)
@@ -38,10 +44,10 @@ except Exception as e:
     EMOTION_THRESHOLDS = {emotion: 0.3 for emotion in EMOTIONS}  # fallback
 
 # ---------------------------------------
-#  **Sentiment Analysis**
+#  **Sentiment Analysis** - LOCAL INFERENCE
 # ---------------------------------------
 @sentiments_bp.route("/analyze", methods=["POST"])
-def analyze_sentiment():
+def analyze_sentiment_local():
     try:
         print("🔵 Starting sentiment analysis")
         data = request.get_json()
@@ -133,6 +139,117 @@ def analyze_sentiment():
         traceback.print_exc()
         return jsonify({"error": "Failed to analyze sentiment"}), 500
     
+
+# ---------------------------------------
+#  **Sentiment Analysis** - CLOUD INFERENCE
+# ---------------------------------------
+@sentiments_bp.route("/analyze-cloud", methods=["POST"])
+@jwt_required()
+async def analyze_sentiment_cloud():
+    try:
+        print("🔵 Starting sentiment analysis")
+        data = request.get_json()
+        text = data.get('text')
+        user_id = get_jwt_identity()
+
+        print(f"🔹 Analyzing text in cloud: {text[:50]}...")
+        
+        if not text:
+            return jsonify({"error": "No text provided"}), 400
+
+        # Update the paylod for multiple chat_id 
+        payload = {
+            "user_id": user_id,
+            "text": text, 
+        }
+        print("payload is sent : " , payload)
+        # ec2_url = f"http://{E2C_IP}:8080/analyze"  # Send to cloud like this
+        ec2_url = f"http://{E2C_IP}:8080/sentiment"  # Send to cloud like this
+
+        # ec2_url = f"http://{E2C_IP}:8080/predict"  # Send to cloud like this
+        logger.info(f"Connecting to E2C Distance Servre: {E2C_IP} to {ec2_url}\nSending payload :{payload}")
+        start_time = time.time()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(ec2_url, json=payload) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    emotions = result.get("predicted_emotion", [])
+                    chat = result.get("response", "")
+                    print("Results obtained : ", result)
+                else:
+                    raise Exception(f"EC2 returned status {resp.status}")
+                        
+        logger.info(f"Results from E2C Distance Servre: {E2C_IP} by {ec2_url} equals to\n result :{result}\n emotions {emotions}")
+
+        print(f"Model returned the result\n {result}\nwhere:\n-emotions : {emotions}\n-chat: {chat}\n ")
+        # time 
+        inference_time = time.time() - start_time
+        # logger
+    
+        return emotions, inference_time , chat
+
+    except Exception as e:
+        print(f"❌ Error in sentiment analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to analyze sentiment"}), 500
+    
+
+# ---------------------------------------
+#  ** Verify sentiment
+# ---------------------------------------
+@sentiments_bp.route("/verify-sentiment", methods=["POST"])
+@jwt_required()
+def verify_helper():
+    import asyncio
+    import aiohttp
+    from flask import current_app as app
+
+    user_id = get_jwt_identity()
+
+    data = request.get_json()
+    message = data.get("message")
+    sentiment = data.get("sentiment", "neutral")
+
+    if not message:
+        return jsonify({"error": "No question provided"}), 400
+
+    async def fetch_helper_response():
+        try:
+            prompt = f"You are an AI helper for the Sentio app. The user asked: '{message}'"
+
+            payload = {
+                "user_id": user_id,
+                "message": prompt,
+                "sentiment": sentiment,
+            }
+
+            ec2_url = f"http://{E2C_IP}:8080/verify-sentiment-chat"
+            logger.info(f"Sending payload to {ec2_url}: {payload}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(ec2_url, json=payload) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        chat = result.get("sentiment", sentiment ) # old sentiment
+                        logger.info(f"EC2 response: {result}")
+                        # Log sentiment
+                        return chat
+                    else:
+                        raise Exception(f"EC2 returned status code {resp.status}")
+        except Exception as e:
+            logger.error(f"Error in fetch_helper_response: {e}")
+            return "Sorry, something went wrong."
+
+    # Run the async call
+    try:
+        answer = asyncio.run(fetch_helper_response())
+        return jsonify({"response": answer})
+    
+    except Exception as e:
+        logger.exception("Helper AI failed.")
+        return jsonify({"error": str(e)}), 500
+
 
 @sentiments_bp.route("/<timeframe>", methods=["GET"])
 @jwt_required()

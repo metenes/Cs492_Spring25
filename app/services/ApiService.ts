@@ -62,7 +62,7 @@ export const fetchByKeybordEmotion = async (token: string, keyword : string) => 
 };
 
 // **********************************************
-// **Sentiment API** - 
+// **Sentiment API** 
 // **********************************************
 export const analyzeSentiment = async (text: string) => {
   try {
@@ -89,8 +89,8 @@ export const analyzeSentiment = async (text: string) => {
     console.log("🔍 Parsed sentiment data:", JSON.stringify(data, null, 2));
     // Verify emotions array
     if (!data.emotions || !Array.isArray(data.emotions)) {
-      console.error("❌ Invalid emotions data:", data);
-      throw new Error("Invalid emotions data received");
+        console.error("❌ Invalid emotions data:", data);
+        throw new Error("Invalid emotions data received");
     }
 
     // Log each emotion object
@@ -105,7 +105,7 @@ export const analyzeSentiment = async (text: string) => {
 
     return data;
   } catch (error) {
-    console.error("❌ Error in analyzeSentiment:", error);
+      console.error("❌ Error in analyzeSentiment:", error);
     throw error;
   }
 };
@@ -240,10 +240,10 @@ export const fetchCurrentSentimentMood = async (token: string) => {
 // ** Chat API** 
 // **********************************************
 // Send message
-export const sendMessageChat = async (message: string, chat_id: string) => {
+export const sendMessageChat = async (message: string, tone: string, chat_id: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
-
+    console.log("here")
     const response = await fetch(`${API_URL}/chat/chat-message/${chat_id}`, {
       method: "POST",
       headers: {
@@ -252,7 +252,8 @@ export const sendMessageChat = async (message: string, chat_id: string) => {
       },
       body: JSON.stringify({
         message,
-        chat_id
+        chat_id,
+        tone
       }),
     });
 
@@ -333,7 +334,6 @@ export const clearHistoryAllChat = async()  => {
     return "Sorry, something went wrong.";
   }
 }
-
 
 // delete history of chat 
 export const deleteHistoryChat = async(chat_id : string)  => {
@@ -578,7 +578,6 @@ export const renameChat = async(chat_id: string, name: string) => {
   }
 }
 
-
 export const saveChat = async(chat_id: string) => {
   try {
     const token = await AsyncStorage.getItem("userToken");
@@ -607,6 +606,80 @@ export const saveChat = async(chat_id: string) => {
     throw error; // Better to throw the error for handling upstream
   }
 }
+
+// **********************************************
+// **Guided AI bot** 
+// **********************************************
+
+export const askHelperAI = async (token : string ,message: string) => {
+  try {
+    console.log("helper question : ",message )
+    const response = await fetch(`${API_URL}/chat/ask-helper`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("helper api ", data)    
+    console.log("Data received from server:", data);
+
+    if (!data.response) {
+      throw new Error("Invalid response format");
+    }
+    return  data.response  || "Sorry, I couldn't find any answer.";
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+};
+
+// **********************************************
+// ** Verify Sentiment & Message Matching Cloud ** 
+// **********************************************
+
+export const verifySentimentChat = async (token : string ,message: string, sentiment : string[] ) => {
+  try {
+    console.log("verify chat")
+    const response = await fetch(`${API_URL}/chat/verify-sentiment-chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message,
+        sentiment
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Data received from server:", data);
+
+    if (!data.reply && !data.response) {
+      throw new Error("Invalid response format");
+    }
+    return data.reply || data.response  || "Sorry, I couldn't find any answer.";
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return "Sorry, something went wrong.";
+  }
+};
 
 
 // **********************************************

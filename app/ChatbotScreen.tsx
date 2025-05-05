@@ -4,12 +4,16 @@ import { sendMessageChat, deleteHistoryChat, getHistoryChat, getHistoryAllChat, 
 import BottomNavigation from "./BottomNavigation";
 import { AlignJustify, ArrowUp, Bot, Download, Edit2, Plus, Trash2, User, X, Zap } from "lucide-react-native";
 import { useTheme } from './context/ThemeContext';
+import Slider from '@react-native-community/slider';
+// Prevent keyboad hide
+import {  ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 
 // Define the type for each message
 interface Message {
   id: string;
   sender: "user" | "bot";
   text: string;
+  tone: string;
   timestamp: Date;
 }
 
@@ -21,6 +25,7 @@ interface Conversation {
 const ChatbotScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [tone, setTone] = useState(0);
   const [loading, setLoading] = useState(false); // Show loading 
   const [error, setError] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
@@ -78,6 +83,7 @@ const ChatbotScreen = () => {
       id: Date.now().toString(),
       sender: "user", 
       text: input,
+      tone : mapNumToTone(tone) ,
       timestamp: new Date()
     };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
@@ -86,13 +92,14 @@ const ChatbotScreen = () => {
   
     try {
       console.log("sending message to chat server ...")
-      const responseText = await sendMessageChat(input, activeConversation);
+      const responseText = await sendMessageChat(input,  mapNumToTone(tone),  activeConversation);
   
-      const botMessage: Message = { 
+      const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        sender: "bot", 
+        sender: "bot",
         text: typeof responseText === "string" ? responseText : responseText.message,
-        timestamp: new Date()
+        timestamp: new Date(),
+        tone: mapNumToTone(tone) 
       };
   
       setMessages((prevMessages) => [...prevMessages, botMessage]);
@@ -100,6 +107,7 @@ const ChatbotScreen = () => {
       // Update conversation title with first user message for new chats
       const currentConversation = conversations.find(c => c.id === activeConversation);
       if (currentConversation && currentConversation.title === "New Chat") {
+        
         // Create a truncated title from the user's first message
         const newTitle = input.length > 30 ? input.substring(0, 27) + "..." : input;
         handleRenameChat(activeConversation, newTitle);
@@ -112,6 +120,7 @@ const ChatbotScreen = () => {
           id: (Date.now() + 1).toString(),
           sender: "bot", 
           text: "Sorry, something went wrong. Try again!",
+          tone: mapNumToTone(tone) ,
           timestamp: new Date()
         },
       ]);
@@ -135,6 +144,31 @@ const ChatbotScreen = () => {
     }
   };
   
+// Fix for the mapNumToTone function
+const mapNumToTone = (tone: number): string => {
+  let toneString = "Neutral" 
+  // "Rigid", "Cold", "Calm", "Neutral", "Encouraging", "Uplifting", "Energetic"
+  if(tone == 0){
+    toneString = "Rigid" 
+  }
+  else if(tone == 1){
+    toneString = "Cold" 
+  }
+  else if(tone == 2){
+    toneString = "Calm" 
+  }
+  else if(tone == 4){
+    toneString = "Encouraging" 
+  }
+  else if(tone == 5){
+    toneString = "Uplifting" 
+  }
+  else if(tone == 6){
+    toneString = "Energetic" 
+  }
+  return toneString; 
+}
+
   const handleStartNewChat = async () => {
     try {
       setLoading(true);
@@ -151,7 +185,7 @@ const ChatbotScreen = () => {
       setConversations(prevConversations => [newChat, ...prevConversations]);
       setActiveConversation(newId);
       setMessages([
-        { id: '1', sender: "bot", text: "Hi there! How can I help you today?", timestamp: new Date() }
+        { id: '1', sender: "bot", text: "Hi there! How can I help you today?", tone :  mapNumToTone(tone) , timestamp: new Date() }
       ]);
       setShowSidebar(false);
     } catch (error) {
@@ -180,6 +214,7 @@ const ChatbotScreen = () => {
           id: String(i + 1),
           sender: m.sender,
           text: m.text,
+          tone : m.tone,
           timestamp: new Date(m.timestamp || Date.now())
         }));
       
@@ -187,13 +222,13 @@ const ChatbotScreen = () => {
       } else {
         console.log("No messages found for this conversation, starting fresh");
         setMessages([
-          { id: '1', sender: "bot", text: "Hi there! How can I help you today?", timestamp: new Date() }
+          { id: '1', sender: "bot", text: "Hi there! How can I help you today?", tone : mapNumToTone(tone) , timestamp: new Date() }
         ]);
       }
     } catch (error) {
       console.error("Failed to load chat history", error);
       setMessages([
-        { id: '1', sender: "bot", text: "Could not load conversation. Please try again.", timestamp: new Date() }
+        { id: '1', sender: "bot", text: "Could not load conversation. Please try again.", tone : mapNumToTone(tone) ,timestamp: new Date() }
       ]);
     } finally {
       setLoading(false);
@@ -414,6 +449,10 @@ const ChatbotScreen = () => {
     </Modal>
   );
 
+  function setToneLevel(tone: any) {
+    setTone(tone)
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? theme.backgroundColor : "#f9f9fb" }]}>
       <View style={[styles.header, { 
@@ -443,12 +482,16 @@ const ChatbotScreen = () => {
           </TouchableOpacity>
         )}
       </View>
-
+  
       <View style={styles.content}>
         {renderSidebar()}
         {renderEditModal()}
-        
-        <View style={[styles.chatContainer, { backgroundColor: darkMode ? theme.backgroundColor : 'transparent' }]}>
+  
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[styles.chatContainer, { backgroundColor: darkMode ? theme.backgroundColor : 'transparent', flex: 1 }]}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} // Adjust if needed
+        >
           {!activeConversation && conversations.length === 0 ? (
             <View style={styles.welcomeContainer}>
               <Text style={[styles.welcomeTitle, { color: theme.text }]}>Welcome to Sentio ChatBot</Text>
@@ -466,6 +509,7 @@ const ChatbotScreen = () => {
               keyExtractor={item => item.id}
               style={styles.messageList}
               contentContainerStyle={styles.messageListContent}
+              keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
                 activeConversation ? (
                   <View style={styles.emptyChat}>
@@ -475,29 +519,38 @@ const ChatbotScreen = () => {
               }
             />
           )}
-          
+  
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#007BFF" />
               <Text style={[styles.loadingText, { color: darkMode ? '#aaa' : '#777' }]}>Sentio ChatBot is thinking...</Text>
             </View>
           )}
-          
+  
           {activeConversation && (
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === "ios" ? "padding" : "height"} 
-              style={[styles.inputWrapper, { 
-                backgroundColor: darkMode ? theme.cardBackground : '#fff',
-                borderTopColor: darkMode ? '#333' : '#eaecef'
-              }]}
+            <View
+              style={[
+                styles.inputWrapper,
+                { 
+                  backgroundColor: darkMode ? theme.cardBackground : '#fff',
+                  borderTopColor: darkMode ? '#333' : '#eaecef',
+                  paddingHorizontal: 12,
+                  paddingVertical: 8
+                }
+              ]}
             >
               <View style={styles.inputContainer}>
                 <TextInput
-                  style={[styles.input, {
-                    backgroundColor: darkMode ? '#222' : '#fff',
-                    borderColor: darkMode ? '#444' : '#ddd',
-                    color: theme.text
-                  }]}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: darkMode ? '#222' : '#fff',
+                      borderColor: darkMode ? '#444' : '#ddd',
+                      color: theme.text,
+                      padding: 10,
+                      borderRadius: 12
+                    }
+                  ]}
                   value={input}
                   onChangeText={setInput}
                   placeholder="Message Sentio ChatBot..."
@@ -508,9 +561,14 @@ const ChatbotScreen = () => {
                 <TouchableOpacity 
                   style={[
                     styles.sendButton, 
-                    !input.trim() || !activeConversation ? 
-                      [styles.disabledButton, { backgroundColor: darkMode ? '#333' : '#f0f0f0' }] : 
-                      {}
+                    {
+                      backgroundColor: !input.trim() || !activeConversation 
+                        ? (darkMode ? '#333' : '#f0f0f0') 
+                        : (darkMode ? '#007AFF' : '#007AFF'),
+                      borderRadius: 10,
+                      padding: 10,
+                      marginLeft: 8
+                    }
                   ]} 
                   onPress={handleSend}
                   disabled={!input.trim() || loading || !activeConversation}
@@ -522,17 +580,34 @@ const ChatbotScreen = () => {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.disclaimer, { color: darkMode ? '#888' : '#888' }]}>
+              <Text style={[styles.disclaimer, { color: darkMode ? '#888' : '#888', marginTop: 8 }]}>
                 Sentio ChatBot may display inaccurate info, including about people.
               </Text>
-            </KeyboardAvoidingView>
+              <View style={{ marginTop: 10, alignItems: 'center' }}>
+                <Text style={{ color: theme.text, marginBottom: 4, fontSize: 14 }}>
+                  Response Tone: {["Rigid", "Cold", "Calm", "Neutral", "Encouraging", "Uplifting", "Energetic"][tone]}
+                </Text>
+                <Slider
+                  minimumValue={0}
+                  maximumValue={6}
+                  step={1}
+                  value={tone}
+                  onValueChange={setToneLevel}
+                  style={{ width: '100%', height: 40 }}
+                  minimumTrackTintColor={darkMode ? '#aaa' : '#007AFF'}
+                  maximumTrackTintColor={darkMode ? '#444' : '#ccc'}
+                  thumbTintColor={darkMode ? '#fff' : '#007AFF'}
+                />
+              </View>
+            </View>
           )}
-        </View>
+        </KeyboardAvoidingView>
       </View>
       
       <BottomNavigation activeScreen={"FreeJournaling"} />
     </SafeAreaView>
   );
+  
 };
 
 const styles = StyleSheet.create({
