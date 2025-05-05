@@ -66,7 +66,7 @@ USER_MODEL_PATH = "sagemaker-eu-north-1-495599763151/pytorch-inference-2025-04-1
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 # E2c Model 
-E2C_IP = "51.21.246.174" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
+E2C_IP = "56.228.3.31" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
 
 # Define the emotion labels - Local 
 emotion_labels = [

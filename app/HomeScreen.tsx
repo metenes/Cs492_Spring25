@@ -150,6 +150,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<Entry[]>([]);
   const [shouldLoadData, setShouldLoadData] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
+
   // Search Bar
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -167,38 +169,43 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
   // Enhanced filter function
   const applyFilter = (filter: string) => {
-
     setActiveFilter(filter);
-    let filtered = entries;
-    // Apply category filter
-    if (filter !== "all") {
-      filtered = filtered.filter(entry => entry.category === filterMap[filter]);
-    }
-    
-    // Apply search filter if there's a search query
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(entry => 
-        entry.entryContent?.toLowerCase().includes(query) || 
-        entry.prompt?.toLowerCase().includes(query)
-      );
-    }
-
-
-    if (selectedEmotions.length > 0) {
-      const selectedSet = new Set(selectedEmotions);
-      filtered = filtered.filter(entry => {
-        if (!entry.journalSentiments?.length) return false;
-
-        return entry.journalSentiments.some(sentiment => {
-          const emotionStr = emotionMap[sentiment.emotion];
-          return emotionStr && selectedSet.has(emotionStr);;
+    setIsFiltering(true);
+  
+    // let React paint the spinner before we crunch the array
+    setTimeout(() => {
+      let filtered = entries;
+  
+      // — category filter
+      if (filter !== "all") {
+        filtered = filtered.filter(e => e.category === filterMap[filter]);
+      }
+  
+      // — text search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(e => {
+        const content = (e.entryContent ?? "").toLowerCase();
+        const p      = (e.prompt       ?? "").toLowerCase();
+        return content.includes(q) || p.includes(q);
         });
-      });
-    }
-
-    setFilteredEntries(filtered);
+      }
+  
+      // — emotion filter
+      if (selectedEmotions.length) {
+        const sel = new Set(selectedEmotions);
+        filtered = filtered.filter(e =>
+          e.journalSentiments?.some(s =>
+            sel.has(emotionMap[s.emotion])
+          )
+        );
+      }
+  
+      setFilteredEntries(filtered);
+      setIsFiltering(false);
+    }, 0);
   };
+  
 
   // Update search query handler
   const onChangeSearch = (query: string) => {
@@ -215,10 +222,10 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
     } else {
       setSelectedEmotions([...selectedEmotions, emotion]);
     }
-    // Reapply filters after toggling emotion
-    applyFilter(activeFilter);
   };
-
+  useEffect(() => {
+    applyFilter(activeFilter);
+  }, [selectedEmotions, searchQuery, activeFilter]);
   const loadData = useCallback(async () => {
     if (!shouldLoadData) return;
 
@@ -761,7 +768,11 @@ if (!earnedBadges.includes("locked_journal")) {
 
           </ScrollView>
         </View>
-
+        {isFiltering ? (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" color={theme.primary} />
+    </View>
+  ) : (
         <FlatList
           data={filteredEntries}
           renderItem={renderEntry}
@@ -783,6 +794,7 @@ if (!earnedBadges.includes("locked_journal")) {
             ) : null
           }
         />
+  )}
 
         {/* Floating Action Button (FAB) + Dropdown Menu */}
         <View style={styles.fabContainer}>
