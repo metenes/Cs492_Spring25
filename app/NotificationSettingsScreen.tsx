@@ -8,6 +8,7 @@ import BottomNavigation from './BottomNavigation';
 import { Picker } from '@react-native-picker/picker';
 import { useTheme } from './context/ThemeContext';
 import { updateNotificationFrequency, fetchNotificationPreferences } from './services/ApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
   NotificationSettings: undefined;
@@ -20,6 +21,15 @@ export const NotificationSettingsScreen = () => {
   const [frequency, setFrequency] = useState("daily");
   const navigation = useNavigation<NavigationProp>();
   const { theme, darkMode } = useTheme();
+  const [pushToken, setPushToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPushToken = async () => {
+      const token = await AsyncStorage.getItem("expoPushToken");
+      setPushToken(token);
+    };
+    fetchPushToken();
+  }, []);
 
 
   useEffect(() => {
@@ -89,6 +99,7 @@ export const NotificationSettingsScreen = () => {
                   selectedValue={frequency}
                   onValueChange={(itemValue) => handleSelection(itemValue)}
                   style={{ color: theme.text }}
+                  aria-disabled={!pushToken}
                 >
                   <Picker.Item label="Daily" value="daily" color={theme.text} />
                   <Picker.Item label="Weekly" value="weekly" color={theme.text} />
