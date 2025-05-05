@@ -280,44 +280,59 @@ const GuidedJournalingScreen = () => {
           <View style={{ 
             backgroundColor: darkMode ? theme.cardBackground : "#F5F5F5", 
             padding: 20, 
-            borderRadius: 12 
+            borderRadius: 12, 
           }}>
             {/* Clear Draft Icon */}
-            <TouchableOpacity
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                zIndex: 1,
-                padding: 8,
-              }}
-              onPress={() => {
-                if (content.trim()) {
-                  Alert.alert(
-                    "Clear Entry",
-                    "Are you sure you want to clear your current entry?",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Clear",
-                        style: "destructive",
-                        onPress: async () => {
-                          await clearDraft();
-                          setContent("");
-                          setImageUris([]);
-                        }
-                      }
-                    ]
-                  );
-                }
-              }}
-            >
-              <Text style={{ fontSize: 18, color: theme.text }}>❌</Text>
-            </TouchableOpacity>
+            {(content.trim() || imageUris.length > 0) && (
+  <TouchableOpacity
+    style={{
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      backgroundColor: darkMode ? '#404040' : '#e0e0e0',
+      borderRadius: 20,
+      padding: 6,
+      elevation: 4, // Android shadow
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    }}
+    onPress={() => {
+      Alert.alert(
+        "Clear Entry",
+        "Are you sure you want to clear your current entry?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Clear",
+            style: "destructive",
+            onPress: async () => {
+              await clearDraft();
+              setContent("");
+              setImageUris([]);
+            }
+          }
+        ]
+      );
+    }}
+    activeOpacity={0.8}
+  >
+    <Text style={{ 
+      fontSize: 18, 
+      color: darkMode ? "#fff" : "#333",
+      opacity: 0.8,
+    }}>
+      ✕
+    </Text>
+  </TouchableOpacity>
+)}
+
 
             <TextInput
               style={{
                 minHeight: 200,
+                marginTop: 20,
                 fontSize: 16,
                 color: theme.text,
                 textAlignVertical: "top",
@@ -338,6 +353,18 @@ const GuidedJournalingScreen = () => {
             }}>
               {content.length} / {MAX_CHAR_COUNT}
             </Text>
+            {content.length >= MAX_CHAR_COUNT - 500 && content.length < MAX_CHAR_COUNT && (
+            <Text style={{ color: "red", textAlign: "center", marginTop: 5 }}>
+              ⚠️ You're writing a wonderful entry! Just a heads-up, you're nearing the character limit.
+            </Text>
+          )}
+
+          {content.length >= MAX_CHAR_COUNT && (
+            <Text style={{ color: "red", textAlign: "center", marginTop: 5, fontWeight: "bold" }}>
+              🚫 That's an amazing entry! You've reached the limit, but you can always start a new one.
+            </Text>
+          )}
+
           </View>
 
           {/* Button Container */}
