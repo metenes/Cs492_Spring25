@@ -21,6 +21,7 @@ from botocore.exceptions import ClientError
 import os
 from werkzeug.utils import secure_filename
 import time
+import string
 
 from flask_dance.contrib.google import make_google_blueprint
 
@@ -508,54 +509,37 @@ def update_user(user_id):
     return jsonify({"message": "Profile updated successfully"}), 200
 
 # Upload profile picture
-@user_bp.route('/<user_id>/profile-image', methods=['POST'])
+@user_bp.route('/profile-image', methods=['POST'])
 @jwt_required()
-def upload_profile_image(user_id):
+def upload_profile_image():
     try:
-        # Verify user is updating their own profile
-        current_user_id = get_jwt_identity()
-        if str(current_user_id) != user_id:
-            return jsonify({"error": "Unauthorized"}), 403
+        # Get user ID from token
+        user_id = get_jwt_identity()
+        print(f"🔍 Uploading profile image for user: {user_id}")
 
-        # Log request details
-        print(f"Request files: {request.files}")
-        print(f"Request form: {request.form}")
-
-        if 'profileImage' not in request.files:
-            print("No 'profileImage' found in request.files")
+        if 'image' not in request.files:
             return jsonify({"error": "No image provided"}), 400
 
-        file = request.files['profileImage']
-        print(f"File received: filename={file.filename}, content_type={file.content_type}")
-        
-        # Handle missing filename
-        original_filename = "profile-image.jpg"  # Use a guaranteed valid name
-        filename = f"profile-images/{user_id}/{int(time.time())}_{secure_filename(original_filename)}"
+        file = request.files['image']
+        if not file:
+            return jsonify({"error": "No image provided"}), 400
+
+        timestamp = int(time.time())
+        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        original_filename = secure_filename(file.filename)
+        filename = f"profile-images/{user_id}/{timestamp}_{random_string}_{original_filename}"
 
         print(f"Generated S3 filename: {filename}")
-        
-        # Try to read the file
-        try:
-            file_content = file.read()
-            file_size = len(file_content)
-            print(f"File size read: {file_size} bytes")
-            # Seek back to beginning for upload
-            file.seek(0)
-        except Exception as read_error:
-            print(f"Error reading file: {str(read_error)}")
-            return jsonify({"error": "Could not read uploaded file"}), 400
         
         # Upload to S3
         try:
             print(f"Attempting to upload to S3: bucket={S3_BUCKET}, filename={filename}")
             s3_client.upload_fileobj(
-            file.stream, 
-            S3_BUCKET,
-            filename,
-            ExtraArgs={
-                "ContentType": file.content_type or "image/jpeg"
-            }
-        )
+                file.stream,
+                S3_BUCKET,
+                filename,
+                ExtraArgs={'ContentType': file.content_type or 'image/jpeg'}
+            )
             print("S3 upload successful")
 
             # Generate the URL for the uploaded image

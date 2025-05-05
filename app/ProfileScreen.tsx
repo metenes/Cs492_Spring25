@@ -340,163 +340,22 @@ const ProfileScreen = () => {
   // Upload image to server (S3 via backend)
   const uploadImage = async (imageUri: string) => {
     try {
-      const currentToken = await AsyncStorage.getItem('userToken');
-      console.log('Checking token for upload:', currentToken ? 'Token exists' : 'No token');
-
-      if (!currentToken) {
-        console.log('No token found for upload');
-        Alert.alert('Error', 'Not authenticated. Please log in again.');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        });
-        return;
-      }
-
-      try {
-        // Split and decode token
-        const parts = currentToken.split('.');
-        if (parts.length !== 3) {
-          throw new Error('Invalid token format - token should have 3 parts');
-        }
-
-        const payload = parts[1];
-        // Add padding if needed
-        const paddedPayload = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '=');
-        const base64 = paddedPayload.replace(/-/g, '+').replace(/_/g, '/');
-        const decodedPayload = JSON.parse(atob(base64));
-
-        console.log("Upload token payload:", decodedPayload);
-        
-        const currentUserId = decodedPayload.userId || decodedPayload.sub || decodedPayload.id;
-        if (!currentUserId) {
-          throw new Error('No user ID found in token');
-        }
-
-        console.log('Using user ID for upload:', currentUserId);
-        setIsLoading(true);
-        
-        // Get file size for logging
-        const fileSize = await getFileSize(imageUri);
-        console.log('File size before upload:', fileSize, 'bytes');
-        
-        // Create FormData and append the image
-        const formData = new FormData();
-        formData.append('profileImage', {
-          uri: imageUri, // Do not strip 'file://' prefix
-          type: 'image/jpeg',
-          name: 'profile-image.jpg',
-        } as any);
-
-        // Log FormData contents for debugging
-        console.log('FormData structure:', {
-          profileImage: {
-            uri: imageUri,
-            type: 'image/jpeg',
-            name: 'profile-image.jpg',
-            size: fileSize
-          }
-        });
-
-        // Updated endpoint to include user ID
-        const uploadEndpoint = `${API_URL}/user/${currentUserId}/profile-image`;
-        console.log('Making upload request to:', uploadEndpoint);
-
-        try {
-          const response = await fetch(uploadEndpoint, {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${currentToken}`
-            },
-            body: formData
-          });
-
-          console.log('Response status:', response.status);
-          const responseData = await response.json();
-          console.log('Response data:', responseData);
-
-          if (!response.ok) {
-            throw new Error(responseData.error || 'Upload failed');
-          }
-
-          if (responseData && responseData.profileImageUrl) {
-            setProfileImage(responseData.profileImageUrl);
-            Alert.alert('Success', 'Profile picture updated successfully');
-          } else {
-            throw new Error('No profile image URL received in response');
-          }
-        } catch (error: any) {
-          console.error('Error processing upload:', error.message);
-          if (error.response?.status === 400) {
-            Alert.alert(
-              'Error',
-              'The image could not be uploaded. Please make sure you\'ve selected a valid image file.'
-            );
-          } else if (error.response?.status === 500) {
-            Alert.alert(
-              'Error',
-              'There was a problem uploading your image. Please try again later.'
-            );
-          } else {
-            Alert.alert(
-              'Error',
-              error.message || 'Failed to upload profile picture'
-            );
-          }
-          throw error;
-        }
-      } catch (error: any) {
-        console.error('Error processing upload:', error.response?.data || error.message);
-        console.error('Full error object:', JSON.stringify(error, null, 2));
-        
-        if (error.response?.status === 500) {
-          console.error('Server error details:', error.response?.data);
-          console.error('Server error headers:', error.response?.headers);
-          Alert.alert(
-            'Error',
-            'There was a problem uploading your image. Please try again with a different image or contact support if the problem persists.'
-          );
-        } else if (error.response?.status === 404) {
-          Alert.alert(
-            'Error',
-            'The upload endpoint was not found. Please contact support.'
-          );
-        } else if (error.response?.status === 405) {
-          Alert.alert(
-            'Error',
-            'The server does not accept this type of request. Please try again later.'
-          );
-        } else {
-          Alert.alert(
-            'Error',
-            'Failed to upload profile picture. Please try again later.'
-          );
-        }
-        throw error;
-      }
+      setIsLoading(true);
+      console.log('Starting profile image upload for URI:', imageUri);
+      
+      const profileImageUrl = await uploadProfileImage(imageUri);
+      console.log('Profile image upload successful:', profileImageUrl);
+      
+      setProfileImage(profileImageUrl);
+      Alert.alert('Success', 'Profile picture updated successfully');
     } catch (error: any) {
-      console.error('Error uploading image:', error);
-      if (!error.message.includes('endpoint was not found')) {
-        Alert.alert(
-          'Error',
-          error.response?.data?.error || error.message || 'Failed to upload profile picture. Please try again.'
-        );
-      }
+      console.error('Error uploading profile image:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to upload profile picture. Please try again.'
+      );
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Helper function to get file size
-  const getFileSize = async (uri: string): Promise<number> => {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      return blob.size;
-    } catch (error) {
-      console.error('Error getting file size:', error);
-      return 0;
     }
   };
 

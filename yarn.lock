@@ -3125,6 +3125,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-community/blur@npm:^4.4.1":
+  version: 4.4.1
+  resolution: "@react-native-community/blur@npm:4.4.1"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 1e47144b0c00dce562e72ea9f6c3e93d3bb392ec0ea001ce37ff801d9a496c9801927033ee4800bf92ea2ece9de0abe596715add3b7afe3c5d1533e260f5e09e
+  languageName: node
+  linkType: hard
+
 "@react-native-community/datetimepicker@npm:8.3.0":
   version: 8.3.0
   resolution: "@react-native-community/datetimepicker@npm:8.3.0"
@@ -3141,6 +3151,13 @@ __metadata:
     react-native-windows:
       optional: true
   checksum: a25468f54699c2d57c71469e10bcfa0ffcfe9be09cf850783202da8d081d34da38b33088edf5c0fe8e24d0a1320929ce7508d74903213c05c1dc287ac6ecc957
+  languageName: node
+  linkType: hard
+
+"@react-native-community/slider@npm:4.5.6":
+  version: 4.5.6
+  resolution: "@react-native-community/slider@npm:4.5.6"
+  checksum: 8287f3f69b63e0b313639d7dc9a45718a85c4c4494f78485695d7e80bcf3fa9d3891d05a557affc66306df5f2a0a9853d319a35ffcc875ae71149a38a2258bb8
   languageName: node
   linkType: hard
 
@@ -13521,6 +13538,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-blur-effect@npm:^1.1.3":
+  version: 1.1.3
+  resolution: "react-native-blur-effect@npm:1.1.3"
+  peerDependencies:
+    react: ^17.0.2
+    react-native: ^0.66.4
+    react-native-webview: ^13.6.2
+  checksum: 9adcaa8f2d83100e64013f1aebc1f7ef31ea5526826a875beb8af75f1cb6ccde8ab43ea240e7853ea8d8fa20bd6076f9913c4c09aa229c3e90181e690be8d50b
+  languageName: node
+  linkType: hard
+
 "react-native-calendars@npm:^1.1308.1":
   version: 1.1312.0
   resolution: "react-native-calendars@npm:1.1312.0"
@@ -14795,7 +14823,9 @@ __metadata:
     "@expo/metro-runtime": ~5.0.4
     "@expo/vector-icons": ^14.1.0
     "@react-native-async-storage/async-storage": ^2.1.2
+    "@react-native-community/blur": ^4.4.1
     "@react-native-community/datetimepicker": 8.3.0
+    "@react-native-community/slider": 4.5.6
     "@react-native-picker/picker": ^2.11.0
     "@react-navigation/bottom-tabs": ^7.2.0
     "@react-navigation/native": ^7.1.6
@@ -14866,6 +14896,7 @@ __metadata:
     react-dom: 19.0.0
     react-i18next: ^15.0.1
     react-native: 0.79.2
+    react-native-blur-effect: ^1.1.3
     react-native-calendars: ^1.1308.1
     react-native-chart-kit: ^6.12.0
     react-native-date-picker: ^5.0.10

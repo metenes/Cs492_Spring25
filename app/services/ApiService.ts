@@ -1020,44 +1020,54 @@ export const changePassword = async (token: string, oldPassword: string, newPass
 };
 
 // Upload profile image
-export const uploadProfileImage = async (token: string, imageFile: File) => {
+export const uploadProfileImage = async (imageUri: string): Promise<string> => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
 
-  // First get the user ID from the token (if not stored separately)
-  const userResponse = await fetch(`${API_URL}/user/get-user-id`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    // Extract the original filename from the URI
+    const originalFileName = imageUri.split('/').pop();
+    if (!originalFileName) {
+      throw new Error('Invalid image URI');
+    }
 
-  if (!userResponse.ok) {
-    throw new Error(`Failed to fetch user ID: ${userResponse.statusText}`);
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    } as any);
+
+    console.log('Uploading profile image with FormData:', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: originalFileName
+    });
+
+    const uploadResponse = await fetch(`${API_URL}/user/profile-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      console.error('Upload failed:', errorData);
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+
+    const data = await uploadResponse.json();
+    console.log('Upload successful:', data);
+    return data.profileImageUrl; // Return the profile image URL from the response
+  } catch (error) {
+    console.error('Error uploading profile image:', error);
+    throw error;
   }
-
-  const userData = await userResponse.json();
-  const userId = userData._id;
-
-  if (userId == -1) {
-    throw new Error(`Failed to userId -1`);
-  }
-
-
-  const formData = new FormData();
-  formData.append('profileImage', imageFile);
-
-  const response = await fetch(`${API_URL}/user/${userId}/profile-image`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to upload profile image: ${response.statusText}`);
-  }
-
-  return await response.json();
 };
 
 
