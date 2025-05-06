@@ -127,61 +127,197 @@ const pastelColors = [
 // Increase chart height to 300 so it's more prominent.
 const CHART_HEIGHT = 300;
 
+// Helper to normalize date for API calls
+const normalizeDateForAPI = (date: Date): string => {
+  // Set time to start of day in local timezone
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return toLocalDateString(normalized);
+};
+
+// Helper to get end of day for API calls
+const getEndOfDay = (date: Date): string => {
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return toLocalDateString(endOfDay);
+};
+
+// Helper to get local date string in "YYYY-MM-DD" format
+const toLocalDateString = (date: Date) => {
+  // Get the date in local timezone without time component
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper to format date for display
+const formatDateForDisplay = (dateString: string) => {
+  try {
+    // Handle both ISO date strings and YYYY-MM-DD format
+    let date;
+    if (dateString.includes('T')) {
+      // If it's an ISO string, parse it directly
+      date = new Date(dateString);
+    } else {
+      // If it's YYYY-MM-DD format, parse components
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return 'Invalid Date';
+    }
+
+    // Format using Turkish locale
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid Date';
+  }
+};
+
 /**
  * Returns a group key based on entryDate and selected interval.
  */
 const getGroupKey = (entryDate: string, interval: string): string => {
-  const date = new Date(entryDate);
-  switch (interval) {
-    case "daily":
-      return date.toISOString().split("T")[0];
-    case "weekly":
-      const year = date.getFullYear();
-      const firstJan = new Date(year, 0, 1);
-      const pastDays = (date.getTime() - firstJan.getTime()) / 86400000;
-      const weekNumber = Math.ceil((pastDays + firstJan.getDay() + 1) / 7);
-      return `${year}-W${weekNumber}`;
-    case "yearly":
-      return date.getFullYear().toString();
-    case "monthly":
-    default:
-      return date.toISOString().slice(0, 7);
+  try {
+    // Handle both ISO date strings and YYYY-MM-DD format
+    let date;
+    if (entryDate.includes('T')) {
+      // If it's an ISO string, parse it directly
+      date = new Date(entryDate);
+    } else {
+      // If it's YYYY-MM-DD format, parse components
+      const [year, month, day] = entryDate.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', entryDate);
+      return entryDate;
+    }
+
+    // Normalize the date to start of day
+    date.setHours(0, 0, 0, 0);
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    switch (interval) {
+      case "daily":
+        return toLocalDateString(date);
+      case "weekly":
+        const firstJan = new Date(year, 0, 1);
+        const pastDays = (date.getTime() - firstJan.getTime()) / 86400000;
+        const weekNumber = Math.ceil((pastDays + firstJan.getDay() + 1) / 7);
+        return `${year}-W${weekNumber}`;
+      case "yearly":
+        return year.toString();
+      case "monthly":
+      default:
+        return `${year}-${String(month).padStart(2, '0')}`;
+    }
+  } catch (error) {
+    console.error('Error in getGroupKey:', error);
+    return entryDate;
   }
+};
+
+// Add debug logging helper
+const debugLog = (section: string, message: string, data?: any) => {
+  console.log(`[SENTIMENT CHART] ${section}: ${message}`, data ? data : '');
 };
 
 /**
  * Aggregates raw journal entries into an array of RawSentiment objects.
  */
 const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment[] => {
+  debugLog('AGGREGATION', 'Starting aggregation process');
+  debugLog('AGGREGATION', 'Entry summary:', {
+    totalEntries: entries.length,
+    entryTypes: entries.reduce((acc: any, e) => {
+      acc[e.type] = (acc[e.type] || 0) + 1;
+      return acc;
+    }, {}),
+    entriesWithSentiments: entries.filter(e => e.journalSentiments?.length > 0).length
+  });
+
   const aggregation: Record<string, Record<number, { total_percentage: number; entry_count: number }>> = {};
 
-  entries.forEach(entry => {
+  entries.forEach((entry, index) => {
+    // Skip entries without sentiments
+    if (!entry.journalSentiments || entry.journalSentiments.length === 0) {
+      debugLog('AGGREGATION', `Skipping entry ${index} (no sentiments)`, {
+        type: entry.type,
+        date: entry.entryDate
+      });
+      return;
+    }
+
     const groupKey = getGroupKey(entry.entryDate, interval);
     if (!aggregation[groupKey]) {
       aggregation[groupKey] = {};
     }
-    (entry.journalSentiments || []).forEach((sentiment: any) => {
-      // 1) Normalize to a numeric code
+
+    debugLog('AGGREGATION', `Processing ${entry.type} entry ${index}`, {
+      originalDate: entry.entryDate,
+      normalizedDate: groupKey,
+      sentimentCount: entry.journalSentiments.length,
+      sentiments: entry.journalSentiments
+    });
+
+    entry.journalSentiments.forEach((sentiment: any) => {
       let code: number | undefined;
+      
+      // Handle different emotion formats
       if (typeof sentiment.emotion === 'number') {
         code = sentiment.emotion;
+        debugLog('AGGREGATION', `Found numeric emotion code: ${code}`);
+      } else if (typeof sentiment.emotion === 'string') {
+        const emotionLower = sentiment.emotion.toLowerCase();
+        code = reverseEmotionMap[emotionLower];
+        debugLog('AGGREGATION', `Mapped string emotion: ${emotionLower} -> ${code}`);
+        if (code === undefined) {
+          debugLog('AGGREGATION', `WARNING: Could not map emotion string: ${emotionLower}`);
+          return;
+        }
       } else {
-        code = reverseEmotionMap[sentiment.emotion.toLowerCase()];
+        debugLog('AGGREGATION', `WARNING: Invalid emotion format:`, sentiment.emotion);
+        return;
       }
-      if (typeof code !== 'number') return;  // skip if we can't map it
 
-      // 2) Initialize bucket if needed
+      // Initialize bucket if needed
       if (!aggregation[groupKey][code]) {
         aggregation[groupKey][code] = { total_percentage: 0, entry_count: 0 };
       }
 
-      // 3) Accumulate
-      aggregation[groupKey][code].total_percentage += sentiment.percentage;
+      // Accumulate with proper percentage handling
+      const percentage = typeof sentiment.percentage === 'number' ? sentiment.percentage : 1.0;
+      aggregation[groupKey][code].total_percentage += percentage;
       aggregation[groupKey][code].entry_count += 1;
+
+      debugLog('AGGREGATION', `Added emotion data`, {
+        emotion: emotionMap[code],
+        code: code,
+        percentage: percentage,
+        groupKey: groupKey,
+        entryType: entry.type
+      });
     });
   });
 
-  // 4) Flatten into RawSentiment[]
+  debugLog('AGGREGATION', 'Final aggregation result:', aggregation);
+
+  // Flatten into RawSentiment[]
   const result: RawSentiment[] = [];
   Object.entries(aggregation).forEach(([time_period, emotionsMap]) => {
     Object.entries(emotionsMap).forEach(([emotionKey, { total_percentage, entry_count }]) => {
@@ -196,50 +332,133 @@ const aggregateJournalEntries = (entries: any[], interval: string): RawSentiment
     });
   });
 
+  debugLog('AGGREGATION', 'Final processed data:', result);
   return result;
 };
 
+// Helper to format date for display in chart
+const formatChartDate = (dateStr: string, interval: string): string => {
+  try {
+    if (interval === 'weekly' && dateStr.includes('W')) {
+      // For weekly format (YYYY-WXX)
+      const [year, week] = dateStr.split('-W');
+      return `Week ${week}`;
+    }
+
+    if (interval === 'monthly') {
+      // For monthly format (YYYY-MM)
+      const [year, month] = dateStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1);
+      return date.toLocaleDateString('tr-TR', { month: 'short' });
+    }
+
+    if (interval === 'yearly') {
+      // For yearly format (YYYY)
+      return dateStr;
+    }
+
+    // For daily format (YYYY-MM-DD)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('tr-TR', { 
+      day: '2-digit',
+      month: 'short'
+    });
+  } catch (error) {
+    console.error('Error formatting chart date:', error);
+    return dateStr;
+  }
+};
+
+// Helper to get all dates in range
+const getDatesInRange = (startDate: string, endDate: string, interval: string): string[] => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const dates: string[] = [];
+
+  let current = new Date(start);
+  while (current <= end) {
+    dates.push(toLocalDateString(current));
+    
+    // Increment based on interval
+    switch (interval) {
+      case 'daily':
+        current.setDate(current.getDate() + 1);
+        break;
+      case 'weekly':
+        current.setDate(current.getDate() + 7);
+        break;
+      case 'monthly':
+        current.setMonth(current.getMonth() + 1);
+        break;
+      case 'yearly':
+        current.setFullYear(current.getFullYear() + 1);
+        break;
+    }
+  }
+  return dates;
+};
 
 /**
  * Processes raw aggregated data into a structure for the chart.
  */
-const processData = (rawData: RawSentiment[], selectedEmotions: string[]): ProcessedChartData => {
-  console.log("Raw sentiment data for chart:", rawData);
-  console.log("Selected emotions:", selectedEmotions);
-  console.log("Emotion mapping:", emotionMap);
-  console.log("Reverse emotion mapping:", reverseEmotionMap);
-  
+const processData = (
+  rawData: RawSentiment[], 
+  selectedEmotions: string[],
+  interval: string,
+  startDate: string,
+  endDate: string
+): ProcessedChartData => {
+  debugLog('PROCESS', 'Starting data processing', {
+    rawDataLength: rawData.length,
+    selectedEmotions,
+    interval,
+    dateRange: { startDate, endDate }
+  });
+
+  // Get all dates in the range
+  const allDates = getDatesInRange(startDate, endDate, interval);
+  debugLog('PROCESS', 'Generated date range', allDates);
+
   // First, aggregate counts by date and emotion
   const aggregatedData = rawData.reduce((acc: { [key: string]: { [key: number]: number } }, item) => {
     if (!acc[item.time_period]) {
       acc[item.time_period] = {};
     }
-    // Use both count and percentage for debugging
     const count = item.count || 0;
-    const percentage = item.percentage || 0;
     acc[item.time_period][item.emotion] = count;
-    
-    console.log(`Aggregating - Date: ${item.time_period}, Emotion: ${emotionMap[item.emotion]} (code: ${item.emotion}), Count: ${count}, Percentage: ${percentage}`);
+    debugLog('PROCESS', `Aggregated data point`, {
+      timePeriod: item.time_period,
+      emotion: item.emotion,
+      count: count
+    });
     return acc;
   }, {});
 
-  console.log("Aggregated data:", aggregatedData);
+  debugLog('PROCESS', 'Aggregated data structure', aggregatedData);
 
-  // Get unique sorted dates for labels
-  let labels = Object.keys(aggregatedData).sort();
-  console.log("Time periods (labels):", labels);
+  // Use all dates in range for labels
+  const labels = allDates;
+  debugLog('PROCESS', 'Time periods before formatting', labels);
+
+  // Format labels based on interval
+  const formattedLabels = labels.map(label => formatChartDate(label, interval));
+  debugLog('PROCESS', 'Formatted labels', formattedLabels);
 
   const datasets = selectedEmotions.map(emotionName => {
     const emotionCode = reverseEmotionMap[emotionName.toLowerCase()];
-    console.log(`Processing emotion: ${emotionName}, code: ${emotionCode}`);
-    
-    if (emotionCode === undefined) {
-      console.warn(`Warning: No code found for emotion: ${emotionName}`);
-    }
-    
+    debugLog('PROCESS', `Processing emotion dataset`, {
+      emotion: emotionName,
+      code: emotionCode
+    });
+
     const dataArray = labels.map(label => {
       const count = emotionCode !== undefined ? (aggregatedData[label]?.[emotionCode] || 0) : 0;
-      console.log(`Date: ${label}, Emotion: ${emotionName} (code: ${emotionCode}), Count: ${count}`);
+      debugLog('PROCESS', `Data point for ${emotionName}`, {
+        date: label,
+        count: count,
+        hasData: !!aggregatedData[label]?.[emotionCode]
+      });
       return count;
     });
     
@@ -249,30 +468,30 @@ const processData = (rawData: RawSentiment[], selectedEmotions: string[]): Proce
     };
   });
 
-  // Don't filter out empty datasets - show them with zeros
-  const filteredDatasets = datasets;
-  console.log("Datasets with counts:", filteredDatasets);
-
   // Handle single data point differently
   if (labels.length === 1) {
+    debugLog('PROCESS', 'Single data point detected, adding padding');
     const date = new Date(labels[0]);
     const prevDate = new Date(date);
     prevDate.setDate(date.getDate() - 1);
     const nextDate = new Date(date);
     nextDate.setDate(date.getDate() + 1);
 
-    labels = [
-      prevDate.toISOString().split('T')[0],
-      labels[0],
-      nextDate.toISOString().split('T')[0]
-    ];
+    const prevDateStr = toLocalDateString(prevDate);
+    const nextDateStr = toLocalDateString(nextDate);
 
-    filteredDatasets.forEach(ds => {
-      ds.data = [0, ds.data[0], 0];
+    labels.unshift(prevDateStr);
+    labels.push(nextDateStr);
+    formattedLabels.unshift(formatChartDate(prevDateStr, interval));
+    formattedLabels.push(formatChartDate(nextDateStr, interval));
+
+    datasets.forEach(ds => {
+      ds.data.unshift(0);
+      ds.data.push(0);
     });
   }
 
-  const chartDatasets = filteredDatasets.map(ds => ({
+  const chartDatasets = datasets.map(ds => ({
     data: ds.data,
     color: (opacity = 1) =>
       pastelColors[selectedEmotions.indexOf(ds.emotion) % pastelColors.length] ||
@@ -281,8 +500,20 @@ const processData = (rawData: RawSentiment[], selectedEmotions: string[]): Proce
     emotion: ds.emotion,
   }));
 
-  const processedData: ProcessedChartData = { labels, datasets: chartDatasets };
-  console.log("Final processed chart data:", processedData);
+  const processedData: ProcessedChartData = { 
+    labels: formattedLabels, 
+    datasets: chartDatasets 
+  };
+  
+  debugLog('PROCESS', 'Final processed chart data', {
+    labels: processedData.labels,
+    datasets: processedData.datasets.map(ds => ({
+      emotion: ds.emotion,
+      dataPoints: ds.data,
+      nonZeroPoints: ds.data.filter(d => d > 0).length
+    }))
+  });
+
   return processedData;
 };
 
@@ -439,31 +670,65 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       setLoading(true);
       setError(null);
       try {
-        // 1) get token
+        debugLog('LOAD', 'Starting data load process');
         const token = await AsyncStorage.getItem("userToken");
         if (!token) throw new Error("Missing auth token");
-  
-        // 2) fetch all journal + checkin entries in this date range
+
+        debugLog('LOAD', 'Fetching entries for date range', {
+          startDate,
+          endDate,
+          interval,
+          selectedEmotions
+        });
+
         const { entries } = await fetchJournalEntriesWithDate(
           token,
           startDate,
           endDate
         );
-      console.log("Fetched journal entries:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", entries);
-        // 3) aggregate client-side into the same RawSentiment shape
+
+        // Log detailed entry information
+        debugLog('LOAD', 'Fetched entries summary', {
+          total: entries.length,
+          byType: entries.reduce((acc: any, e) => {
+            acc[e.type] = (acc[e.type] || 0) + 1;
+            return acc;
+          }, {}),
+          entriesWithSentiments: entries.filter(e => e.journalSentiments?.length > 0).length,
+          sampleEntries: entries.slice(0, 3).map(e => ({
+            type: e.type,
+            date: e.entryDate,
+            sentiments: e.journalSentiments?.length || 0,
+            sentimentDetails: e.journalSentiments?.map((s: any) => ({
+              emotion: s.emotion,
+              percentage: s.percentage
+            }))
+          }))
+        });
+
         const raw: RawSentiment[] = aggregateJournalEntries(entries, interval);
-  
+        debugLog('LOAD', 'Aggregated raw data:', raw);
+
         if (!raw.length) {
+          debugLog('LOAD', 'No data found after aggregation');
           setError("empty");
           setChartData(null);
           setLabels([]);
         } else {
-          const processed = processData(raw, selectedEmotions);
+          const processed = processData(raw, selectedEmotions, interval, startDate, endDate);
+          debugLog('LOAD', 'Final processed chart data', {
+            labels: processed.labels,
+            datasets: processed.datasets.map(ds => ({
+              emotion: ds.emotion,
+              dataPoints: ds.data,
+              nonZeroPoints: ds.data.filter(d => d > 0).length
+            }))
+          });
           setLabels(processed.labels);
           setChartData(processed);
         }
       } catch (err: any) {
-        console.error("Chart load error:", err);
+        debugLog('ERROR', 'Chart load error:', err);
         setError(err.message);
         setChartData(null);
       } finally {

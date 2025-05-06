@@ -42,9 +42,58 @@ console.log(emotionMap[3]); // "Caring"
 
 // Helper to get local date string in "YYYY-MM-DD" format
 const toLocalDateString = (date: Date) => {
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-  return localDate.toISOString().split("T")[0];
+  // Get the date in local timezone without time component
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper to format date for display
+const formatDateForDisplay = (dateString: string) => {
+  try {
+    // Handle both ISO date strings and YYYY-MM-DD format
+    let date;
+    if (dateString.includes('T')) {
+      // If it's an ISO string, parse it directly
+      date = new Date(dateString);
+    } else {
+      // If it's YYYY-MM-DD format, parse components
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
+      return 'Invalid Date';
+    }
+
+    // Format using Turkish locale
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid Date';
+  }
+};
+
+// Helper to normalize date for API calls
+const normalizeDateForAPI = (date: Date): string => {
+  // Set time to start of day in local timezone
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return toLocalDateString(normalized);
+};
+
+// Helper to get end of day for API calls
+const getEndOfDay = (date: Date): string => {
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return toLocalDateString(endOfDay);
 };
 
 const SentimentAnalysisPage: React.FC = () => {
@@ -92,8 +141,8 @@ const SentimentAnalysisPage: React.FC = () => {
         setRecommendation(data.recommendation || []);
         //setTopCauses(data.top_causes || []);
         setEmotionCauseLinks(data.emotion_cause_links || {});
-        console.log("***************RECOMMENDATIONS FROM DASHBOARD.TSX")
-        console.log(emotionCauseLinks)
+        // console.log("***************RECOMMENDATIONS FROM DASHBOARD.TSX")
+        // console.log(emotionCauseLinks)
       } catch (error) {
         console.error("❌ Error fetching trend insight:", error);
       }
@@ -129,8 +178,14 @@ const SentimentAnalysisPage: React.FC = () => {
         if(token === null){
           throw new Error("Retrive user token is null");
         }
-        const startDateStr = toLocalDateString(selectedStartDate);
-        const endDateStr = toLocalDateString(selectedEndDate);
+        const startDateStr = normalizeDateForAPI(selectedStartDate);
+        const endDateStr = getEndOfDay(selectedEndDate);
+        console.log('Initial fetch for date range:', { 
+          startDateStr, 
+          endDateStr,
+          startDate: selectedStartDate.toISOString(),
+          endDate: selectedEndDate.toISOString()
+        });
         const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
         setJournalEntries(entries);
       } catch (err: any) {
@@ -151,11 +206,16 @@ const SentimentAnalysisPage: React.FC = () => {
       if(token === null){
         throw new Error("Retrive user token is null");
       }
-      const startDateStr = toLocalDateString(selectedStartDate);
-      const endDateStr = toLocalDateString(selectedEndDate);
+      const startDateStr = normalizeDateForAPI(selectedStartDate);
+      const endDateStr = getEndOfDay(selectedEndDate);
+      console.log('Fetching entries for date range:', { 
+        startDateStr, 
+        endDateStr,
+        startDate: selectedStartDate.toISOString(),
+        endDate: selectedEndDate.toISOString()
+      });
       const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
       setJournalEntries(entries);
-
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -164,7 +224,6 @@ const SentimentAnalysisPage: React.FC = () => {
   };
 
   useEffect(() => {
-    
     const fetchEntries = async () => {
       setLoading(true)
       setError(null)
@@ -173,10 +232,10 @@ const SentimentAnalysisPage: React.FC = () => {
         if (!token) throw new Error("Missing token")
         const start = toLocalDateString(selectedStartDate)
         const end   = toLocalDateString(selectedEndDate)
-        console.log("Fetching entries for", start, end)     // ← debug
+        // console.log("Fetching entries for", start, end)     // ← debug
         const { entries } = await fetchJournalEntriesWithDate(token, start, end)
         setJournalEntries(entries)
-        console.log("Fetched entries:", entries)          // ← debug
+        // console.log("Fetched entries:", entries)          // ← debug
       } catch (err: any) {
         console.error("Fetch failed:", err)
         setError(err.message)
@@ -255,9 +314,11 @@ const SentimentAnalysisPage: React.FC = () => {
   const renderJournalCards = () => {
     return journalEntries.map((entry, index) => {
       const { entryDate, journalSentiments = [], category } = entry;
+      // console.log('Entry date before formatting:', entryDate); // Debug log
       const formattedDate = entryDate
-        ? new Date(entryDate).toLocaleDateString("en-US", { timeZone: "UTC" })
+        ? formatDateForDisplay(entryDate)
         : "Unknown Date";
+      // console.log('Formatted date:', formattedDate); // Debug log
 
       // Handle entries with no sentiments
       if (!journalSentiments || journalSentiments.length === 0) {
@@ -436,7 +497,7 @@ const SentimentAnalysisPage: React.FC = () => {
               darkMode={darkMode}
             />
           </View>
-          <Text style={[styles.checkinsTitle]}>💫 Let’s hear from your check-ins 💫</Text>
+          <Text style={[styles.checkinsTitle]}>💫 Let's hear from your check-ins 💫</Text>
           {emotionalInsight && (
             <View style={[styles.insightContainer, { backgroundColor: darkMode ? '#2C2C2C' : '#E6F0FA' }]}>
               <Text style={[styles.insightTitle, { color: darkMode ? theme.text : '#1A3C6F' }]}>🧠 Emotional Insight</Text>
