@@ -342,7 +342,7 @@ const formatChartDate = (dateStr: string, interval: string): string => {
     if (interval === 'weekly' && dateStr.includes('W')) {
       // For weekly format (YYYY-WXX)
       const [year, week] = dateStr.split('-W');
-      return `Week ${week}`;
+      return `W${week}`;
     }
 
     if (interval === 'monthly') {
@@ -361,7 +361,7 @@ const formatChartDate = (dateStr: string, interval: string): string => {
     const [year, month, day] = dateStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('tr-TR', { 
-      day: '2-digit',
+      day: 'numeric',
       month: 'short'
     });
   } catch (error) {
@@ -644,6 +644,30 @@ const renderEmptyTable = (
   );
 };
 
+const CustomLegend = ({ datasets, darkMode }: { datasets: any[], darkMode: boolean }) => {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 10, marginTop: 10 }}>
+      {datasets.map((dataset, index) => (
+        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8, marginVertical: 4 }}>
+          <View style={{ 
+            width: 12, 
+            height: 12, 
+            backgroundColor: pastelColors[index % pastelColors.length],
+            marginRight: 4,
+            borderRadius: 2
+          }} />
+          <Text style={{ 
+            color: darkMode ? '#FFFFFF' : '#000000',
+            fontSize: 12
+          }}>
+            {dataset.emotion}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export const SentimentChart: React.FC<SentimentChartProps> = ({ 
   selectedEmotions, 
   interval, 
@@ -820,8 +844,11 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       borderRadius: 16,
     },
     propsForLabels: {
-      fontSize: 12,
+      fontSize: 9,
       fill: darkMode ? "#FFFFFF" : "#000000",
+      rotation: 45,
+      translateY: 10,
+      translateX: 5,
     },
     propsForDots: {
       r: "4",
@@ -831,32 +858,52 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     yAxisLabel: "%",
     yAxisSuffix: "%",
     yAxisInterval: 20,
+    paddingRight: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    count: chartData.labels.length,
+    width: Dimensions.get("window").width - 32,
+    height: CHART_HEIGHT,
+    formatXLabel: (value: string) => {
+      const totalLabels = chartData.labels.length;
+      if (totalLabels > 10) {
+        const index = chartData.labels.indexOf(value);
+        if (index % Math.ceil(totalLabels / 10) !== 0) {
+          return '';
+        }
+      }
+      return value;
+    }
   };
 
   return (
     <View style={{ position: "relative" }}>
-     <LineChart
-  data={{
-    labels: chartData.labels,
-    datasets: chartData.datasets.map((dataset, index) => ({
-      ...dataset,
-      color: (opacity = 1) => pastelColors[index % pastelColors.length], // ✅ Ensures each line has a unique color
-    })),
-    legend: chartData.datasets.map(ds => ds.emotion),
-  }}
-  width={Dimensions.get("window").width - 32}
-  height={CHART_HEIGHT}
-  chartConfig={chartConfig}
-  bezier
-  withShadow
-  withInnerLines
-  withOuterLines
-  style={{
-    borderRadius: 12,
-    marginVertical: 8,
-  }}
-/>
-
+      <LineChart
+        data={{
+          labels: chartData.labels,
+          datasets: chartData.datasets.map((dataset, index) => ({
+            ...dataset,
+            color: (opacity = 1) => pastelColors[index % pastelColors.length],
+          })),
+          legend: [], // Remove default legend
+        }}
+        width={Dimensions.get("window").width - 32}
+        height={CHART_HEIGHT}
+        chartConfig={chartConfig}
+        bezier
+        withShadow
+        withInnerLines
+        withOuterLines
+        style={{
+          borderRadius: 12,
+          marginVertical: 8,
+        }}
+        segments={5}
+        fromZero
+        renderDotContent={({ x, y, index }) => null}
+        getDotColor={(dataPoint, dataPointIndex) => pastelColors[dataPointIndex % pastelColors.length]}
+      />
+      <CustomLegend datasets={chartData.datasets} darkMode={darkMode} />
     </View>
   );
 };
