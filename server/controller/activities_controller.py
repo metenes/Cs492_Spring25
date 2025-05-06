@@ -13,6 +13,7 @@ import numpy as np
 from bson.objectid import ObjectId
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
+from utils.load_model import  E2C_IP
 
 # Initialize Blueprint for user routes
 activities_bp = Blueprint("activity_bp", __name__)
@@ -31,7 +32,7 @@ BASE_MODEL_PATH = "models/model.pt"
 BASE_MODEL_TAR_PATH = "models/model.tar.gz"
 
 # E2c Model 
-E2C_IP = "13.60.245.250" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
+# E2C_IP = "56.228.8.205" # E2C Distance Server Public IP - NEED TO CHANGE EVERY TIME WE GET NEW SERVER OPEN/CLOSE
 
 # MongoAPI
 MONGO_URI = "mongodb+srv://sentiooffical:o03TiLebpxrbIS0D@cluster0.0nh7y.mongodb.net/"

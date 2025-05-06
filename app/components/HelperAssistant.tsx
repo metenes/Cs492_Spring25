@@ -14,6 +14,7 @@ import {
   PanResponder,
   Dimensions,
   Easing,
+  Keyboard,
 } from "react-native";
 import { HelpCircle, SendHorizonal, X, MessageCircle } from "lucide-react-native";
 import { askHelperAI } from "../services/ApiService";
@@ -43,6 +44,33 @@ const HelperAssistant = () => {
   const pressStartTime = useRef(0);
   const isDragging = useRef(false);
   const scrollViewRef = useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Add keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // Scroll to bottom when keyboard appears
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Animated values
   const position = useRef(new Animated.ValueXY({ x: 20, y: height - 100 })).current; // Positioned at bottom left
@@ -151,28 +179,17 @@ const HelperAssistant = () => {
         duration: 300,
         useNativeDriver: true,
       }).start();
+
+      // Scroll to bottom after new message
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       setReply("Sorry, I couldn't process your request. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  /*
-  const addAssistantMessage = (text: any) => {
-    const updatedMessages = [...messages, { 
-      id: Date.now().toString(),
-      text: text, 
-      isUser: false 
-    }];
-    setMessages(updatedMessages);
-    
-    // Scroll to bottom after message added
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-  */
 
   const openModal = () => {
     setVisible(true);
@@ -194,6 +211,7 @@ const HelperAssistant = () => {
   };
 
   const closeModal = () => {
+    Keyboard.dismiss(); // Dismiss keyboard when closing modal
     Animated.timing(modalScale, {
       toValue: 0,
       duration: 300,
@@ -222,7 +240,6 @@ const HelperAssistant = () => {
       >
         <View style={styles.blurBackground}>
           <TouchableOpacity
-            activeOpacity={1}
             onPress={openModal}
             style={[
               styles.floatingButton,
@@ -237,32 +254,32 @@ const HelperAssistant = () => {
   
       {/* Modal */}
       <Modal visible={visible} animationType="none" transparent>
-        <View style={styles.modalOverlay}>
-          <Animated.View
-            style={[
-              styles.modalContent,
-              darkMode && styles.modalContentDark,
-              {
-                transform: [{ scale: modalScale }],
-                opacity: modalScale,
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, darkMode && styles.textDark]}>
-                Ask Sentio Assistant
-              </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <X size={22} color={darkMode ? "#ccc" : "#555"} />
-              </TouchableOpacity>
-            </View>
-  
-            {/* Wrap ScrollView + Input in KeyboardAvoidingView */}
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              style={{ flex: 1 }}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          <View style={styles.modalOverlay}>
+            <Animated.View
+              style={[
+                styles.modalContent,
+                darkMode && styles.modalContentDark,
+                {
+                  transform: [{ scale: modalScale }],
+                  opacity: modalScale,
+                  maxHeight: Platform.OS === "android" ? `${keyboardHeight > 0 ? 70 : 80}%` : "70%"
+                },
+              ]}
             >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, darkMode && styles.textDark]}>
+                  Ask Sentio Assistant
+                </Text>
+                <TouchableOpacity onPress={closeModal}>
+                  <X size={22} color={darkMode ? "#ccc" : "#555"} />
+                </TouchableOpacity>
+              </View>
+    
               <ScrollView
                 style={styles.replyBox}
                 ref={scrollViewRef}
@@ -294,7 +311,7 @@ const HelperAssistant = () => {
                   </View>
                 )}
               </ScrollView>
-  
+    
               <View style={styles.inputArea}>
                 <TextInput
                   style={[styles.input, darkMode && styles.inputDark]}
@@ -314,21 +331,14 @@ const HelperAssistant = () => {
                   <SendHorizonal size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </View>
+            </Animated.View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
   
 };
-
-/**      <BlurView
-        style={styles.absolute}
-        blurType="light"
-        blurAmount={10}
-        reducedTransparencyFallbackColor="white"
-      /> */
 
 const styles = StyleSheet.create({
   floatingButtonContainer: {
@@ -462,4 +472,3 @@ const styles = StyleSheet.create({
 });
 
 export default HelperAssistant;
-

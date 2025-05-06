@@ -12,7 +12,7 @@ import numpy as np
 # Client 
 s3 = boto3.client("s3")
 
-E2C_IP = "16.16.202.113" 
+E2C_IP = "56.228.8.205" 
 # Get the absolute path to the server directory
 
 BUCKET = "sentiobucket"

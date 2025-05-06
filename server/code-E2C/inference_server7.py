@@ -294,8 +294,8 @@ def get_mindfulness_tip(emotion, tone):
             "mindfulness": "Try progressive muscle relaxation to let tension go slowly, one body part at a time."
         },
         "annoyance": {
-            "supportive": "It's okay to feel irritated. Try identifying what’s triggering it.",
-            "motivational": "You’re in control of how you respond. A calm pause can shift your entire day.",
+            "supportive": "It's okay to feel irritated. Try identifying what is triggering it.",
+            "motivational": "You are in control of how you respond. A calm pause can shift your entire day.",
             "mindfulness": "Notice the sensation of frustration. Label it, breathe into it, then let it pass."
         },
         "approval": {
@@ -305,31 +305,31 @@ def get_mindfulness_tip(emotion, tone):
         },
         "caring": {
             "supportive": "Your empathy is powerful. Make sure you're also showing care to yourself.",
-            "motivational": "Let compassion lead you—but remember, refueling your own heart is part of caring.",
+            "motivational": "Let compassion lead you but remember, refueling your own heart is part of caring.",
             "mindfulness": "Breathe deeply and send warmth to someone you care about through a loving-kindness meditation."
         },
         "confusion": {
-            "supportive": "It’s okay not to have all the answers. You’re allowed to take your time.",
-            "motivational": "Every question is a step toward clarity. Keep going—answers will come.",
+            "supportive": "It is okay not to have all the answers. You are allowed to take your time.",
+            "motivational": "Every question is a step toward clarity. Keep going answers will come.",
             "mindfulness": "Take a pause. Focus on your breath for 2 minutes. Let your mind settle before returning to the problem."
         },
         "curiosity": {
-            "supportive": "Your curiosity is a gift—follow it gently and see where it leads.",
+            "supportive": "Your curiosity is a gift follow it gently and see where it leads.",
             "motivational": "This is the seed of growth. Let yourself explore without pressure.",
             "mindfulness": "Sit with your curiosity. Ask questions inwardly and just notice where your thoughts go."
         },
         "desire": {
             "supportive": "Desire can be a compass. Acknowledge it with honesty and care.",
             "motivational": "Let your goals inspire you, but remember to balance ambition with wellbeing.",
-            "mindfulness": "Close your eyes and picture your desire. Breathe into it without clinging—just observe it."
+            "mindfulness": "Close your eyes and picture your desire. Breathe into it without clinging just observe it."
         },
         "disappointment": {
-            "supportive": "Disappointment is tough. It’s okay to feel let down. Let yourself rest.",
-            "motivational": "This setback isn’t the end. It’s a redirection—learn from it and continue onward.",
+            "supportive": "Disappointment is tough. It is okay to feel let down. Let yourself rest.",
+            "motivational": "This setback is not the end. It is a redirection learn from it and continue onward.",
             "mindfulness": "Breathe and name the feeling. Accept it as temporary and watch it pass gently."
         },
         "disapproval": {
-            "supportive": "It’s hard when things don’t align with your values. Honor your boundaries kindly.",
+            "supportive": "It is hard when things do not align with your values. Honor your boundaries kindly.",
             "motivational": "Use this moment to assert what matters to you clearly and respectfully.",
             "mindfulness": "Feel into what triggered your response. Can you observe without reacting?"
         },
@@ -339,84 +339,84 @@ def get_mindfulness_tip(emotion, tone):
             "mindfulness": "Notice where disgust sits in your body. Breathe deeply and allow space around it."
         },
         "embarrassment": {
-            "supportive": "Everyone makes mistakes—it’s part of being human. You’re not alone.",
+            "supportive": "Everyone makes mistakes it is part of being human. You are not alone.",
             "motivational": "Own your story. Confidence comes from self-acceptance, not perfection.",
-            "mindfulness": "Place your hand on your heart. Breathe slowly and remind yourself it’s okay to feel exposed."
+            "mindfulness": "Place your hand on your heart. Breathe slowly and remind yourself it is okay to feel exposed."
         },
         "excitement": {
             "supportive": "Let yourself feel the joy! Your energy is contagious.",
-            "motivational": "Ride that wave of excitement—channel it into something meaningful!",
+            "motivational": "Ride that wave of excitement channel it into something meaningful!",
             "mindfulness": "Close your eyes and savor the feeling. Let it fill your body like sunlight."
         },
         "fear": {
             "supportive": "You are safe right now. Breathe and stay grounded.",
-            "motivational": "Fear often shows us where growth lies. You’re stronger than you know.",
+            "motivational": "Fear often shows us where growth lies. You are stronger than you know.",
             "mindfulness": "Try grounding: feel your feet on the floor, name 5 things you can see, 4 you can touch..."
         },
         "gratitude": {
             "supportive": "Gratitude brings peace. Take a moment to say 'thank you' internally.",
-            "motivational": "Start a gratitude journal—just 3 things daily can rewire your outlook.",
+            "motivational": "Start a gratitude journal just 3 things daily can rewire your outlook.",
             "mindfulness": "Breathe and visualize something you're grateful for. Let that warmth spread."
         },
         "grief": {
-            "supportive": "Your pain is real and valid. Take your time. You don’t have to be okay right now.",
-            "motivational": "Healing isn’t linear, but every step forward matters—even tears.",
-            "mindfulness": "Place both hands over your heart. Breathe and say: 'It’s okay to grieve.'"
+            "supportive": "Your pain is real and valid. Take your time. You do not have to be okay right now.",
+            "motivational": "Healing is not linear, but every step forward matters even tears.",
+            "mindfulness": "Place both hands over your heart. Breathe and say: 'It is okay to grieve.'"
         },
         "joy": {
             "supportive": "Bask in this moment. Let yourself truly feel it.",
-            "motivational": "Celebrate your wins—no matter how small!",
-            "mindfulness": "Close your eyes and say: 'I’m here. I’m joyful. I am enough.'"
+            "motivational": "Celebrate your wins no matter how small!",
+            "mindfulness": "Close your eyes and say: 'I am here. I am joyful. I am enough.'"
         },
         "love": {
             "supportive": "Love connects us. Let yourself feel it deeply and fully.",
-            "motivational": "Lead with love—it’s the most powerful force you carry.",
+            "motivational": "Lead with love , it is the most powerful force you carry.",
             "mindfulness": "Send loving-kindness thoughts: 'May I be happy. May they be safe. May we feel peace.'"
         },
         "nervousness": {
-            "supportive": "It’s okay to be nervous. It means you care. You’ve got this.",
+            "supportive": "It is okay to be nervous. It means you care. You have this.",
             "motivational": "Transform nerves into energy. Breathe, focus, and move forward.",
             "mindfulness": "Try the 5-4-3-2-1 technique to ground: list 5 things you see, 4 you feel, and so on."
         },
         "optimism": {
             "supportive": "Your hope is a light. Keep nurturing it gently.",
-            "motivational": "Let that spark drive your next steps—keep going!",
-            "mindfulness": "Focus on the good you’re seeing. Let it fill your attention without clinging to it."
+            "motivational": "Let that spark drive your next steps, keep going!",
+            "mindfulness": "Focus on the good you are seeing. Let it fill your attention without clinging to it."
         },
         "pride": {
-            "supportive": "You’ve earned this. Let yourself enjoy your progress.",
-            "motivational": "Use this pride to fuel your next goal. You’re capable of more!",
+            "supportive": "You have earned this. Let yourself enjoy your progress.",
+            "motivational": "Use this pride to fuel your next goal. You are capable of more!",
             "mindfulness": "Say: 'I am proud of myself' while breathing deeply. Let it land."
         },
         "realization": {
             "supportive": "New insights can be overwhelming. Give yourself time to adjust.",
-            "motivational": "This realization is a gift—use it to grow with purpose.",
+            "motivational": "This realization is a gift use it to grow with purpose.",
             "mindfulness": "Sit with your realization. Feel it in your body. Let it become part of you."
         },
         "relief": {
-            "supportive": "It’s okay to exhale. Let go. You've come through.",
+            "supportive": "It is okay to exhale. Let go. You've come through.",
             "motivational": "Now that the storm has passed, what can you do to take care of yourself?",
             "mindfulness": "Breathe into that feeling of safety and ease. Stay present with the peace."
         },
         "remorse": {
-            "supportive": "Everyone makes mistakes. It’s okay to acknowledge and grow.",
+            "supportive": "Everyone makes mistakes. It is okay to acknowledge and grow.",
             "motivational": "Turn regret into learning. Forgive yourself and move forward.",
             "mindfulness": "Breathe slowly and say: 'I am learning. I release guilt.'"
         },
         "sadness": {
-            "supportive": "You’re not alone. Let yourself feel and be gentle with yourself.",
+            "supportive": "You are not alone. Let yourself feel and be gentle with yourself.",
             "motivational": "Sadness shows you care. Let it fuel your healing and self-love.",
             "mindfulness": "Feel your breath. Say: 'This too shall pass.' Rest in that knowing."
         },
         "surprise": {
             "supportive": "Unexpected things can be gifts. Let curiosity guide you.",
-            "motivational": "Use the surprise as a spark—what can you do with this moment?",
+            "motivational": "Use the surprise as a spark what can you do with this moment?",
             "mindfulness": "Anchor yourself in the now. Let the surprise pass through like a wave."
         },
         "neutral": {
             "supportive": "Calm days matter too. Not everything needs intensity.",
             "motivational": "Use this moment of calm to reflect, rest, or gently plan ahead.",
-            "mindfulness": "Close your eyes. Just breathe. No judgment—just being."
+            "mindfulness": "Close your eyes. Just breathe. No judgment, just being."
         }
     }
 
