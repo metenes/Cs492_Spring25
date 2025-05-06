@@ -260,7 +260,7 @@ if chat_tokenizer.pad_token is None:
 last_user_id, cached_model = None, None
 
 # ----------------------------- Chat Generator -----------------------------
-def generate_response(user_message, emotion_context, prompt = None):
+def generate_response(user_message, emotion_context, tone = "neutral", prompt = None):
     print("Generating supportive response based on emotion...")
 
     # Construct prompt with TinyLlama chat format
@@ -275,6 +275,7 @@ def generate_response(user_message, emotion_context, prompt = None):
     if ( prompt is None ):
         prompt = (
          "<|system|>You are a compassionate and knowledgeable mental health assistant, who just give a response to users message with long detailed analysis."
+         f"<|system|>You will answer the question with {tone} tone."
          f"<|system|>You know that user fell {emotion_context}. Give answer accordingly"
          f"<|user|>{user_message}.<|assistant|>"
         )
@@ -434,6 +435,8 @@ def analyze_sentiment_last():
     try:
         data = request.get_json()
         user_id = data.get("user_id")
+        tone = data.get("tone")
+
         raw_message = data.get("message", "").strip()
         chat_id = data.get("chat_id")
 
@@ -463,7 +466,7 @@ def analyze_sentiment_last():
         print(f"Predicted emotion: {predicted_emotion} ({confidence:.2f})")
 
         # Generate AI reply
-        response_text = generate_response(message, predicted_emotion)
+        response_text = generate_response(message, predicted_emotion, tone)
 
         return jsonify({
             "user_id": user_id,

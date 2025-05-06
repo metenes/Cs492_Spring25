@@ -228,26 +228,29 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
   useEffect(() => {
     applyFilter(activeFilter);
   }, [selectedEmotions, searchQuery, activeFilter]);
+
   const loadData = useCallback(async () => {
     if (!shouldLoadData) return;
-
+  
     try {
-      setIsLoadingMore(skip > 0);
+      // Only show loading indicator for pagination, not for initial or refresh loads
+      if (skip > 0) {
+        setIsLoadingMore(true);
+      }
     
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
     
-      // ✅ Load earned badges once inside loadData
+      // Load earned badges once inside loadData
       const earned = await AsyncStorage.getItem("earnedBadges");
       const parsedBadges = earned ? JSON.parse(earned) : [];
-      setEarnedBadges(parsedBadges); // update the state so UI can also reflect
-    
-
+      setEarnedBadges(parsedBadges);
+  
       // Load entries
       const fetchedEntries = await fetchJournalEntries(token, limit, skip);
-
+  
       const checkInResponse = await fetchCheckIn(token);
-
+  
       let fetchedCheckIns = [];
       if (Array.isArray(checkInResponse.history)) {
         fetchedCheckIns = checkInResponse.history;
@@ -274,29 +277,33 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
         prompt: "",
         lockCode : checkIn.lockCode || ""
       }));
-
+  
       let allEntries = [...fetchedEntries, ...formattedCheckIns];
       allEntries.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-
-      // Apply pagination
-      allEntries = allEntries.slice(0, skip + limit);
-
-      // Check if we've reached the end of available data
-      setHasMore(allEntries.length >= skip + limit);
-
-      setEntries(allEntries);
-
-      // Reapply the current filter
-      if (activeFilter === "all") {
-        applyFilter(activeFilter)
+  
+      // Handle pagination correctly
+      if (skip === 0) {
+        // For initial load or refresh, replace all entries
+        setEntries(allEntries);
       } else {
-        applyFilter(activeFilter)
+        // For pagination, append to existing entries without duplicates
+        const existingIds = new Set(entries.map(entry => entry._id));
+        const newEntries = allEntries.filter(entry => !existingIds.has(entry._id));
+        setEntries(prev => [...prev, ...newEntries]);
       }
-
+  
+      // Check if we've reached the end of available data
+      setHasMore(allEntries.length >= limit);
+  
+      // Reapply the current filter
+      applyFilter(activeFilter);
+  
       // Load streak
       const dates = await fetchJournalDates(token, limit, skip);
       const calculatedStreak = calculateStreak(dates);
       setStreak(calculatedStreak);
+      
+      // Award badges logic (unchanged)
       if (streak == 365 && !earnedBadges.includes("one_year")) {
         const userId = await AsyncStorage.getItem("userId");
         if (userId) {
@@ -310,7 +317,7 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
           }
         }
       }
-
+  
       if (!parsedBadges.includes("prompt_wanderer")) {
         const guidedEntries = allEntries.filter(entry => entry.category === "guided");
       
@@ -328,23 +335,22 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
             if (success) {
               const updatedBadges = [...parsedBadges, "prompt_wanderer"];
               await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
-              setEarnedBadges(updatedBadges); // ✅ update local state too
+              setEarnedBadges(updatedBadges);
               setAwardedBadgeKey("prompt_wanderer");
               setBadgeCongratsModalVisible(true);
             }
           }
         }
       }
-      
-      // Reset loading flags
-      setIsLoadingMore(false);
-      setShouldLoadData(false);
     } catch (error) {
       console.error("❌ Error loading data:", error);
+    } finally {
+      // Always reset these flags when we're done, regardless of success/failure
       setIsLoadingMore(false);
       setShouldLoadData(false);
+      setIsRefreshing(false);
     }
-  }, [activeFilter, skip, limit, shouldLoadData]);
+  }, [activeFilter, skip, limit, shouldLoadData, entries]);
 
   // Check for token on component mount
   useEffect(() => {
@@ -380,6 +386,8 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
 
       // Trigger data reload on screen focus
       setShouldLoadData(true);
+      // setIsRefreshing(true)
+      setIsRefreshing(true);
 
       return () => {
         // Clean up any pending operations if needed
@@ -513,21 +521,21 @@ const HomeScreen = ({ navigation }: { navigation: HomeScreenNavigationProp }) =>
       setConfirmPin('');
       setSelectedEntry(null);
       // Award LockedBadge if not already earned
-if (!earnedBadges.includes("locked_journal")) {
-  const token = await AsyncStorage.getItem("userToken");
-  const userId = await AsyncStorage.getItem("userId");
-  if (token && userId) {
-    const success = await awardBadge( token, userId,"locked_journal",);
-    if (success) {
-      const updatedBadges = [...earnedBadges, "locked_journal"];
-      await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
-      setEarnedBadges(updatedBadges);
-      setAwardedBadgeKey("locked_journal");
-      setBadgeCongratsModalVisible(true);
-    }
-    
-  }
-}
+      if (!earnedBadges.includes("locked_journal")) {
+        const token = await AsyncStorage.getItem("userToken");
+        const userId = await AsyncStorage.getItem("userId");
+        if (token && userId) {
+          const success = await awardBadge( token, userId,"locked_journal",);
+          if (success) {
+            const updatedBadges = [...earnedBadges, "locked_journal"];
+            await AsyncStorage.setItem("earnedBadges", JSON.stringify(updatedBadges));
+            setEarnedBadges(updatedBadges);
+            setAwardedBadgeKey("locked_journal");
+            setBadgeCongratsModalVisible(true);
+          }
+          
+        }
+      }
     } catch (error) {
       console.error("Error setting PIN:", error);
       Alert.alert("Error", "Failed to set PIN. Please try again.");
@@ -657,124 +665,121 @@ if (!earnedBadges.includes("locked_journal")) {
       </TouchableOpacity>
     );
   };
-// item.category === "freeform" && 
-  const handleRefresh = async () => {
-    try {
-      setIsRefreshing(true);
-      setSkip(0); // Reset pagination to start
-      setShouldLoadData(true); // Trigger a data reload
-    } catch (err) {
-      console.error("Refresh failed", err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  
+// Improved handleRefresh function
+const handleRefresh = async () => {
+  setIsRefreshing(true);
+  setSkip(0); // Reset pagination to start
+  setShouldLoadData(true); // Trigger a data reload
+  // No need to manually set isRefreshing to false here, loadData will handle it
+};
 
-  const handleLoadMore = () => {
-    if (hasMore && !isLoadingMore) {
-      setSkip(prevSkip => prevSkip + limit);
-      setShouldLoadData(true);
-    }
-  };
+// Updated handleLoadMore function
+const handleLoadMore = () => {
+  if (hasMore && !isLoadingMore && !isRefreshing) {
+    setSkip(prevSkip => prevSkip + limit);
+    setShouldLoadData(true);
+  }
+};
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
-      {showOnboarding && (
-        <OnboardingWizard
-          onComplete={async () => {
-            const token = await AsyncStorage.getItem("userToken");
-            if (token) await completeOnboarding(token);
-            setShowOnboarding(false);
-          }}
-        />
-      )}
-      <SafeAreaView
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.backgroundColor,
-            flex: 1,
-            marginBottom: 0
-          }
-        ]}
-      >
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Text style={[styles.title, { color: theme.text }]}>Your Entries</Text>
-          <TouchableOpacity
-            style={[styles.streakContainer, { backgroundColor: 'transparent' }]}
-            onPress={() => navigation.navigate("DiaryMain")}
-          >
-            <Text style={[styles.streakText, { color: theme.text }]}>{streak}</Text>
-            <Text>
-              <MaterialCommunityIcons name="fire" size={20} color={theme.text} />
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {/* Search Bar */}
-        <Searchbar
-          placeholder="Search journals..."
-          onChangeText={onChangeSearch}
-          value={searchQuery}
-          style={[styles.searchBar, { backgroundColor: theme.inputBackground }]}
-          inputStyle={{ color: theme.text }}
-          iconColor={theme.icon}
-          placeholderTextColor={theme.textSecondary}
-          clearIcon={() => searchQuery ? <Icon name="x" size={20} color={theme.icon} /> : null}
-          right={() => (
-            <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-              <Icon name="sliders" size={20} color={theme.icon} style={[styles.sliderIcon]} />
-            </TouchableOpacity>
-          )}
-        />
-
-        {/* Advanced Filters (Collapsible) */}
-        {showFilters && (
-          <View style={[styles.advancedFilters, { backgroundColor: theme.cardBackground }]}>            
-            {/* Emotions Filter */}
-            <Text style={[styles.filterHeader, { color: theme.text }]}>Filter by emotions:</Text>
-            <View style={styles.emotionsContainer}>
-              {commonEmotions.map(emotion => (
-                <TouchableOpacity 
-                  key={emotion}
-                  style={[
-                    styles.emotionChip,
-                    selectedEmotions.includes(emotion) && 
-                      { backgroundColor: theme.primary + '30', borderColor: theme.primary }
-                  ]}
-                  onPress={() => toggleEmotion(emotion)}
-                >
-                  <Text 
-                    style={[
-                      styles.emotionText, 
-                      { color: selectedEmotions.includes(emotion) ? theme.primary : theme.text }
-                    ]}
-                  >
-                    {emotion}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+      <View style={{ flex: 1, backgroundColor: theme.backgroundColor }}>
+        {showOnboarding && (
+          <OnboardingWizard
+            onComplete={async () => {
+              const token = await AsyncStorage.getItem("userToken");
+              if (token) await completeOnboarding(token);
+              setShowOnboarding(false);
+            }}
+          />
         )}
+        <SafeAreaView
+          style={[
+            styles.container,
+            {
+              backgroundColor: theme.backgroundColor,
+              flex: 1,
+              marginBottom: 0
+            }
+          ]}
+        >
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
+            <Text style={[styles.title, { color: theme.text }]}>Your Entries</Text>
+            <TouchableOpacity
+              style={[styles.streakContainer, { backgroundColor: 'transparent' }]}
+              onPress={() => navigation.navigate("DiaryMain")}
+            >
+              <Text style={[styles.streakText, { color: theme.text }]}>{streak}</Text>
+              <Text>
+                <MaterialCommunityIcons name="fire" size={20} color={theme.text} />
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {/* Search Bar */}
+          <Searchbar
+            placeholder="Search journals..."
+            onChangeText={onChangeSearch}
+            value={searchQuery}
+            style={[styles.searchBar, { backgroundColor: theme.inputBackground }]}
+            inputStyle={{ color: theme.text }}
+            iconColor={theme.icon}
+            placeholderTextColor={theme.textSecondary}
+            clearIcon={() => searchQuery ? <Icon name="x" size={20} color={theme.icon} /> : null}
+            right={() => (
+              <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
+                <Icon name="sliders" size={20} color={theme.icon} style={[styles.sliderIcon]} />
+              </TouchableOpacity>
+            )}
+          />
 
-        <View style={[styles.tabWrapper, { borderColor: darkMode ? "#111" : "#fff" }]}>{/* <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}> */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabContainer}
-          >
-            {renderTab("All Entries", "all", activeFilter === "all")}
-            {renderTab("Check-ins", "checkin", activeFilter === "checkin")}
-            {renderTab("Freeform Journals", "freeform", activeFilter === "freeform")}
-            {renderTab("Guided Journals", "guided", activeFilter === "guided")}
+          {/* Advanced Filters (Collapsible) */}
+          {showFilters && (
+            <View style={[styles.advancedFilters, { backgroundColor: theme.cardBackground }]}>            
+              {/* Emotions Filter */}
+              <Text style={[styles.filterHeader, { color: theme.text }]}>Filter by emotions:</Text>
+              <View style={styles.emotionsContainer}>
+                {commonEmotions.map(emotion => (
+                  <TouchableOpacity 
+                    key={emotion}
+                    style={[
+                      styles.emotionChip,
+                      selectedEmotions.includes(emotion) && 
+                        { backgroundColor: theme.primary + '30', borderColor: theme.primary }
+                    ]}
+                    onPress={() => toggleEmotion(emotion)}
+                  >
+                    <Text 
+                      style={[
+                        styles.emotionText, 
+                        { color: selectedEmotions.includes(emotion) ? theme.primary : theme.text }
+                      ]}
+                    >
+                      {emotion}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
-          </ScrollView>
-        </View>
-        {isFiltering ? (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <ActivityIndicator size="large" color={theme.primary} />
-    </View>
-  ) : (
+          <View style={[styles.tabWrapper, { borderColor: darkMode ? "#111" : "#fff" }]}>{/* <View style={[styles.tabWrapper, { backgroundColor: theme.backgroundColor }]}> */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabContainer}
+            >
+              {renderTab("All Entries", "all", activeFilter === "all")}
+              {renderTab("Check-ins", "checkin", activeFilter === "checkin")}
+              {renderTab("Freeform Journals", "freeform", activeFilter === "freeform")}
+              {renderTab("Guided Journals", "guided", activeFilter === "guided")}
+
+            </ScrollView>
+          </View>
+          {isFiltering ? (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    ) : (
         <FlatList
           data={filteredEntries}
           renderItem={renderEntry}
@@ -788,12 +793,25 @@ if (!earnedBadges.includes("locked_journal")) {
           refreshing={isRefreshing}
 
           // Infinite scroll (Scroll down)
-          onEndReachedThreshold={0.3}
-          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          onEndReached={({ distanceFromEnd }) => {
+            // Only trigger if we're actually near the end
+            if (distanceFromEnd > 20) {
+              handleLoadMore();
+            }
+          }}
           ListFooterComponent={
             isLoadingMore ? (
               <ActivityIndicator size="small" color="#3b82f6" style={{ marginVertical: 16 }} />
-            ) : null
+            ) : hasMore ? (
+              // Optional: Show nothing or a subtle indicator that more can be loaded
+              <View style={{ height: 40 }} />
+            ) : (
+              // Optional: Show "end of list" indicator
+              <Text style={{ textAlign: 'center', padding: 16, color: '#888' }}>
+                No more entries
+              </Text>
+            )
           }
         />
   )}

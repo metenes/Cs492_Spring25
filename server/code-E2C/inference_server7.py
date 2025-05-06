@@ -54,7 +54,11 @@ EMOTION_THRESHOLDS = {
 }
 EMOTIONS = list(EMOTION_THRESHOLDS.keys())
 
-# App information that will be included in helper prompts
+# Counter for aggregation triggers - Training 
+AGGREGATION_COUNTER = 0
+AGGREGATION_COUNTER_LOCK = threading.Lock()
+
+# App information that will be included in helper 
 APP_INFO = """
     This app is a sentiment analysis assistant that helps users understand emotions in text.Our Sentiment-Aware Journaling Web App aims to support users in reflecting on their daily emotions and experiences through an innovative approach combining journaling and conversational AI. The. app includes two core sections: a freeform journal entry feature where users can document their
     feelings and thoughts, and a chatbot interface that engages users in conversation about their day.
@@ -438,10 +442,135 @@ if chat_tokenizer.pad_token is None:
     chat_tokenizer.pad_token = chat_tokenizer.eos_token
 
 # Model cache
+# ----------------------------- S3 Getters -----------------------------
+# Trigger model retraining
+def trigger_user_model_retrain(user_id):
+    """Trigger retraining of user model"""
+    try:
+        # Add retraining task to queue
+        TASK_QUEUE.put((perform_retraining, (user_id, {}), {}))
+        print(f"Model retraining queued for user {user_id}")
+    except Exception as e:
+        print(f"Error in trigger_user_model_retrain: {str(e)}")
+        traceback.print_exc()
+
 last_user_id, cached_model = None, None
+async def check_s3_object_exists(bucket: str, key: str) -> bool:
+    """Check if an object exists in S3."""
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            return False
+        else:
+            raise
+
+async def copy_s3_object(src_bucket: str, src_key: str, dest_bucket: str, dest_key: str):
+    """Copy an object within S3."""
+    s3.copy_object(
+        Bucket=dest_bucket,
+        CopySource={'Bucket': src_bucket, 'Key': src_key},
+        Key=dest_key
+    )
+
+def get_cached_model(user_id):
+    """Get model from cache or load it."""
+    current_time = time.time()
+    
+    with CACHE_LOCK:
+        # Clean expired models
+        expired_keys = []
+        for key, (_, timestamp) in MODEL_CACHE.items():
+            if current_time - timestamp > CACHE_TIMEOUT:
+                expired_keys.append(key)
+        
+        for key in expired_keys:
+            del MODEL_CACHE[key]
+        
+        # Check if model is in cache
+        if user_id in MODEL_CACHE:
+            model, _ = MODEL_CACHE[user_id]
+            # Update timestamp
+            MODEL_CACHE[user_id] = (model, current_time)
+            return model
+    
+    # Model not in cache, load it
+    try:
+        model_key = f"models/{user_id}/model.pt"
+        local_path = f"/tmp/{user_id}_model.pt"
+        
+        if not check_s3_object_exists(BUCKET, model_key):
+            # Create new user model from base
+            copy_s3_object(BUCKET, BASE_MODEL_KEY, BUCKET, model_key)
+        
+        s3.download_file(BUCKET, model_key, local_path)
+        
+        model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=len(EMOTIONS))
+        model.load_state_dict(torch.load(local_path, map_location="cpu"))
+        model.eval()
+        
+        # Add to cache
+        with CACHE_LOCK:
+            MODEL_CACHE[user_id] = (model, current_time)
+        
+        return model
+    except Exception as e:
+        print(f"Error loading model for {user_id}: {str(e)}")
+        raise
+
+def background_worker():
+    """Worker to process background tasks."""
+    while True:
+        try:
+            task, args, kwargs = TASK_QUEUE.get()
+            task(*args, **kwargs)
+        except Exception as e:
+            print(f"Error in background task: {str(e)}")
+        finally:
+            TASK_QUEUE.task_done()
+
+def start_background_workers():
+    """Start background worker threads."""
+    for _ in range(MAX_WORKERS):
+        worker = threading.Thread(target=background_worker, daemon=True)
+        worker.start()
+
+def rate_limit(func):
+    """Decorator for rate limiting by IP."""
+    def wrapper(*args, **kwargs):
+        try:
+            if request:
+                ip = request.remote_addr
+                current_time = time.time()
+                
+                with RATE_LIMIT_LOCK:
+                    # Clean expired entries
+                    expired_ips = []
+                    for key, (_, timestamp) in REQUEST_COUNTS.items():
+                        if current_time - timestamp > RATE_WINDOW:
+                            expired_ips.append(key)
+                    
+                    for key in expired_ips:
+                        del REQUEST_COUNTS[key]
+                    
+                    # Check rate limit
+                    if ip in REQUEST_COUNTS:
+                        count, _ = REQUEST_COUNTS[ip]
+                        if count >= MAX_REQUESTS:
+                            return jsonify({"error": "Rate limit exceeded"}), 429
+                        REQUEST_COUNTS[ip] = (count + 1, current_time)
+                    else:
+                        REQUEST_COUNTS[ip] = (1, current_time)
+        except Exception:
+            # If any error in rate limiting, continue with the function
+            pass
+            
+        return func(*args, **kwargs)
+    return wrapper
 
 # ----------------------------- Chat Generator -----------------------------
-def generate_response(user_message, emotion_context, prompt = None):
+def generate_response(user_message, emotion_context, tone = "neutral",prompt = None):
     print("Generating supportive response based on emotion...")
 
     # Construct prompt with TinyLlama chat format
@@ -456,6 +585,7 @@ def generate_response(user_message, emotion_context, prompt = None):
     if ( prompt is None ):
         prompt = (
          "<|system|>You are a compassionate and knowledgeable mental health assistant, who just give a response to users message with long detailed analysis."
+         f"<|system|>You will answer the question with {tone} tone."
          f"<|system|>You know that user fell {emotion_context}. Give answer accordingly"
          f"<|user|>{user_message}.<|assistant|>"
         )
@@ -484,7 +614,6 @@ def generate_response(user_message, emotion_context, prompt = None):
     return response.strip()
 
 # ----------------------------- sentiment model API -----------------------------
-
 def compute_sentiment(user_id, text):
         global last_user_id, cached_model  # Add this line to access global variables
         # Load emotion model (user-specific or fallback)
@@ -610,11 +739,16 @@ def sentiment():
         return jsonify({"error": "Failed to analyze sentiment"}), 500
 
 @app.route("/analyze-last", methods=["POST"])
+@rate_limit # Rate limiting for high demand
 def analyze_sentiment_last():
+    print("inferene/analyze started")
+
     global last_user_id, cached_model
     try:
         data = request.get_json()
         user_id = data.get("user_id")
+        tone = data.get("tone")
+
         raw_message = data.get("message", "").strip()
         chat_id = data.get("chat_id")
 
@@ -644,7 +778,7 @@ def analyze_sentiment_last():
         print(f"Predicted emotion: {predicted_emotion} ({confidence:.2f})")
 
         # Generate AI reply
-        response_text = generate_response(message, predicted_emotion)
+        response_text = generate_response(message, predicted_emotion,tone)
 
         return jsonify({
             "user_id": user_id,
@@ -902,6 +1036,9 @@ def validate_sentiment():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Exception occurred", "details": str(e)}), 500
+
+# Multiple backgroudn workers 
+start_background_workers()
 
 # ----------------------------- Entry Point -----------------------------
 if __name__ == "__main__":

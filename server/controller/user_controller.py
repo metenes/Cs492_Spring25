@@ -307,7 +307,9 @@ def login():
                 return jsonify({"error": "Invalid credentials"}), 401
 
         # Generate JWT token
-        access_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))  # You can pass user ID as string
+        #access_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=15))  # You can pass user ID as string
+        access_token = create_access_token(identity=str(user["_id"]), expires_delta=timedelta(minutes=150))  # You can pass user ID as string
+
         print(f"LOGIN {access_token}")
 
         return jsonify({"access_token": access_token}), 200
