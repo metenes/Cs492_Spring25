@@ -196,27 +196,6 @@ def edit_checkin(entry_id):
 @check_bp.route("/delete/<entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_checkin(entry_id):
-    try:
-        token = request.headers.get("Authorization").split(" ")[1]
-        user_id = get_jwt_identity()
-
-        if not user_id:
-            return jsonify({"error": "Unauthorized"}), 401
-
-        result = check_in_collection.delete_one({"_id": ObjectId(entry_id), "userId": user_id})
-
-        if result.deleted_count == 0:
-            return jsonify({"error": "Entry not found or unauthorized"}), 404
-
-        return jsonify({"message": "Check-in deleted successfully!"})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-        
-    
-@check_bp.route("/delete/<entry_id>", methods=["DELETE"])
-@jwt_required()
-def delete_checkin_entry(entry_id):
     print("🔥 check-in delete route loaded")
     try:
         user_id = get_jwt_identity()

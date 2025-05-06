@@ -1840,12 +1840,16 @@ export const editCheckIn = async (entryId: string, sentiments: string[], causes:
 
 
 // Function to delete a specific check-in
-export const deleteCheckIn = async (entry : any) => {
+export const deleteCheckIn = async (entry: any) => {
   try {
     const token = await AsyncStorage.getItem('userToken');
 
     if (!token) {
       throw new Error('Authentication required');
+    }
+
+    if (!entry || !entry._id) {
+      throw new Error('Invalid check-in entry');
     }
 
     const response = await fetch(`${API_URL}/check-in/delete/${entry._id}`, {

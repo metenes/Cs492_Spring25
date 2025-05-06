@@ -302,8 +302,8 @@ const EntryDetail = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              if(entry.category === "checkin") {  // Fixed: use entry.category instead of entry.type
-                await deleteCheckIn(entry._id);  // Fixed: pass only the ID
+              if(entry.category === "checkin") {
+                await deleteCheckIn(entry);  // Pass the entire entry object
               }
               else{
                 await deleteJournalEntry(entry._id);
