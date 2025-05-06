@@ -478,7 +478,14 @@ const ProfileScreen = () => {
       {/* Profile Display Section */}
       <View style={[styles.profileContainer, { backgroundColor: theme.cardBackground }]}>
         <View style={styles.avatarWrapper}>
-          <View style={styles.avatarContainer}>
+          <TouchableOpacity
+            onPress={() => {
+              console.log('Avatar pressed, opening modal...');
+              setModalVisible(true);
+            }}
+            style={[styles.avatarContainer, { backgroundColor: 'rgba(0,0,0,0.1)' }]}
+            activeOpacity={0.7}
+          >
             {imageLoading && !profileImage && (
               <Animated.View
                 style={[
@@ -493,25 +500,27 @@ const ProfileScreen = () => {
               />
             )}
             {profileImage ? (
-              <TouchableOpacity
-                onPress={() => setModalVisible(true)}
-              >
-                <Image
-                  source={{ uri: profileImage }}
-                  style={[styles.avatar, { backgroundColor: 'transparent' }]}
-                  onLoadStart={() => setImageLoading(true)}
-                  onLoadEnd={() => setImageLoading(false)}
-                />
-              </TouchableOpacity>
+              <Image
+                source={{ uri: profileImage }}
+                style={[styles.avatar, { backgroundColor: 'transparent' }]}
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+              />
             ) : (
               <View style={[styles.skeletonAvatar, { backgroundColor: theme.cardBackground }]}>
                 <Ionicons name="person" size={40} color={theme.textSecondary} />
               </View>
             )}
-          </View>
-          <View style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => {
+              console.log('Camera icon pressed, opening modal...');
+              setModalVisible(true);
+            }}
+            style={[styles.editIcon, { backgroundColor: theme.backgroundColor, borderColor: theme.border }]}
+          >
             <Ionicons name="camera-outline" size={18} color={theme.text} />
-          </View>
+          </TouchableOpacity>
         </View>
         <View style={styles.usernameContainer}>
         <Text style={[styles.username, { color: theme.text }]}>{name}</Text>
