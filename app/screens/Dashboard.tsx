@@ -137,12 +137,15 @@ const SentimentAnalysisPage: React.FC = () => {
     const fetchRecommendations = async () => {
       try {
         const data = await fetchEmotionalRecommendations();
+        console.log('Raw emotional recommendations data:', data);
         setEmotionalInsight(data.insight || "");
         setRecommendation(data.recommendation || []);
-        //setTopCauses(data.top_causes || []);
         setEmotionCauseLinks(data.emotion_cause_links || {});
-        // console.log("***************RECOMMENDATIONS FROM DASHBOARD.TSX")
-        // console.log(emotionCauseLinks)
+        
+        // Log the top emotions for debugging
+        if (data.top_emotions) {
+          console.log('Top emotions:', data.top_emotions);
+        }
       } catch (error) {
         console.error("❌ Error fetching trend insight:", error);
       }
@@ -176,19 +179,38 @@ const SentimentAnalysisPage: React.FC = () => {
       try {
         const token = await AsyncStorage.getItem("userToken");
         if(token === null){
-          throw new Error("Retrive user token is null");
+          throw new Error("Retrieve user token is null");
         }
-        const startDateStr = normalizeDateForAPI(selectedStartDate);
-        const endDateStr = getEndOfDay(selectedEndDate);
-        console.log('Initial fetch for date range:', { 
+
+        // Ensure we're using the correct timezone
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+        
+        const startDateStr = normalizeDateForAPI(startDate);
+        const endDateStr = getEndOfDay(today);
+        
+        console.log('Fetching entries with date range:', { 
           startDateStr, 
           endDateStr,
-          startDate: selectedStartDate.toISOString(),
-          endDate: selectedEndDate.toISOString()
+          startDate: startDate.toISOString(),
+          endDate: today.toISOString(),
+          currentTime: new Date().toISOString()
         });
+
         const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
+        console.log('Fetched entries:', JSON.stringify(entries, null, 2));
+        
+        // Filter and log today's entries specifically
+        const todayStr = toLocalDateString(today);
+        const todayEntries = entries.filter(entry => 
+          entry.entryDate && toLocalDateString(new Date(entry.entryDate)) === todayStr
+        );
+        console.log('Today\'s entries:', JSON.stringify(todayEntries, null, 2));
+        
         setJournalEntries(entries);
       } catch (err: any) {
+        console.error('Error fetching entries:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -198,55 +220,37 @@ const SentimentAnalysisPage: React.FC = () => {
   }, []);
 
   // Weekly fetch when selectedStartDate or selectedEndDate changes
-  const fetchWeeklyData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if(token === null){
-        throw new Error("Retrive user token is null");
-      }
-      const startDateStr = normalizeDateForAPI(selectedStartDate);
-      const endDateStr = getEndOfDay(selectedEndDate);
-      console.log('Fetching entries for date range:', { 
-        startDateStr, 
-        endDateStr,
-        startDate: selectedStartDate.toISOString(),
-        endDate: selectedEndDate.toISOString()
-      });
-      const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
-      setJournalEntries(entries);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     const fetchEntries = async () => {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
       try {
-        const token = await AsyncStorage.getItem("userToken")
-        if (!token) throw new Error("Missing token")
-        const start = toLocalDateString(selectedStartDate)
-        const end   = toLocalDateString(selectedEndDate)
-        // console.log("Fetching entries for", start, end)     // ← debug
-        const { entries } = await fetchJournalEntriesWithDate(token, start, end)
-        setJournalEntries(entries)
-        // console.log("Fetched entries:", entries)          // ← debug
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) throw new Error("Missing token");
+        
+        const startDateStr = normalizeDateForAPI(selectedStartDate);
+        const endDateStr = getEndOfDay(selectedEndDate);
+        
+        console.log('Fetching entries for date range:', { 
+          startDateStr, 
+          endDateStr,
+          startDate: selectedStartDate.toISOString(),
+          endDate: selectedEndDate.toISOString()
+        });
+        
+        const { entries } = await fetchJournalEntriesWithDate(token, startDateStr, endDateStr);
+        console.log('Fetched entries:', entries); // Debug log
+        setJournalEntries(entries);
       } catch (err: any) {
-        console.error("Fetch failed:", err)
-        setError(err.message)
+        console.error('Error fetching entries:', err);
+        setError(err.message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-  
-    fetchEntries()
-  }, [selectedStartDate, selectedEndDate])
-  
+    };
+
+    fetchEntries();
+  }, [selectedStartDate, selectedEndDate]);
 
   // Date picker handlers
   const handleStartDateChange = (event: any, isWeekly: boolean, date?: Date) => {

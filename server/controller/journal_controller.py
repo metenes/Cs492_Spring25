@@ -315,16 +315,21 @@ def journal_entries_with_date():
         # Retrieve and validate query parameters.
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
-        print(f"📅 Date range: {start_date_str} to {end_date_str}")
+        print(f"📅 Received date range: {start_date_str} to {end_date_str}")
         
         if not start_date_str or not end_date_str:
             return jsonify({"error": "start_date and end_date are required"}), 400
 
         # Parse the start and end dates.
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-        # Adjust the end date to include the entire day.
-        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+            # Adjust the end date to include the entire day.
+            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            print(f"📅 Parsed dates - Start: {start_date}, End: {end_date}")
+        except ValueError as e:
+            print(f"❌ Error parsing dates: {str(e)}")
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
         # First, let's check if we can find the user's journal document
         user_doc = journal_entries_collection.find_one({"_id": user_id})
@@ -338,11 +343,20 @@ def journal_entries_with_date():
             {"$match": {"_id": user_id}},
             # Unwind the journalEntries array
             {"$unwind": "$journalEntries"},
+            # Convert entryDate to proper date format for comparison
+            {"$addFields": {
+                "journalEntries.parsedDate": {
+                    "$dateFromString": {
+                        "dateString": "$journalEntries.entryDate",
+                        "onNull": None
+                    }
+                }
+            }},
             # Filter entries by entryDate within the given period
             {"$match": {
-                "journalEntries.entryDate": {
-                    "$gte": start_date_str,
-                    "$lte": end_date_str
+                "journalEntries.parsedDate": {
+                    "$gte": start_date,
+                    "$lte": end_date
                 }
             }},
             # Project only the needed fields
@@ -361,51 +375,6 @@ def journal_entries_with_date():
             {"$sort": {"entryDate": -1}}
         ]
 
-        # Build the aggregation pipeline for check-in entries:
-        checkin_pipeline = [
-            # Match using userId
-            {"$match": {"userId": str(user_id)}},
-            # Filter by date range
-            {"$match": {
-                "timestamp": {
-                    "$gte": start_date,
-                    "$lte": end_date
-                }
-            }},
-            # Project only the needed fields
-            {"$project": {
-                "_id": "$_id",
-                "entryContent": {"$cond": {
-                    "if": {"$gt": [{"$size": "$comments"}, 0]},
-                    "then": {"$arrayElemAt": ["$comments", 0]},
-                    "else": "No comments"
-                }},
-                "entryDate": {
-                    "$dateToString": {
-                        "date": "$timestamp",
-                        "format": "%Y-%m-%d"
-                    }
-                },
-                "images": [],
-                "journalSentiments": {
-                    "$map": {
-                        "input": "$sentiments",
-                        "as": "sentiment",
-                        "in": {
-                            "emotion": {"$toLower": "$$sentiment"},
-                            "percentage": 1.0
-                        }
-                    }
-                },
-                "createdAt": "$timestamp",
-                "category": "checkin",
-                "prompt": "",
-                "type": "checkin"
-            }},
-            # Sort by date descending (newest first)
-            {"$sort": {"entryDate": -1}}
-        ]
-
         print("🔍 Executing journal entries pipeline...")
         # Execute both pipelines
         journal_entries = list(journal_entries_collection.aggregate(journal_pipeline))
@@ -413,28 +382,18 @@ def journal_entries_with_date():
         if journal_entries:
             print(f"📅 Sample journal entry date: {journal_entries[0].get('entryDate')}")
 
-        print("🔍 Executing check-in entries pipeline...")
-        checkin_entries = list(check_in_collection.aggregate(checkin_pipeline))
-        print(f"📝 Found {len(checkin_entries)} check-in entries")
-        if checkin_entries:
-            print(f"📅 Sample check-in entry date: {checkin_entries[0].get('entryDate')}")
-
-        # Combine and sort all entries
-        all_entries = journal_entries + checkin_entries
-        all_entries.sort(key=lambda x: x.get("entryDate", ""), reverse=True)
-
         # Convert ObjectId to string in the response
-        for entry in all_entries:
+        for entry in journal_entries:
             if "_id" in entry:
                 entry["_id"] = str(entry["_id"])
 
         response_data = {
             "start_date": start_date_str,
             "end_date": end_date_str,
-            "entries": all_entries
+            "entries": journal_entries
         }
         
-        print(f"✅ Returning {len(all_entries)} total entries")
+        print(f"✅ Returning {len(journal_entries)} total entries")
         return jsonify(response_data), 200
 
     except Exception as e:
